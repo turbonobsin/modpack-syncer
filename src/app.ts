@@ -21,7 +21,7 @@ export async function preInit(){
         });
     });
     ipcMain.handle("openMenu",async (ev,...args)=>{
-        new CCMenu();
+        await openCCMenu(args[0]);
     });
     ipcMain.handle("searchPacks",async (ev,arg:Arg_SearchPacks)=>{
         return (await searchPacks(arg)).unwrap();
@@ -36,7 +36,7 @@ export async function preInit(){
 import { parseCFGFile, util_readdir, util_readdirWithTypes, util_readText, wait } from "./util";
 import { Arg_SearchPacks, FSTestData, PackMetaData } from "./interface";
 import { getPackMeta, searchPacks, searchPacksMeta } from "./network";
-import { CCMenu } from "./frontend/menu_api";
+import { openCCMenu, SearchPacksMenu, ViewInstanceMenu } from "./frontend/menu_api";
 
 async function fsTest(customPath?:string): Promise<FSTestData|undefined>{
     let instancePath:string;

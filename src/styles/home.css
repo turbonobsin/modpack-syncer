@@ -229,12 +229,12 @@ aside{
 
     /*  */
     &.active{
-        outline:solid 1px var(--accent1);
+        outline:solid 1px var(--accent-border);
         /* outline:solid 1px var(--input-focus); */
         /* box-shadow:0px 0px 0px 5px var(--input-focus-shadow); */
     }
     &:hover{
-        filter:brightness(1.5);
+        filter:var(--hover-filter);
     }
 }
 
@@ -255,7 +255,7 @@ aside{
             display:flex;
             justify-content:space-between;
             /* color:var(--text-dim); */
-            color:var(--accent1);
+            color:var(--accent-t1);
         }
     }
     & .info-body{

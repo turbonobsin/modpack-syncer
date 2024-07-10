@@ -43,7 +43,7 @@ const b_addInstance = document.querySelector<HTMLButtonElement>(".b-add-instance
 // 
 
 b_addInstance?.addEventListener("click",e=>{
-    window.gAPI.openMenu("add-instance");
+    window.gAPI.openMenu("search_packs");
 });
 
 const query = document.querySelector<HTMLFormElement>(".query");

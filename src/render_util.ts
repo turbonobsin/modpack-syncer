@@ -41,8 +41,9 @@ export async function loadModPackMetaPanel(meta:PackMetaData,panel?:HTMLElement|
     footer.addParts(
         new MP_Button({
             label:"Add Mod Pack",
+            className:"b-add-mod-pack",
             onclick:e=>{
-                
+                window.close();
             }
         })
     )

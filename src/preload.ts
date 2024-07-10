@@ -63,5 +63,7 @@ contextBridge.exposeInMainWorld("gAPI",{
 
 window.addEventListener("DOMContentLoaded",e=>{
     // document.body.parentElement?.classList.add("themestyle-clean-dark");
-    document.body.parentElement?.classList.add("themestyle-dark");
+    // document.body.parentElement?.classList.add("themestyle-dark");
+    // document.body.parentElement?.classList.add("themestyle-clean-light");
+    document.body.parentElement?.classList.add("themestyle-light","theme-light2");
 });
