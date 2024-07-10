@@ -1,0 +1,181 @@
+@import "https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200";
+
+:root.themestyle-dark{
+	/* colors */
+	--c1:#501010;
+	/* --c2:#211; */
+	--c2:#111;
+	--menu-bg:#151515;
+	--menu-border:#333;
+
+	--accent1:royalblue;
+	--accent1-t1:white;
+
+	/* text */
+	--t1:white;
+	--t2:lightgray;
+	--text-dim:gray;
+
+	/* table */
+	--table-border:#444;
+	--table-bg:#151515;
+	--table-t1:white;
+	--table-hover:#252525;
+
+	--table-select-bg:rgb(52, 70, 126);
+	--table-select-t1:white;
+	--table-select-hover:rgb(59, 86, 169);
+
+	/* input */
+	--input-bg:#333;
+	--input-border:#444;
+	--input-t1:gainsboro;
+
+	--input-focus:white;
+	--input-focus-shadow:rgba(255, 255, 255, 0.311);
+
+	/* buttons */
+	--btn-bg:var(--input-bg);
+	--btn-t1:var(--t1);
+	--btn-border:var(--input-border);
+	--btn-hover:var(--input-border);
+	--btn-active:var(--menu-bg);
+
+	color-scheme:dark;
+}
+
+:root.themestyle-light{
+	/* light theme */
+	--c2:#eee;
+	--t1:black;
+	--t2:#333;
+	/* --menu-bg:whitesmoke; */
+	--menu-bg:#e5e5e5;
+	--menu-border:#ddd;
+
+	--input-bg:#ddd;
+	--input-border:#ccc;
+	--input-t1:#111;
+
+	--table-bg:#e5e5e5;
+	--table-border:#ddd;
+	--table-t1:#111;
+
+	--input-focus:royalblue;
+	--input-focus-shadow:rgba(65, 105, 225, 0.312);
+
+	color-scheme:light;
+
+	/* light theme 2 */
+	--c2:#e5e5e5;
+	--menu-bg:#eee;
+	--table-bg:#eee;
+}
+
+:root.themestyle-clean-light{
+	--accent1:rgba(65, 105, 225, 0.171);
+	--accent1-t1:#000;
+	--text-dim:#444;
+	
+	--input-focus:royalblue;
+	--input-focus-shadow:rgba(65, 105, 225, 0.312);
+}
+:root.themestyle-clean-dark{
+	--c2:#020202;
+	--t1:#ddd;
+	--t2:#bbb;
+	--text-dim:#aaa;
+	
+	--accent1:rgba(65, 105, 225, 0.271);
+	--accent1-t1:#ddd;
+	
+	--input-focus:white;
+	--input-focus-shadow:rgba(255, 255, 255, 0.311);
+	/* --input-focus:rgba(65,105,225,0.3); */
+	/* --input-focus-shadow:rgba(65,105,225,0.412); */
+
+	/* do I want this in clean-dark? */
+	--input-bg:#333;
+	--input-border:#333;
+	--input-t1:gainsboro;
+
+	color-scheme:dark;
+}
+
+body {
+	font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica,
+		Arial, sans-serif;
+	/* margin: auto; */
+	/* max-width: 38rem; */
+	/* padding: 2rem; */
+
+	color:var(--t1);
+	background-color:var(--c2);
+
+	margin:0px;
+}
+
+.mod-list{
+	margin-top:20px;
+	display:flex;
+	flex-direction:column;
+	width:550px;
+	border:solid 1px gray;
+	gap:2px;
+}
+.mod-list > div{
+	padding:10px 15px;
+	background-color:var(--c1);
+	color:var(--t1);
+	font-size:12px;
+	border:solid 1px gray;
+}
+
+.mod-table{
+	margin-top:20px;
+
+	border-collapse:collapse;
+	font-size:12px;
+	background-color:var(--table-bg);
+	color:var(--table-t1);
+
+	user-select:none;
+}
+.mod-table td,
+.mod-table th{
+	padding:10px;
+	border:solid 1px var(--table-border);
+}
+.mod-table .mod-row:hover{
+	cursor:default;
+	background-color:var(--table-hover);
+}
+
+.mod-table.thin td{
+	padding:3px 10px;
+}
+
+/*  */
+.mod-table .index{
+	width:0px;
+	height:0px;
+	font-size:11px;
+	padding:5px 10px;
+	text-align:center;
+	color:var(--text-dim);
+}
+.mod-table .selected{
+	background-color:var(--table-select-bg);
+	color:var(--table-select-t1);
+
+	& td{
+		border-color:var(--table-select-border,var(--table-select-bg));
+	}
+}
+.mod-table .selected:hover{
+	background-color:var(--table-select-hover);
+
+	& td{
+		border-color:var(--table-select-hover-border,var(--table-select-hover));
+	}
+}
