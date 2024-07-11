@@ -29,14 +29,41 @@ export async function preInit(){
     ipcMain.handle("searchPacksMeta",async (ev,arg:Arg_SearchPacks)=>{
         return (await searchPacksMeta(arg)).unwrap();
     });
+    ipcMain.handle("addInstance",async (ev,meta:PackMetaData)=>{
+        return (await addInstance(meta)).unwrap();
+    });
+    ipcMain.handle("getInstances",async (ev,folder?:string)=>{
+        let root = path.join(app.getAppPath(),"data","instances");
+        if(folder) root = path.join(root,folder);
+
+        let instanceIds = await util_readdir(root);
+        let list:InstanceData[] = [];
+
+        for(const iid of instanceIds){
+            let inst = await new ModPackInst(path.join(root,iid,"meta.json")).load();
+            if(!inst){
+                util_warn(iid+": failed to load instance");
+                continue;
+            }
+            if(!inst.meta){
+                util_warn(iid+": failed to load instance's meta");
+                continue;
+            }
+            list.push(inst.meta);
+        }
+
+        return list;
+    });
 }
 
 // 
 
-import { parseCFGFile, util_readdir, util_readdirWithTypes, util_readText, wait } from "./util";
+import { parseCFGFile, util_readdir, util_readdirWithTypes, util_readText, util_warn, wait } from "./util";
 import { Arg_SearchPacks, FSTestData, PackMetaData } from "./interface";
 import { getPackMeta, searchPacks, searchPacksMeta } from "./network";
 import { openCCMenu, SearchPacksMenu, ViewInstanceMenu } from "./frontend/menu_api";
+import { addInstance, ModPackInst } from "./db";
+import { InstanceData } from "./db_types";
 
 async function fsTest(customPath?:string): Promise<FSTestData|undefined>{
     let instancePath:string;

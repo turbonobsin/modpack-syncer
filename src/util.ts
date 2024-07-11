@@ -56,7 +56,7 @@ export function util_readdirWithTypes(path:fs.PathLike,recursive=false){
 export function util_readText(path:fs.PathOrFileDescriptor){
     return new Promise<string>(resolve=>{
         fs.readFile(path,{encoding:"utf8"},(err,data)=>{
-            if(err) console.log("Err: ",err);
+            // if(err) console.log("Err: ",err);
             resolve(data);
         });
     });
@@ -65,7 +65,7 @@ export function util_readJSON<T>(path:fs.PathOrFileDescriptor){
     return new Promise<T | undefined>(resolve=>{
         fs.readFile(path,{encoding:"utf8"},(err,data)=>{
             if(err){
-                console.log("Err: ",err);
+                // console.log("Err: ",err);
                 resolve(undefined);
             }
             else{
@@ -92,7 +92,7 @@ export function util_lstat(path:fs.PathLike){
     return new Promise<fs.Stats|undefined>(resolve=>{
         fs.lstat(path,(err,stats)=>{
             if(err){
-                console.log("Err: ",err);
+                // console.log("Err: ",err);
                 resolve(undefined);
             }
             else resolve(stats);
@@ -100,18 +100,22 @@ export function util_lstat(path:fs.PathLike){
     });
 }
 export function util_mkdir(path:fs.PathLike){
-    return new Promise<void>(resolve=>{
-        fs.mkdir(path,()=>{
-            resolve();
+    return new Promise<boolean>(resolve=>{
+        fs.mkdir(path,(err)=>{
+            if(err){
+                // console.log("Err:",err);
+                resolve(false);
+            }
+            resolve(true);
         });
     });
 }
 
 // 
-export function util_warn(text:string){
+export function util_warn(...text:string[]){
     // console.log('\x1b[36m%s\x1b[0m', 'I am cyan'); // cyan
     // console.log('\x1b[33m%s\x1b[0m', 'Your yellow text here'); // yellow        
-    console.log("\x1b[33m%s\x1b[0m","Warn: "+text);
+    for(const item of text) console.log("\x1b[33m%s\x1b[0m","Warn: "+item);
 }
 
 /**

@@ -159,7 +159,10 @@ aside{
 
 /* instance grid */
 .instance-grid{
-    margin:30px;
+    /* margin:30px; */
+    padding: 30px;
+    /* background-color: var(--menu-bg); */
+    /* border-bottom: solid 1px var(--menu-border); */
 }
 .instance-grid-items:not(:has(*)){
     background-color:darkred;
@@ -169,6 +172,7 @@ aside{
     grid-template-columns:repeat(auto-fill,200px);
     font-size:15px;
     gap:5px;
+    margin-top:20px;
 
     &.view-list{
         grid-template-columns:1fr;

@@ -30,6 +30,9 @@
 import { FSTestData } from "./interface";
 import './styles/index.css';
 import "./styles/home.css";
+import { loadModPackMetaPanel } from "./render_util";
+import { InstanceData } from "./db_types";
+import { MP_Article, MP_Div, MP_Header, MP_Ops, MP_P, MP_Text } from "./frontend/menu_parts";
 
 console.log('👋 This message is being logged by "renderer.ts", included via Vite');
 
@@ -196,6 +199,89 @@ class TableSelection{
 }
 const selAPI = new SelectionAPI();
 
+interface CMP_FullInst_Ops extends MP_Ops {
+    data: InstanceData;
+}
+/**
+ * Custom Menu Part - Result
+ */
+export class CMP_FullInst extends MP_Article {
+    constructor(ops: CMP_FullInst_Ops) {
+        if (!ops.classList) ops.classList = [];
+        ops.classList.push("instance-item");
+        super(ops);
+    }
+    declare ops: CMP_FullInst_Ops;
+
+    load(): void {
+        super.load();
+        if (!this.e) return;
+
+        let data = this.ops.data;
+
+        this.addParts(
+            new MP_Header({
+                textContent: data.meta.name,
+                className: "l-title"
+            }),
+            new MP_Div({
+                classList: ["details"]
+            }).addParts(
+                new MP_P({
+                    text: "",
+                    classList: ["l-version"]
+                }).addParts(
+                    new MP_Text({ text: data.meta.version }),
+                    new MP_Text({ text: data.meta.loader })
+                ),
+                new MP_P({
+                    text: data.meta.desc,
+                    // text:(()=>{
+                    //     let desc = data.desc;
+                    //     let tmp = document.createElement("span");
+                    //     tmp.style.whiteSpace = "nowrap";
+                    //     tmp.style.fontSize = "12px";
+                    //     tmp.textContent = desc;
+                    //     // let w = tmp.getBoundingClientRect();
+                    //     document.body.appendChild(tmp);
+                    //     let w = tmp.offsetWidth;
+                    //     tmp.remove();
+                    //     // let w = _tmpCtx?.measureText(desc).width;
+                    //     let maxWidth = 190;
+                    //     let ratio = maxWidth/w;
+                    //     if(w > maxWidth) desc = desc.substring(0,Math.floor(desc.length*ratio));
+                    //     return desc;
+                    // })(),
+                    classList: ["l-desc"]
+                }).onPostLoad(p => {
+                    if (!p.e) return;
+
+                    let tmp = document.createElement("span");
+                    tmp.style.whiteSpace = "nowrap";
+                    tmp.style.fontSize = "12px";
+                    tmp.textContent = p.e?.textContent ?? null;
+
+                    document.body.appendChild(tmp);
+                    let w = tmp.offsetWidth;
+                    tmp.remove();
+
+                    let maxWidth = 178.4 * 2;
+                    if (w > maxWidth) {
+                        p.e.classList.add("overflow");
+                    }
+                })
+            )
+        );
+
+        this.e.addEventListener("click", e => {
+            if (!this.e) return;
+            loadModPackMetaPanel(this.ops.data.meta,document.querySelector("aside"));
+            // selectPack(this.ops.data, this.e);
+        });
+    }
+}
+
+
 async function loadData(data:FSTestData){
     if(!modTable) return;
 
@@ -240,3 +326,24 @@ async function loadData(data:FSTestData){
     //     modList.appendChild(container);
     // }
 }
+
+
+
+async function initPage(){
+    let instList = await window.gAPI.getInstances();
+    let root = new MP_Div({
+        overrideDiv:document.querySelector(".instance-grid-items") as HTMLElement
+    });
+    console.log(root);
+    if(instList){
+        for(const inst of instList){
+            root.addPart(
+                new CMP_FullInst({
+                    data:inst
+                })
+            );
+        }
+    }
+    console.log("INST LIST:",instList);
+}
+initPage();

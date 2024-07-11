@@ -45,6 +45,9 @@ contextBridge.exposeInMainWorld("gAPI",{
     searchPacks:regf("searchPacks"),
     searchPacksMeta:regf("searchPacksMeta"),
 
+    addInstance:regf("addInstance"),
+    getInstances:regf("getInstances"),
+
     onInitMenu: (cb) => ipcRenderer.on("initMenu",(ev,data)=>cb(data))
 } as IGlobalAPI);
 
@@ -63,7 +66,7 @@ contextBridge.exposeInMainWorld("gAPI",{
 
 window.addEventListener("DOMContentLoaded",e=>{
     // document.body.parentElement?.classList.add("themestyle-clean-dark");
-    // document.body.parentElement?.classList.add("themestyle-dark");
+    document.body.parentElement?.classList.add("themestyle-dark");
     // document.body.parentElement?.classList.add("themestyle-clean-light");
-    document.body.parentElement?.classList.add("themestyle-light","theme-light2");
+    // document.body.parentElement?.classList.add("themestyle-light","theme-light2");
 });

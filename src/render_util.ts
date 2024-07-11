@@ -42,8 +42,10 @@ export async function loadModPackMetaPanel(meta:PackMetaData,panel?:HTMLElement|
         new MP_Button({
             label:"Add Mod Pack",
             className:"b-add-mod-pack",
-            onclick:e=>{
-                window.close();
+            onclick:async e=>{
+                let res = await window.gAPI.addInstance(meta);
+                console.log("RES:",res);
+                // window.close();
             }
         })
     )

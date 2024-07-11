@@ -12,7 +12,6 @@ abstract class CCMenu{
         this.startScript = startScript;
         this.w = w;
         this.h = h;
-        this.init();
     }
     startScript:string;
     w:number;

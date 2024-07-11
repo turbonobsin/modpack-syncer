@@ -1,3 +1,8 @@
+// Server Types
+
+import { ModPackInst } from "./db";
+import { InstanceData } from "./db_types";
+
 type FSTestData = {
     instancePath:string;
     modList:string[];
@@ -29,6 +34,7 @@ export type Err<T> = {
 };
 
 export interface IGlobalAPI{
+    // render -> main
     fsTest:(path?:string)=>Promise<FSTestData>;
     getPackMeta:(id?:string)=>Promise<Err<PackMetaData>>;
     alert:(msg?:string)=>Promise<void>;
@@ -37,6 +43,10 @@ export interface IGlobalAPI{
     searchPacks:(arg:Arg_SearchPacks)=>Promise<Res_SearchPacks>;
     searchPacksMeta:(arg:Arg_SearchPacks)=>Promise<Res_SearchPacksMeta>;
 
+    addInstance:(meta:PackMetaData)=>Promise<ModPackInst|undefined>;
+    getInstances:(folder?:string)=>Promise<InstanceData[]|undefined>;
+    
+    // main -> render
     onInitMenu:(cb:(data:InitMenuData)=>void)=>void;
 }
 
