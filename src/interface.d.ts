@@ -28,6 +28,47 @@ interface Res_SearchPacksMeta{
     similar:PackMetaData[];
 }
 
+interface PrismInstance{
+    name:string;
+    group:string;
+    version:string;
+    loader:string;
+    loaderVersion:string;
+    totalTimePlayed:number;
+}
+interface Arg_GetPrismInstances{
+
+}
+interface Res_GetPrismInstances{
+    list:PrismInstance[];
+}
+
+// prism
+interface InstGroups{
+    formatVersion:string;
+    groups:Record<string,{
+        hidden:boolean;
+        instances:string[];
+    }>;
+}
+interface MMCPack{
+    formatVersion:number;
+    components:{
+        cachedName:string;
+        cachedVersion:string;
+        cachedVolatile:boolean;
+        dependencyOnly:boolean;
+        uid:string;
+        version:string;
+        cachedRequires:{
+            suggests:string;
+            equals:string;
+            uid:string;
+        }[];
+        important:boolean;
+    }[];
+}
+
 export type Err<T> = {
     err?:string;
     data?:T;
@@ -45,6 +86,9 @@ export interface IGlobalAPI{
 
     addInstance:(meta:PackMetaData)=>Promise<ModPackInst|undefined>;
     getInstances:(folder?:string)=>Promise<InstanceData[]|undefined>;
+    linkInstance:(iid:string)=>Promise<string|undefined>;
+
+    getPrismInstances:(arg:Arg_GetPrismInstances)=>Promise<Res_GetPrismInstances>;
     
     // main -> render
     onInitMenu:(cb:(data:InitMenuData)=>void)=>void;

@@ -1,5 +1,10 @@
 // Menu Components/Parts (Petal Parts? haha Petal Code is crazy)
 
+export enum PartTextStyle{
+    normal,
+    note,
+}
+
 export interface MP_Ops{
     overrideDiv?:HTMLElement;
     classList?:string[];
@@ -7,19 +12,24 @@ export interface MP_Ops{
     id?:string;
     textContent?:string;
     __tag?:string;
+    skipAdd?:boolean;
 }
 export interface MP_Text_Ops extends MP_Ops{
     overrideTag?:string;
     text:string;
+    style?:PartTextStyle;
 }
 export interface MP_Flexbox_Ops extends MP_Ops{
-    direction:string;
-    gap:string;
+    direction?:string;
+    gap?:string;
+    justifyContent?:string;
+    alignItems?:string;
 }
 export interface MP_Button_Ops extends MP_Ops{
     onclick:(e:MouseEvent)=>void;
-    label:string,
-    disabled?:boolean
+    label:string;
+    disabled?:boolean;
+    icon?:string;
 }
 export interface MP_Input_Ops extends MP_Ops{
     type:string;
@@ -33,6 +43,11 @@ export interface MP_Input_Ops extends MP_Ops{
 }
 export interface MP_SearchForm_Ops extends MP_Ops{
     onsubmit:(e:SubmitEvent,query?:string)=>void;
+}
+
+function addClassToOps(ops:MP_Ops,className:string){
+    if(!ops.classList) ops.classList = [];
+    ops.classList.push(className);
 }
 
 export abstract class MenuPart{
@@ -62,12 +77,17 @@ export abstract class MenuPart{
     }
 
     addParts(...parts:MenuPart[]){
+        if(this.ops.skipAdd) return this;
+        
         for(const p of parts){
             this.addPart(p);
         }
         return this;
     }
     addPart(part:MenuPart){
+        if(this.ops.skipAdd) return part;
+        if(part.ops.skipAdd) return part;
+
         if(!this.e){
             console.warn("Err: could not add part, there was no container on this object.",this);
             return part;
@@ -91,6 +111,15 @@ export abstract class MenuPart{
         f(this);
         return this;
     }
+
+    wrapWith(p:MenuPart){
+        p.addPart(this);
+        return p;
+    }
+    autoJustify(justifyContent?:string,alignItems?:string){
+        return this.wrapWith(new MP_Flexbox({justifyContent,alignItems}));
+    }
+
     // private _onPostLoad?:(p:MenuPart)=>void;
     
 
@@ -129,7 +158,14 @@ abstract class TextMenuPart extends MenuPart{
         
         this.e = document.createElement(this.ops.overrideTag);
         this.e.textContent = this.ops.text;
+
+        let o = this.ops;
+        if(o.style) applyTextStyle(this.e,o.style);
     }
+}
+
+function applyTextStyle(e:Element,style:PartTextStyle){
+    e.classList.add("textstyle-"+PartTextStyle[style]);
 }
 
 interface MenuPartTemplateOps{
@@ -193,6 +229,22 @@ export class MP_Text extends TextMenuPart{
         super("span",ops);
     }
 }
+export class MP_HR extends MenuPart{
+    constructor(ops:MP_Ops={}){
+        super(ops);
+    }
+    create(): void {
+        this.e = document.createElement("hr");
+    }
+}
+export class MP_Section extends MenuPart{
+    constructor(ops:MP_Ops={}){
+        super(ops);
+    }
+    create(): void {
+        this.e = document.createElement("section");
+    }
+}
 
 export class MP_Header extends MenuPart{
     constructor(ops:MP_Ops){
@@ -213,6 +265,7 @@ export class MP_Article extends MenuPart{
 
 export class MP_Button extends MenuPart{
     constructor(ops:MP_Button_Ops){
+        if(ops.icon) addClassToOps(ops,"icon-btn");
         super(ops);
     }
     declare ops:MP_Button_Ops;
@@ -223,11 +276,21 @@ export class MP_Button extends MenuPart{
     }
     load(): void {
         if(!this.e) return;
+        let o = this.ops;
 
         this.e.addEventListener("click",e=>{
             this.ops.onclick(e);
         });
-        this.e.textContent = this.ops.label;
+
+        if(this.ops.icon){
+            this.addParts(
+                new MP_Text({text:this.ops.icon,className:"icon"}),
+                new MP_Text({text:this.ops.label})
+            );
+        }
+        else this.e.textContent = this.ops.label;
+
+        this.e.disabled = !!o.disabled;
     }
 }
 export class MP_Input extends MenuPart{
@@ -256,12 +319,37 @@ export class MP_Input extends MenuPart{
     }
 }
 
-export class MP_Flexbox extends MenuPart{
-    constructor(ops:MP_Ops){
+export class MP_Flexbox extends MP_Div{
+    constructor(ops:MP_Flexbox_Ops){
         super(ops);
     }
+    declare ops:MP_Flexbox_Ops;
+
     create(): void {
-        
+        super.create();
+    }
+    load(): void {
+        super.load();
+        if(!this.e) return;
+        let o = this.ops;
+
+        this.e.classList.add("flex");
+        let e = this.e as HTMLElement;
+
+        if(o.direction) e.style.flexDirection = o.direction;
+        if(o.gap) e.style.gap = o.gap;
+        if(o.justifyContent) e.style.justifyContent = o.justifyContent;
+        if(o.alignItems) e.style.alignItems = o.alignItems;
+    }
+}
+export class MP_OutlinedBox extends MP_Flexbox{
+    constructor(ops:MP_Flexbox_Ops){
+        if(!ops.gap) ops.gap = "10px";
+        if(!ops.alignItems) ops.alignItems = "center";
+        if(!ops.classList) ops.classList = [];
+        ops.classList.push("outlined-box");
+
+        super(ops);
     }
 }
 

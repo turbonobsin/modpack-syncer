@@ -28,11 +28,10 @@
 
 // import { Menu, MenuItem } from "electron";
 import { FSTestData } from "./interface";
-import './styles/index.css';
-import "./styles/home.css";
-import { loadModPackMetaPanel } from "./render_util";
+import "./menus/lib_submenu";
+import { loadModPackMetaPanel, SelectedItem, selectItem } from "./render_util";
 import { InstanceData } from "./db_types";
-import { MP_Article, MP_Div, MP_Header, MP_Ops, MP_P, MP_Text } from "./frontend/menu_parts";
+import { MP_Article, MP_Button, MP_Div, MP_Flexbox, MP_Header, MP_HR, MP_Ops, MP_OutlinedBox, MP_P, MP_Section, MP_Text, PartTextStyle } from "./frontend/menu_parts";
 
 console.log('👋 This message is being logged by "renderer.ts", included via Vite');
 
@@ -42,6 +41,7 @@ const b_click2 = document.querySelector<HTMLButtonElement>(".b-click2");
 const modList = document.querySelector<HTMLDivElement>(".mod-list");
 const modTable = document.querySelector<HTMLTableElement>(".mod-table");
 const b_addInstance = document.querySelector<HTMLButtonElement>(".b-add-instance");
+const viewPanel = document.querySelector("aside");
 
 // 
 
@@ -199,6 +199,12 @@ class TableSelection{
 }
 const selAPI = new SelectionAPI();
 
+const selectedInst = new SelectedItem<CMP_FullInst>({
+    onSelect:(data,item)=>{
+        data.showData();
+    }
+})
+
 interface CMP_FullInst_Ops extends MP_Ops {
     data: InstanceData;
 }
@@ -212,6 +218,95 @@ export class CMP_FullInst extends MP_Article {
         super(ops);
     }
     declare ops: CMP_FullInst_Ops;
+
+    canLaunch(){
+        let inst = this.ops.data;
+        if(inst.dirPath == undefined) return false;
+        
+        return true;
+    }
+    showData(panel?:HTMLElement|null){
+        if(!panel) panel = viewPanel;
+        if(!panel) return;
+        let inst = this.ops.data;
+        let meta = inst.meta;
+        
+        let root = new MP_Div({
+            overrideDiv:panel
+        });
+        root.clearParts();
+    
+        let head = root.addPart(new MP_Div({className:"info-head"}));
+        let body = root.addPart(new MP_Div({className:"info-body"}));
+        // let footer = root.addPart(new MP_Div({className:"info-footer"}));
+    
+        head.addParts(
+            new MP_Header({
+                textContent:meta.name
+            }),
+            new MP_Div({
+                className:"info-details"
+            }).addParts(
+                new MP_Text({
+                    text:meta.version,
+                    className:"l-version"
+                }),
+                new MP_Text({
+                    text:meta.loader,
+                    className:"l-loader"
+                })
+            )
+        );
+    
+        body.addParts(
+            new MP_P({
+                text:meta.desc,
+                className:"l-desc"
+            }),
+            new MP_OutlinedBox({
+                skipAdd:inst.dirPath != undefined,
+            }).addParts(
+                new MP_P({
+                    text:"This instance is not yet linked to a Prism Instance.",
+                    style:PartTextStyle.note
+                }),
+                new MP_Button({
+                    label:"Link",
+                    icon:"link",
+                    onclick:async e=>{
+                        // window.gAPI.openMenu("prism_instances");
+                        
+                        let res = await window.gAPI.linkInstance(inst.iid);
+                        console.log("RES:",res);
+                    },
+                }),
+            ).wrapWith(new MP_Section()),
+
+            new MP_HR(),
+
+            new MP_Section().addParts(
+                new MP_Button({
+                    label:"Launch",
+                    className:"b-inst-launch",
+                    disabled:!this.canLaunch(),
+                    onclick:async e=>{
+                        // let res = await window.gAPI.addInstance(meta);
+                        // console.log("RES:",res);
+                    }
+                })
+            )
+        );
+        // footer.addParts(
+        //     new MP_Button({
+        //         label:"Launch",
+        //         className:"b-inst-launch",
+        //         onclick:async e=>{
+        //             // let res = await window.gAPI.addInstance(meta);
+        //             // console.log("RES:",res);
+        //         }
+        //     })
+        // )
+    }
 
     load(): void {
         super.load();
@@ -236,22 +331,6 @@ export class CMP_FullInst extends MP_Article {
                 ),
                 new MP_P({
                     text: data.meta.desc,
-                    // text:(()=>{
-                    //     let desc = data.desc;
-                    //     let tmp = document.createElement("span");
-                    //     tmp.style.whiteSpace = "nowrap";
-                    //     tmp.style.fontSize = "12px";
-                    //     tmp.textContent = desc;
-                    //     // let w = tmp.getBoundingClientRect();
-                    //     document.body.appendChild(tmp);
-                    //     let w = tmp.offsetWidth;
-                    //     tmp.remove();
-                    //     // let w = _tmpCtx?.measureText(desc).width;
-                    //     let maxWidth = 190;
-                    //     let ratio = maxWidth/w;
-                    //     if(w > maxWidth) desc = desc.substring(0,Math.floor(desc.length*ratio));
-                    //     return desc;
-                    // })(),
                     classList: ["l-desc"]
                 }).onPostLoad(p => {
                     if (!p.e) return;
@@ -275,7 +354,8 @@ export class CMP_FullInst extends MP_Article {
 
         this.e.addEventListener("click", e => {
             if (!this.e) return;
-            loadModPackMetaPanel(this.ops.data.meta,document.querySelector("aside"));
+            selectItem(selectedInst,this,this.e);
+            // loadModPackMetaPanel(this.ops.data.meta,document.querySelector("aside"));
             // selectPack(this.ops.data, this.e);
         });
     }

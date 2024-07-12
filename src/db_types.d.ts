@@ -25,11 +25,13 @@ type DBUser = {
     root:FId,
 };
 
-type DBSys = {
-    fid:number,
-    uid:number,
-    iid:number,
-    ver:string
+interface DBSys{
+    fid:number;
+    uid:number;
+    iid:number;
+    ver:string;
+
+    prismRoot?:string;
 };
 
 // 

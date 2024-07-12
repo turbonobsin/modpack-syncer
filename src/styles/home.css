@@ -89,6 +89,11 @@ button:active{
     background-color:var(--btn-active);
 }
 
+button:disabled{
+    background-color:var(--btn-hover);
+    color:var(--text-dim);
+}
+
 button.accent{
     background-color:var(--accent1);
     color:var(--accent1-t1);
@@ -174,6 +179,14 @@ aside{
     gap:5px;
     margin-top:20px;
 
+    &.view-list2{
+        display:block;
+        & .sub-list{
+            display:grid;
+            grid-template-columns:repeat(auto-fill,350px);
+            gap:5px;
+        }
+    }
     &.view-list{
         grid-template-columns:1fr;
         gap:0px;

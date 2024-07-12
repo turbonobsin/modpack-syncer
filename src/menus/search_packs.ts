@@ -1,35 +1,16 @@
 import "./lib_submenu";
 import { MenuPart, MP_Any, MP_Article, MP_Div, MP_Header, MP_Ops, MP_P, MP_SearchForm, MP_Text, MP_Text_Ops } from "../frontend/menu_parts";
 import { PackMetaData } from "../../src/interface";
-import { loadModPackMetaPanel } from "../../src/render_util";
+import { loadModPackMetaPanel, reselectPack as reselectItem, SelectedItem, selectItem } from "../../src/render_util";
 
 const main = document.querySelector("main");
 const aside = document.querySelector("aside");
 
-let selectedPack:{
-    data:PackMetaData,
-    e:Element
-}|undefined;
-function selectPack(data:PackMetaData,e:Element){
-    selectedPack = {data,e};
-    
-    let wasActive = e.classList.contains("active");
-            
-    let allActive = e.parentElement?.querySelectorAll(".active");
-    if(allActive) for(const elm of allActive) elm.classList.remove("active");
-    if(wasActive){
-        if(aside) aside.textContent = "";
-        return;
+let selectedPack = new SelectedItem<PackMetaData>({
+    onSelect:(data,item)=>{
+        loadModPackMetaPanel(data,aside);
     }
-
-    e.classList.add("active");
-    loadModPackMetaPanel(data,aside);
-}
-function reselectPack(){
-    if(!selectedPack) return;
-
-    selectPack(selectedPack.data,selectedPack.e);
-}
+});
 
 interface CMP_Result_Ops extends MP_Ops{
     data:PackMetaData;
@@ -111,7 +92,7 @@ class CMP_Result extends MP_Article{
 
         this.e.addEventListener("click",e=>{
             if(!this.e) return;
-            selectPack(this.ops.data,this.e);
+            selectItem(selectedPack,this.ops.data,this.e);
         });
     }
 }
@@ -136,7 +117,7 @@ async function initPage(){
             ) as CMP_Result;
         }
 
-        reselectPack();
+        reselectItem(selectedPack);
     }
 
     const root = new MP_Div({

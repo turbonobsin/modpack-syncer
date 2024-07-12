@@ -1,6 +1,7 @@
 {
     "fid": 0,
-    "iid": 3,
+    "iid": 4,
     "uid": 0,
-    "ver": "0.0.1"
+    "ver": "0.0.1",
+    "prismRoot": "D:\\PrismLauncher-Windows-Portable-5.0"
 }

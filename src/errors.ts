@@ -49,6 +49,8 @@ export class Result<T>{
 };
 
 export const errors = {
+    noSys: Result.err("System data isn't loaded"),
+    
     unknown: Result.err("Unknown error"),
     invalid_args: Result.err("Invalid arguments"),
     couldNotFindPack: Result.err("Couldn't find pack"),
@@ -57,4 +59,8 @@ export const errors = {
     instDataConvert: Result.err("Failed to make instance data from pack meta"),
     addInstance: Result.err("Failed to add instnace"),
     addInstFolder: Result.err("Failed to create folder for instance"),
+
+    // prism
+    instgroupsRead: Result.err("Failed to read instance group data"),
+    noPrismRoot: Result.err("No path for Prism Launcher has been set")
 };

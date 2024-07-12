@@ -12,7 +12,6 @@ const folderPath = path.join(dataPath,"folders");
 // 
 let userData:DBUser;
 // let sysData:DBSys;
-let sysInst:SysInst|undefined;
 
 function markSave(path:string,data:any){
     util_writeJSON(path,data);
@@ -81,7 +80,7 @@ export async function initDB(){
     //     sysData = res;
     // }
 
-    sysInst = await new SysInst(path.join(dataPath,"sys.json")).load();
+    sysInst = await sysInst.load();
     
     // 
     let username = "Unnamed";
@@ -115,18 +114,36 @@ abstract class Inst<T>{
         return false;
     }
     abstract getDefault():T|undefined;
+    async fillDefaults(){
+        let def = this.getDefault() as any;
+        if(!def) return;
+        let o = this.meta as any;
+        let wasChange = false;
+
+        let keys = Object.keys(def);
+        for(const k of keys){
+            if(o[k] == undefined){
+                o[k] = def[k];
+                wasChange = true;
+            }
+        }
+
+        if(wasChange) await this.save();
+
+        return this;
+    }
 
     async load(defMeta?:T){ // todo - add some point need to have an instance cache and it'll just grab from that if needed, that way I can queue all write operations
         let stats = await util_lstat(this.filePath);
         if(!stats){
             if(!defMeta && !this.useDefaultIfDNE()){
                 util_warn("couldn't read file [1]");
-                return;
+                return this;
             }
             let def = defMeta ?? this.getDefault();
             if(!def){
                 util_warn("no default was provided");
-                return;
+                return this;
             }
 
             this.meta = def;
@@ -137,10 +154,11 @@ abstract class Inst<T>{
         let res = await util_readJSON<T>(this.filePath);
         if(!res){
             util_warn("couldn't read file [2]");
-            return;
+            return this;
         }
 
         this.meta = res;
+        await this.fillDefaults();
 
         return this;
     }
@@ -184,6 +202,10 @@ export class ModPackInst extends Inst<ModPackInstData>{
 
 const fspath_modPacks = path.join(dataPath,"instances");
 
+export function getModpackInst(iid:string){
+    return new ModPackInst(path.join(fspath_modPacks,iid,"meta.json")).load();
+}
+
 function makeInstanceData(meta:PackMetaData){
     let iid = genId(IDType.instance);
     if(iid == null) return;
@@ -212,3 +234,6 @@ export async function addInstance(meta:PackMetaData):Promise<Result<ModPackInst>
 
     return new Result(inst);
 }
+
+// 
+export let sysInst = new SysInst(path.join(dataPath,"sys.json"));

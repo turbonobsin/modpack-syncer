@@ -20,7 +20,8 @@ export class CFGFile{
         return this.properties.get(key);
     }
 }
-export function parseCFGFile(text:string){
+export function parseCFGFile(text?:string){
+    if(!text) return;
     let file = new CFGFile();
 
     let lines = text.split(/\r?\n/);

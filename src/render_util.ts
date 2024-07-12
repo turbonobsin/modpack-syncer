@@ -44,9 +44,46 @@ export async function loadModPackMetaPanel(meta:PackMetaData,panel?:HTMLElement|
             className:"b-add-mod-pack",
             onclick:async e=>{
                 let res = await window.gAPI.addInstance(meta);
-                console.log("RES:",res);
-                // window.close();
+                window.close();
             }
         })
     )
+}
+
+// Simple Select API
+
+type SelectedItemData<T> = {
+    data:T;
+    e:Element;
+};
+interface SelectedItemOptions<T>{
+    onSelect?:(data:T,item:SelectedItem<T>)=>void;
+}
+export class SelectedItem<T>{
+    constructor(ops:SelectedItemOptions<T>){
+        this.ops = ops;
+    }
+    ops:SelectedItemOptions<T>;
+    data?:SelectedItemData<T>;
+};
+export function selectItem<T>(item:SelectedItem<T>,data:T,e:Element){
+    item.data = {data,e};
+    let aside = document.querySelector("aside");
+    
+    let wasActive = e.classList.contains("active");
+            
+    let allActive = e.parentElement?.querySelectorAll(".active");
+    if(allActive) for(const elm of allActive) elm.classList.remove("active");
+    if(wasActive){
+        if(aside) aside.textContent = "";
+        return;
+    }
+
+    e.classList.add("active");
+    if(item.ops.onSelect) item.ops.onSelect(item.data.data,item);
+}
+export function reselectPack<T>(item:SelectedItem<T>){
+    if(!item.data) return;
+
+    selectItem(item,item.data.data,item.data.e);
 }

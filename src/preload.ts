@@ -47,6 +47,9 @@ contextBridge.exposeInMainWorld("gAPI",{
 
     addInstance:regf("addInstance"),
     getInstances:regf("getInstances"),
+    linkInstance:regf("linkInstance"),
+
+    getPrismInstances:regf("getPrismInstances"),
 
     onInitMenu: (cb) => ipcRenderer.on("initMenu",(ev,data)=>cb(data))
 } as IGlobalAPI);

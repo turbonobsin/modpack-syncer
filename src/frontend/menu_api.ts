@@ -69,6 +69,14 @@ export class ViewInstanceMenu extends CCMenu{
         return "view_instance";
     }
 }
+export class PrismInstancesMenu extends CCMenu{
+    constructor(){
+        super("prism_instances",1200,800);
+    }
+    getId(): string {
+        return "prism_instances";
+    }
+}
 
 class CCMenuRegistry{
     constructor(){
@@ -96,3 +104,4 @@ export async function openCCMenu(id:string){
 // 
 ccMenuRegistry.register(new SearchPacksMenu());
 ccMenuRegistry.register(new ViewInstanceMenu());
+ccMenuRegistry.register(new PrismInstancesMenu());
