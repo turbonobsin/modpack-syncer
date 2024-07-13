@@ -1,20 +1,17 @@
 import "./lib_submenu";
 import { MenuPart, MP_Any, MP_Article, MP_Div, MP_Header, MP_Ops, MP_P, MP_SearchForm, MP_Text, MP_Text_Ops } from "../frontend/menu_parts";
 import { PackMetaData } from "../../src/interface";
-import { loadModPackMetaPanel, reselectPack as reselectItem, SelectedItem, selectItem } from "../../src/render_util";
+import { loadModPackMetaPanel, reselectItem as reselectItem, SelectedItem, selectItem, SelectedItemOptions } from "../render_util";
+import { MP_SearchStructure } from "./lib_submenu";
 
 const main = document.querySelector("main");
 const aside = document.querySelector("aside");
 
-let selectedPack = new SelectedItem<PackMetaData>({
-    onSelect:(data,item)=>{
-        loadModPackMetaPanel(data,aside);
-    }
-});
-
 interface CMP_Result_Ops extends MP_Ops{
     data:PackMetaData;
 }
+
+let search:MP_SearchStructure<PackMetaData>|undefined;
 
 /**
  * Custom Menu Part - Result
@@ -50,25 +47,6 @@ class CMP_Result extends MP_Article{
                 ),
                 new MP_P({
                     text:data.desc,
-                    // text:(()=>{
-                    //     let desc = data.desc;
-                    
-                    //     let tmp = document.createElement("span");
-                    //     tmp.style.whiteSpace = "nowrap";
-                    //     tmp.style.fontSize = "12px";
-                    //     tmp.textContent = desc;
-                    //     // let w = tmp.getBoundingClientRect();
-                    //     document.body.appendChild(tmp);
-                    //     let w = tmp.offsetWidth;
-                    //     tmp.remove();
-                        
-                    //     // let w = _tmpCtx?.measureText(desc).width;
-                    //     let maxWidth = 190;
-                    //     let ratio = maxWidth/w;
-                    //     if(w > maxWidth) desc = desc.substring(0,Math.floor(desc.length*ratio));
-                        
-                    //     return desc;
-                    // })(),
                     classList:["l-desc"]
                 }).onPostLoad(p=>{
                     if(!p.e) return;
@@ -92,7 +70,8 @@ class CMP_Result extends MP_Article{
 
         this.e.addEventListener("click",e=>{
             if(!this.e) return;
-            selectItem(selectedPack,this.ops.data,this.e);
+            if(!search) return;
+            selectItem(search?.selected,this.ops.data,this.e);
         });
     }
 }
@@ -101,24 +80,24 @@ async function initPage(){
     if(!main) return;
     if(!aside) return;
     
-    async function submitSearchPacks(q?:string){
-        instanceGridItems.clearParts();
+    // async function submitSearchPacks(q?:string){
+    //     instanceGridItems.clearParts();
                 
-        let res = await window.gAPI.searchPacksMeta({
-            query:q
-        });
-        if(!res) return;
+    //     let res = await window.gAPI.searchPacksMeta({
+    //         query:q
+    //     });
+    //     if(!res) return;
     
-        for(const m of res.similar){
-            let p = instanceGridItems.addPart(
-                new CMP_Result({
-                    data:m
-                })
-            ) as CMP_Result;
-        }
+    //     for(const m of res.similar){
+    //         let p = instanceGridItems.addPart(
+    //             new CMP_Result({
+    //                 data:m
+    //             })
+    //         ) as CMP_Result;
+    //     }
 
-        reselectItem(selectedPack);
-    }
+    //     reselectItem(selectedPack);
+    // }
 
     const root = new MP_Div({
         overrideDiv:main,
@@ -130,38 +109,62 @@ async function initPage(){
         text:"Search Packs"
     }));
 
-    let searchForm = new MP_SearchForm({
-        onsubmit:(e,q)=>{
-            submitSearchPacks(q);
+    search = new MP_SearchStructure({
+        listId:"instance",
+        onSubmit:async (t,e,q)=>{
+            if(!search) return;
+            if(!search.list) return;
+     
+            let res = await window.gAPI.searchPacksMeta({
+                query:q
+            });
+            if(!res) return;
+            for(const m of res.similar){
+                let p = search.list.addPart(
+                    new CMP_Result({
+                        data:m
+                    })
+                ) as CMP_Result;
+            }
+        },
+        onSelect:(data,item)=>{
+            loadModPackMetaPanel(data,aside);
         }
     });
-    console.log(searchForm.inp);
+    root.addPart(search);
     
-    let mainCont = root.addPart(new MP_Div({classList:["main-options"]}));
-    mainCont.addParts(
-        new MP_Text({
-            text:""
-        }),
-        searchForm
-    );
-
-    let instanceGrid = root.addPart(new MP_Div({
-        classList:["instance-grid"]
-    }));
-    let instanceGridItems = instanceGrid.addPart(new MP_Div({
-        classList:["instance-grid-items"]
-    }));
-    // instanceGridItems.addParts(
-    //     new CMP_Result({})
+    // let searchForm = new MP_SearchForm({
+    //     onsubmit:(e,q)=>{
+    //         submitSearchPacks(q);
+    //     }
+    // });
+    // console.log(searchForm.inp);
+    
+    // let mainCont = root.addPart(new MP_Div({classList:["main-options"]}));
+    // mainCont.addParts(
+    //     new MP_Text({
+    //         text:""
+    //     }),
+    //     searchForm
     // );
+
+    // let instanceGrid = root.addPart(new MP_Div({
+    //     classList:["instance-grid"]
+    // }));
+    // let instanceGridItems = instanceGrid.addPart(new MP_Div({
+    //     classList:["instance-grid-items"]
+    // }));
 
     // 
 
-    await submitSearchPacks();
+    // await submitSearchPacks();
+
+    await search.form?.submit();
 
     requestAnimationFrame(()=>{
-        console.log(searchForm);
-        searchForm.inp?.e?.focus();
+        if(!search) return;
+        // searchForm.inp?.e?.focus();
+        search.i_search?.focus();
     });
 }
 initPage();

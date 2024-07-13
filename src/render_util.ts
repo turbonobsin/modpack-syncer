@@ -1,6 +1,43 @@
 import { MP_Button, MP_Div, MP_Header, MP_P, MP_Text } from "./frontend/menu_parts";
 import { PackMetaData } from "./interface";
 
+export function loadDefaultAside(aside:MP_Div,ops:{
+    title:string,
+    desc?:string
+}){
+    aside.clearParts();
+
+    let head = aside.addPart(new MP_Div({className:"info-head"}));
+    let body = aside.addPart(new MP_Div({className:"info-body"}));
+    let footer = aside.addPart(new MP_Div({className:"info-footer"}));
+
+    let details = new MP_Div({
+        className:"info-details"
+    });
+
+    head.addParts(
+        new MP_Header({
+            textContent:ops.title
+        }),
+        details
+    );
+    
+    // aside.addParts(
+    //     new MP_Div({
+    //         className:"info-head",
+    //         textContent:ops.title
+    //     }),
+    //     new MP_Div({
+    //         skipAdd:ops.desc == null,
+    //         className:"info-body",
+    //         textContent:ops.desc
+    //     })
+    // );
+
+    return {
+        head,body,footer
+    };
+}
 export async function loadModPackMetaPanel(meta:PackMetaData,panel?:HTMLElement|null){
     if(!panel) return;
     
@@ -56,7 +93,7 @@ type SelectedItemData<T> = {
     data:T;
     e:Element;
 };
-interface SelectedItemOptions<T>{
+export interface SelectedItemOptions<T>{
     onSelect?:(data:T,item:SelectedItem<T>)=>void;
 }
 export class SelectedItem<T>{
@@ -82,7 +119,7 @@ export function selectItem<T>(item:SelectedItem<T>,data:T,e:Element){
     e.classList.add("active");
     if(item.ops.onSelect) item.ops.onSelect(item.data.data,item);
 }
-export function reselectPack<T>(item:SelectedItem<T>){
+export function reselectItem<T>(item:SelectedItem<T>){
     if(!item.data) return;
 
     selectItem(item,item.data.data,item.data.e);

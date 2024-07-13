@@ -6,7 +6,7 @@ export enum PartTextStyle{
 }
 
 export interface MP_Ops{
-    overrideDiv?:HTMLElement;
+    overrideDiv?:Element;
     classList?:string[];
     className?:string;
     id?:string;
@@ -42,7 +42,7 @@ export interface MP_Input_Ops extends MP_Ops{
     name?:string;
 }
 export interface MP_SearchForm_Ops extends MP_Ops{
-    onsubmit:(e:SubmitEvent,query?:string)=>void;
+    onSubmit:(t:MP_SearchForm,e:SubmitEvent,query?:string)=>void|Promise<void>;
 }
 
 function addClassToOps(ops:MP_Ops,className:string){
@@ -126,6 +126,42 @@ export abstract class MenuPart{
     // load(){
     //     this.e = this.ops.overrideDiv ?? document.createElement("div");
     // }
+
+    q(selector?:string){
+        if(!selector) return;
+        return this.e?.querySelector(selector) ?? undefined;
+    }
+    qAll(selector?:string){
+        if(!selector) return [];
+        if(!this.e) return [];
+        return [...this.e.querySelectorAll(selector)];
+    }
+    qPart(className?:string){
+        if(!className) return;
+        if(!this.e) return;
+
+        let e = this.q(className);
+        if(!e) return;
+
+        function search(p:MenuPart):MenuPart|undefined{
+            for(const part of p.parts){
+                if(part.e == e) return part;
+                let res1 = search(part);
+                if(res1) return res1;
+            }
+        }
+        let res = search(this);
+        return res;
+
+        // return this.parts.find(v=>v.hasClass(className));
+    }
+
+    hasClass(className?:string){
+        if(!className) return;
+        if(this.ops.classList) if(this.ops.classList.includes(className)) return true;
+        if(this.ops.className) if(this.ops.className.split(" ").includes(className)) return true;
+        return false;
+    }
 
     private _load(){
         this.load();
@@ -317,6 +353,13 @@ export class MP_Input extends MenuPart{
     getValue(){
         return this.e?.value;
     }
+
+    focus(){
+        this.e?.focus();
+    }
+    blur(){
+        this.e?.blur();
+    }
 }
 
 export class MP_Flexbox extends MP_Div{
@@ -384,7 +427,7 @@ export class MP_SearchForm extends MP_Generic<HTMLFormElement>{
 
         this.e?.addEventListener("submit",e=>{
             e.preventDefault();
-            this.ops.onsubmit(e,i_query.getValue());
+            this.ops.onSubmit(this,e,i_query.getValue());
         });
 
         this.addParts(
@@ -397,6 +440,12 @@ export class MP_SearchForm extends MP_Generic<HTMLFormElement>{
         );
 
         this.inp = i_query;
+    }
+
+    async submit(){
+        let ev = new SubmitEvent("submit");
+        await this.ops.onSubmit(this,ev,this.inp?.getValue());
+        // this.e?.submit();
     }
 }
 

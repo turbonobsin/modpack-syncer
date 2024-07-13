@@ -100,6 +100,27 @@ export async function openCCMenu(id:string){
 
     await menu.init();
 }
+export async function openCCMenuCB(id:string,w:Electron.WebContents,...args:any[]){
+    let menu = ccMenuRegistry.reg.get(id);
+    if(!menu){
+        util_warn("Failed to find ccMenu: "+id);
+        console.log("Available packs:",[...ccMenuRegistry.reg.keys()]);
+        return;
+    }
+
+    await menu.init();
+
+    let cb:((value:any)=>void) | undefined;
+    let prom = new Promise<any>(resolve=>cb = resolve);
+    if(!cb) return;
+
+    w.send("initReturnCB",{
+        cb,
+        args
+    });
+
+    return prom;
+}
 
 // 
 ccMenuRegistry.register(new SearchPacksMenu());

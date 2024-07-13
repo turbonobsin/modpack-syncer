@@ -92,6 +92,7 @@ export interface IGlobalAPI{
     
     // main -> render
     onInitMenu:(cb:(data:InitMenuData)=>void)=>void;
+    onInitReturnCB:(cb:(data:any)=>void)=>void;
 }
 
 declare global{

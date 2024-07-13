@@ -23,6 +23,13 @@ export async function preInit(){
     ipcMain.handle("openMenu",async (ev,...args)=>{
         await openCCMenu(args[0]);
     });
+    ipcMain.handle("openMenuCB",async (ev,...args)=>{
+        let id = args[0];
+        args.splice(0,1);
+        await openCCMenu(id);
+
+        ev.sender.send("initReturnCB",...args);
+    });
     ipcMain.handle("searchPacks",async (ev,arg:Arg_SearchPacks)=>{
         return (await searchPacks(arg)).unwrap();
     });
@@ -57,7 +64,8 @@ export async function preInit(){
     ipcMain.handle("linkInstance",async (ev,iid:string)=>{
         if(!await ensurePrismLinked(getWindow(ev))) return;
         
-        await openCCMenu("prism_instances");
+        // await openCCMenu("prism_instances");
+        return openCCMenuCB("prism_instances",ev.sender,{iid});
 
         // let inst = await getModpackInst(iid);
         // if(!inst) return;
@@ -125,19 +133,19 @@ async function getPrismInstances(w=mainWindow):Promise<Result<Res_GetPrismInstan
             }
             let totalTimePlayed = cfg.getValue("totalTimePlayed");
             if(!totalTimePlayed){
-                util_warn("Something went wrong parsing [1.1] "+inst);
+                util_warn("Something went wrong parsing [2] "+inst);
                 continue;
             }
             let versionComp = mmc.components.find(v=>v.cachedName == "Minecraft");
             if(!versionComp){
-                util_warn("Something went wrong parsing [2] "+inst);
+                util_warn("Something went wrong parsing [3] "+inst);
                 continue;
             }
             let loaders = ["fabric","quilt","forge","neoforge"];
             // let loaderComp = mmc.components.find(v=>v.cachedRequires != undefined && v != versionComp);
             let loaderComp = mmc.components.find(v=>loaders.some(w=>v.cachedName.toLowerCase().includes(w)));
             if(!loaderComp){
-                util_warn("Something went wrong parsing [3] "+inst);
+                util_warn("Something went wrong parsing [4] "+inst);
                 continue;
             }
 
@@ -203,7 +211,7 @@ async function alertBox(w:BrowserWindow,message:string,title="Error"){
 import { parseCFGFile, util_readdir, util_readdirWithTypes, util_readJSON, util_readText, util_warn, wait } from "./util";
 import { Arg_GetPrismInstances, Arg_SearchPacks, FSTestData, InstGroups, MMCPack, PackMetaData, Res_GetPrismInstances } from "./interface";
 import { getPackMeta, searchPacks, searchPacksMeta } from "./network";
-import { openCCMenu, SearchPacksMenu, ViewInstanceMenu } from "./frontend/menu_api";
+import { openCCMenu, openCCMenuCB, SearchPacksMenu, ViewInstanceMenu } from "./frontend/menu_api";
 import { addInstance, getModpackInst, ModPackInst, sysInst } from "./db";
 import { InstanceData } from "./db_types";
 import { errors, Result } from "./errors";
