@@ -1,8 +1,8 @@
-import "../styles/index.css";
-import "../styles/home.css";
-import "../styles/menus.css";
-import { MenuPart, MP_Div, MP_Input, MP_SearchForm, MP_SearchForm_Ops, MP_Text } from "../frontend/menu_parts";
-import { reselectItem, SelectedItem } from "../render_util";
+import "./styles/index.css";
+import "./styles/home.css";
+import "./styles/menus.css";
+import { MenuPart, MP_Div, MP_Input, MP_SearchForm, MP_SearchForm_Ops, MP_Text } from "./menu_parts";
+import { deselectItem, reselectItem, SelectedItem } from "./render_util";
 
 const overlaysCont = new MP_Div({
     overrideDiv:document.body
@@ -14,14 +14,25 @@ const overlaysBack = overlaysCont.addPart(new MP_Div({
     className:"overlays-back"
 }));
 
+window.gAPI.refresh(()=>{
+    window.location.reload();
+});
+
 // 
 export interface MP_SearchStructure_Ops<T> extends MP_SearchForm_Ops{
     listId:string;
     customListFormat?:string;
+    submitOnOpen?:boolean;
     onSelect:(data:T,item:SelectedItem<T>)=>void;
 }
 export class MP_SearchStructure<T> extends MP_Div{
     constructor(ops:MP_SearchStructure_Ops<T>){
+        if(ops.submitOnOpen){
+            ops.onAdded = ()=>{
+                this.submit();
+            };
+        }
+        
         super(ops);
         this.selected = new SelectedItem<T>({
             onSelect:(data,item)=>{
@@ -33,9 +44,10 @@ export class MP_SearchStructure<T> extends MP_Div{
     declare ops:MP_SearchStructure_Ops<T>;
 
     listCont?:MP_Div;
-    list?:MP_Div;
+    list = new MP_Div({});
     form?:MP_SearchForm;
     i_search?:MP_Input;
+    mainOptions = new MP_Div({className:"main-options"});
 
     selected:SelectedItem<T>;
 
@@ -49,23 +61,25 @@ export class MP_SearchStructure<T> extends MP_Div{
                 this.list.clearParts();
                 await this.ops.onSubmit(t,e,query);
 
-                reselectItem(this.selected);
+                deselectItem(this.selected);
             }
+        });
+
+        this.list = new MP_Div({
+            className:this.ops.listId+"-grid-items list"+(this.ops.customListFormat?" "+this.ops.customListFormat:"")
         });
 
         this.addParts(
             new MP_Div({
-                className:"main-options"
+                className:"main-options-cont"
             }).addParts(
-                new MP_Text({text:""}),
+                this.mainOptions,
                 this.form
             ),
             new MP_Div({
                 className:this.ops.listId+"-grid list-cont"
             }).addParts(
-                new MP_Div({
-                    className:this.ops.listId+"-grid-items list"+(this.ops.customListFormat?" "+this.ops.customListFormat:"")
-                })
+                this.list
             )
         );
 

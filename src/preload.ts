@@ -47,12 +47,18 @@ contextBridge.exposeInMainWorld("gAPI",{
 
     addInstance:regf("addInstance"),
     getInstances:regf("getInstances"),
+    showLinkInstance:regf("showLinkInstance"),
     linkInstance:regf("linkInstance"),
 
     getPrismInstances:regf("getPrismInstances"),
 
+    launchInstance:regf("launchInstance"),
+
+    showEditInstance:regf("showEditInstance"),
+
     onInitMenu: (cb) => ipcRenderer.on("initMenu",(ev,data)=>cb(data)),
     onInitReturnCB: (cb) => ipcRenderer.on("initReturnCB",(ev,data)=>cb(data)),
+    refresh: (cb) => ipcRenderer.on("refresh",(ev,data)=>cb(data)),
 } as IGlobalAPI);
 
 // contextBridge.exposeInMainWorld("gAPI",{

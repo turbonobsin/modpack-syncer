@@ -61,11 +61,15 @@ export async function preInit(){
 
         return list;
     });
-    ipcMain.handle("linkInstance",async (ev,iid:string)=>{
+    ipcMain.handle("showLinkInstance",async (ev,iid:string,instName:string)=>{
         if(!await ensurePrismLinked(getWindow(ev))) return;
         
         // await openCCMenu("prism_instances");
-        return openCCMenuCB("prism_instances",ev.sender,{iid});
+        await openCCMenu<Data_PrismInstancesMenu>("prism_instances",{
+            reason:"link",
+            iid,
+            instName
+        });
 
         // let inst = await getModpackInst(iid);
         // if(!inst) return;
@@ -84,14 +88,64 @@ export async function preInit(){
 
         // return dirPath;
     });
+    ipcMain.handle("linkInstance",async (ev,iid:string,pInstPath:string)=>{
+        // should we ensure prism here?
+
+        (await linkInstance(iid,pInstPath)).unwrap();
+    });
 
     // prism instances
     ipcMain.handle("getPrismInstances",async (ev,arg:Arg_GetPrismInstances)=>{
-        return (await getPrismInstances(getWindow(ev))).unwrap();
+        return (await getPrismInstances(getWindow(ev),arg)).unwrap();
+    });
+    ipcMain.handle("launchInstance",async (ev,iid:string)=>{
+        // exec("notepad");
+        if(!sysInst.meta) return;
+        if(!sysInst.meta.prismRoot) return;
+
+        let pack = await getModpackInst(iid);
+        if(!pack) return;
+        if(!pack.meta) return;
+        if(!pack.meta.linkName) return;
+
+        let cfgPath = path.join(sysInst.meta.prismRoot,"instances",pack.meta.linkName,"instance.cfg");
+        let instCfg = parseCFGFile(await util_readText(cfgPath));
+        if(!instCfg) return;
+        instCfg.setValue("JavaPath","C:/Program Files (x86)/Minecraft Launcher/runtime/java-runtime-delta/windows-x64/java-runtime-delta/bin/javaw.exe");
+        instCfg.setValue("JavaVersion","21.0.3");
+        instCfg.setValue("OverrideJavaLocation","true");
+        await util_writeText(cfgPath,instCfg.toText());
+
+        let cmd = `${path.join(sysInst.meta.prismRoot,"prismlauncher")} --launch "${pack.meta.linkName}"`;
+        util_warn("EXEC:",cmd);
+        exec(cmd);
+    });
+
+    ipcMain.handle("showEditInstance",async (ev,iid:string)=>{
+        let inst = await getModpackInst(iid);
+        if(!inst || !inst.meta) return;
+
+        await openCCMenu("edit_instance_menu");
     });
 }
 
-async function getPrismInstances(w=mainWindow):Promise<Result<Res_GetPrismInstances>>{
+function refreshMainWindow(){
+    mainWindow.webContents.send("refresh");
+}
+
+async function linkInstance(iid:string,pInstName:string):Promise<Result<undefined>>{
+    let inst = await getModpackInst(iid);
+    if(!inst.meta) return errors.couldNotFindPack;
+
+    inst.meta.linkName = pInstName;
+    await inst.save();
+
+    refreshMainWindow();
+
+    return new Result(undefined);
+}
+
+async function getPrismInstances(w=mainWindow,arg:Arg_GetPrismInstances):Promise<Result<Res_GetPrismInstances>>{
     if(!sysInst.meta) return errors.noSys;
 
     if(!await ensurePrismLinked(w)) return errors.noPrismRoot;
@@ -108,13 +162,13 @@ async function getPrismInstances(w=mainWindow):Promise<Result<Res_GetPrismInstan
         return errors.instgroupsRead;
     }
     
-    console.log("GROUP DATA:",groupData);
-
     let keys = Object.keys(groupData.groups);
     for(const group of keys){
         let gdata = groupData.groups[group];
 
         for(const inst of gdata.instances){
+            if(arg.query) if(!inst.toLowerCase().split(" ").some(v=>v.includes(arg.query??""))) continue;
+
             let cfg = parseCFGFile(await util_readText(path.join(instancePath,inst,"instance.cfg")));
             if(!cfg){
                 util_warn("Failed to read pack config: "+inst);
@@ -133,8 +187,9 @@ async function getPrismInstances(w=mainWindow):Promise<Result<Res_GetPrismInstan
             }
             let totalTimePlayed = cfg.getValue("totalTimePlayed");
             if(!totalTimePlayed){
-                util_warn("Something went wrong parsing [2] "+inst);
-                continue;
+                // util_warn("Something went wrong parsing [2] "+inst);
+                // continue;
+                totalTimePlayed = "0";
             }
             let versionComp = mmc.components.find(v=>v.cachedName == "Minecraft");
             if(!versionComp){
@@ -155,7 +210,8 @@ async function getPrismInstances(w=mainWindow):Promise<Result<Res_GetPrismInstan
                 version:versionComp.version,
                 loader:loaderComp.cachedName,
                 loaderVersion:loaderComp.version,
-                totalTimePlayed:parseInt(totalTimePlayed)
+                totalTimePlayed:parseInt(totalTimePlayed),
+                path:path.join(instancePath,inst)
             });
         }
     }
@@ -208,14 +264,16 @@ async function alertBox(w:BrowserWindow,message:string,title="Error"){
 
 // 
 
-import { parseCFGFile, util_readdir, util_readdirWithTypes, util_readJSON, util_readText, util_warn, wait } from "./util";
-import { Arg_GetPrismInstances, Arg_SearchPacks, FSTestData, InstGroups, MMCPack, PackMetaData, Res_GetPrismInstances } from "./interface";
+import { parseCFGFile, util_readdir, util_readdirWithTypes, util_readJSON, util_readText, util_warn, util_writeJSON, util_writeText, wait } from "./util";
+import { Arg_GetPrismInstances, Arg_SearchPacks, Data_PrismInstancesMenu, FSTestData, InstGroups, MMCPack, PackMetaData, Res_GetPrismInstances } from "./interface";
 import { getPackMeta, searchPacks, searchPacksMeta } from "./network";
-import { openCCMenu, openCCMenuCB, SearchPacksMenu, ViewInstanceMenu } from "./frontend/menu_api";
+import { ListPrismInstReason, openCCMenu, openCCMenuCB, SearchPacksMenu, ViewInstanceMenu } from "./menu_api";
 import { addInstance, getModpackInst, ModPackInst, sysInst } from "./db";
 import { InstanceData } from "./db_types";
 import { errors, Result } from "./errors";
 import { readConfigFile } from "typescript";
+import { getMaxListeners } from "stream";
+import { exec } from "child_process";
 
 async function fsTest(customPath?:string): Promise<FSTestData|undefined>{
     let instancePath:string;

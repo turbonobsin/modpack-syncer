@@ -5,7 +5,7 @@
 import { BrowserWindow, ipcRenderer, Menu } from "electron";
 import path from "path";
 import { InitMenuData } from "src/interface";
-import { util_warn } from "../util";
+import { util_warn } from "./util";
 
 abstract class CCMenu{
     constructor(startScript:string,w=800,h=600){
@@ -19,7 +19,7 @@ abstract class CCMenu{
 
     abstract getId():string;
 
-    async init(){
+    async init<T>(data?:T){
         let w = new BrowserWindow({
             width:this.w,
             height:this.h,
@@ -47,9 +47,9 @@ abstract class CCMenu{
 
         // await w.loadURL(path.join(MAIN_WINDOW_VITE_DEV_SERVER_URL,"menus/search_packs.html"));
         await w.loadURL(path.join(MAIN_WINDOW_VITE_DEV_SERVER_URL,"menus/"+this.startScript+".html"));
-        // w.webContents.send("initMenu",<InitMenuData>{
-        //     color:"gray"
-        // });
+        if(data) w.webContents.send("initMenu",<InitMenuData<T>>{
+            data
+        });
     }
 }
 
@@ -69,12 +69,24 @@ export class ViewInstanceMenu extends CCMenu{
         return "view_instance";
     }
 }
+export enum ListPrismInstReason{
+    view = "view",
+    link = "link"
+}
 export class PrismInstancesMenu extends CCMenu{
     constructor(){
         super("prism_instances",1200,800);
     }
     getId(): string {
         return "prism_instances";
+    }
+}
+export class EditInstanceMenu extends CCMenu{
+    constructor(){
+        super("edit_instance_menu",1200,800);
+    }
+    getId(): string {
+        return "edit_instance_menu";
     }
 }
 
@@ -90,21 +102,21 @@ class CCMenuRegistry{
 }
 const ccMenuRegistry = new CCMenuRegistry();
 
-export async function openCCMenu(id:string){
+export async function openCCMenu<T>(id:string,data?:T){
     let menu = ccMenuRegistry.reg.get(id);
     if(!menu){
         util_warn("Failed to find ccMenu: "+id);
-        console.log("Available packs:",[...ccMenuRegistry.reg.keys()]);
+        console.log("Available menus:",[...ccMenuRegistry.reg.keys()]);
         return;
     }
 
-    await menu.init();
+    await menu.init(data);
 }
 export async function openCCMenuCB(id:string,w:Electron.WebContents,...args:any[]){
     let menu = ccMenuRegistry.reg.get(id);
     if(!menu){
         util_warn("Failed to find ccMenu: "+id);
-        console.log("Available packs:",[...ccMenuRegistry.reg.keys()]);
+        console.log("Available menus:",[...ccMenuRegistry.reg.keys()]);
         return;
     }
 
@@ -126,3 +138,4 @@ export async function openCCMenuCB(id:string,w:Electron.WebContents,...args:any[
 ccMenuRegistry.register(new SearchPacksMenu());
 ccMenuRegistry.register(new ViewInstanceMenu());
 ccMenuRegistry.register(new PrismInstancesMenu());
+ccMenuRegistry.register(new EditInstanceMenu());

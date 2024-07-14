@@ -1,3 +1,3 @@
-import "./lib_submenu";
+import "../render_lib";
 
 window.gAPI.alert("loaded!");

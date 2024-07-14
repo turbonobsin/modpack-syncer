@@ -13,3 +13,8 @@
     - arguments
 
 - prism launcher CLI: https://prismlauncher.org/wiki/getting-started/command-line-interface/
+
+## looking for mod info
+- inside mods like Ad Astra's .jar file, then inside META_INF, then mods.toml, there is display name, author, description, and dependency (with versions) information
+    - I could flag mods in the list that don't meet the dependency requirements
+- in the assets folder 

@@ -1,33 +1,37 @@
-import "./lib_submenu";
+import "../render_lib";
 import "../render_util";
 import "../styles/prism_instances.css";
-import { MP_Article, MP_Button, MP_Div, MP_Flexbox, MP_Header, MP_HR, MP_OutlinedBox, MP_P, MP_Section, MP_Text } from "../frontend/menu_parts";
+import { MP_Article, MP_Button, MP_Div, MP_Flexbox, MP_Header, MP_HR, MP_OutlinedBox, MP_P, MP_Section, MP_Text, PartTextStyle } from "../menu_parts";
 import { loadDefaultAside, SelectedItem, selectItem } from "../render_util";
-import { PrismInstance } from "src/interface";
-import { MP_SearchStructure, qElm } from "./lib_submenu";
+import { Data_PrismInstancesMenu, InitMenuData, PrismInstance } from "src/interface";
+import { MP_SearchStructure, qElm } from "../render_lib";
 
-// const instanceGridItems = document.querySelector(".instance-grid-items");
-// const instList = new MP_Div({overrideDiv:document.querySelector<HTMLElement>(".inst-list")??undefined});
-// const instList = new MP_Div({overrideDiv:document.querySelector<HTMLElement>(".instance-grid-items")??undefined});
+let hasLoadedPage = false;
+
 const mainSection = new MP_Div({overrideDiv:qElm(".main-section")});
 const aside = new MP_Div({overrideDiv:qElm("aside")});
+let pageData:Data_PrismInstancesMenu;
 
-function formatTime(time:number){
-    let t = time;
-    // return t.toFixed(1); // hours
-    return t;
-}
-
-window.gAPI.onInitReturnCB(data=>{
+window.gAPI.onInitMenu((data:InitMenuData<Data_PrismInstancesMenu>)=>{
     console.log("INIT DATA:",data);
+    localStorage.setItem("initData",JSON.stringify(data));
+    pageData = data.data;
+
+    initPage();
 });
 
+setTimeout(()=>{
+    if(hasLoadedPage) return;
+
+    let cache = localStorage.getItem("initData");
+    if(cache){
+        pageData = JSON.parse(cache).data;
+        initPage();
+    }
+},1000);
+
 async function initPage(){
-    if(!mainSection.e) return;
-    if(!aside) return;
-
-    // 
-
+    hasLoadedPage = true;
     const search = new MP_SearchStructure<PrismInstance>({
         listId:"instance",
         customListFormat:"view-list2",
@@ -50,22 +54,46 @@ async function initPage(){
                 )
             );
 
-            a.body.addParts(
-                new MP_HR(),
-                new MP_Section().addParts(
-                    new MP_Button({
-                        label:"Select",
-                        onclick:e=>{
+            console.log("reason:",pageData);
+            if(pageData.reason == "view"){
 
-                        }
-                    })
-                )
-            );
+            }
+            else if(pageData.reason == "link"){
+                a.body.addParts(
+                    new MP_HR(),
+                    new MP_OutlinedBox({
+                        direction:"column",
+                        paddingBottom:"15px"
+                    }).addParts(
+                        new MP_P({
+                            style:PartTextStyle.note,
+                            innerHTML:`Link <span class="textstyle-accent">${pageData.instName}</span> with <span class="textstyle-accent">${data.name}</span>?`
+                        }),
+                        new MP_Button({
+                            label:"Link",
+                            icon:"link",
+                            onclick:async e=>{
+                                await window.gAPI.linkInstance(pageData.iid,data.name);
+                                window.close();
+                            }
+                        })
+                    )
+                    // new MP_Section().addParts(
+                    //     new MP_Button({
+                    //         label:"Link to this Instance",
+                    //         onclick:e=>{
+                                
+                    //         }
+                    //     })
+                    // )
+                );
+            }
         },
         onSubmit:async (t,e,q)=>{
             if(!search.list) return;
+            // search.list.clearParts();
             
-            let res = await window.gAPI.getPrismInstances({});
+            let res = await window.gAPI.getPrismInstances({query:q});
             console.log("inst:",res);
             if(!res) return;
 
@@ -120,6 +148,3 @@ async function initPage(){
     mainSection.addPart(search);
     await search.submit();
 }
-initPage();
-
-//5,449

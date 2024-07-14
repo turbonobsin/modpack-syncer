@@ -1,5 +1,5 @@
 import "../styles/index.css";
-import { MP_Div } from "./menu_parts";
+import { MP_Div } from "../menu_parts";
 
 console.log("menu is loaded");
 

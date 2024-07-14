@@ -1,8 +1,8 @@
-import "./lib_submenu";
-import { MenuPart, MP_Any, MP_Article, MP_Div, MP_Header, MP_Ops, MP_P, MP_SearchForm, MP_Text, MP_Text_Ops } from "../frontend/menu_parts";
+import "../render_lib";
+import { MenuPart, MP_Any, MP_Article, MP_Div, MP_Header, MP_Ops, MP_P, MP_SearchForm, MP_Text, MP_Text_Ops } from "../menu_parts";
 import { PackMetaData } from "../../src/interface";
 import { loadModPackMetaPanel, reselectItem as reselectItem, SelectedItem, selectItem, SelectedItemOptions } from "../render_util";
-import { MP_SearchStructure } from "./lib_submenu";
+import { MP_SearchStructure } from "../render_lib";
 
 const main = document.querySelector("main");
 const aside = document.querySelector("aside");

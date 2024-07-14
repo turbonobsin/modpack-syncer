@@ -19,6 +19,16 @@ export class CFGFile{
     getValue(key:string){
         return this.properties.get(key);
     }
+    setValue(key:string,value:string){
+        return this.properties.set(key,value);
+    }
+    toText(){
+        let text = "";
+        for(const [k,v] of this.properties){
+            text += k+"="+v+"\n";
+        }
+        return text;
+    }
 }
 export function parseCFGFile(text?:string){
     if(!text) return;
@@ -79,6 +89,13 @@ export function util_readJSON<T>(path:fs.PathOrFileDescriptor){
                 }
                 resolve(obj);
             }
+        });
+    });
+}
+export function util_writeText(path:fs.PathOrFileDescriptor,text:string){
+    return new Promise<void>(resolve=>{
+        fs.writeFile(path,text,{encoding:"utf8"},()=>{
+            resolve();
         });
     });
 }

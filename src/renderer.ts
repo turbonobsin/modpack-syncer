@@ -28,10 +28,12 @@
 
 // import { Menu, MenuItem } from "electron";
 import { FSTestData } from "./interface";
-import "./menus/lib_submenu";
+import "./render_lib";
+import "./styles/renderer.css";
 import { loadModPackMetaPanel, SelectedItem, selectItem } from "./render_util";
 import { InstanceData } from "./db_types";
-import { MP_Article, MP_Button, MP_Div, MP_Flexbox, MP_Header, MP_HR, MP_Ops, MP_OutlinedBox, MP_P, MP_Section, MP_Text, PartTextStyle } from "./frontend/menu_parts";
+import { MP_Article, MP_Button, MP_Div, MP_Flexbox, MP_Header, MP_HR, MP_Ops, MP_OutlinedBox, MP_P, MP_Section, MP_Text, PartTextStyle } from "./menu_parts";
+import { MP_SearchStructure, qElm } from "./render_lib";
 
 console.log('👋 This message is being logged by "renderer.ts", included via Vite');
 
@@ -40,14 +42,15 @@ const b_click = document.querySelector<HTMLButtonElement>(".b-click");
 const b_click2 = document.querySelector<HTMLButtonElement>(".b-click2");
 const modList = document.querySelector<HTMLDivElement>(".mod-list");
 const modTable = document.querySelector<HTMLTableElement>(".mod-table");
-const b_addInstance = document.querySelector<HTMLButtonElement>(".b-add-instance");
+// const b_addInstance = document.querySelector<HTMLButtonElement>(".b-add-instance");
 const viewPanel = document.querySelector("aside");
+const mainSection = new MP_Div({overrideDiv:qElm(".main-section")});
 
 // 
 
-b_addInstance?.addEventListener("click",e=>{
-    window.gAPI.openMenu("search_packs");
-});
+// b_addInstance?.addEventListener("click",e=>{
+//     window.gAPI.openMenu("search_packs");
+// });
 
 const query = document.querySelector<HTMLFormElement>(".query");
 const i_query = document.querySelector<HTMLInputElement>("#i-query");
@@ -199,11 +202,15 @@ class TableSelection{
 }
 const selAPI = new SelectionAPI();
 
-const selectedInst = new SelectedItem<CMP_FullInst>({
-    onSelect:(data,item)=>{
-        data.showData();
-    }
-})
+// const selectedInst = new SelectedItem<CMP_FullInst>({
+//     onSelect:(data,item)=>{
+//         localStorage.setItem("selected_modpack",data.ops.data.iid);
+//         data.showData();
+//     },
+//     onDeselect:(data,item)=>{
+//         localStorage.removeItem("selected_modpack");
+//     }
+// })
 
 interface CMP_FullInst_Ops extends MP_Ops {
     data: InstanceData;
@@ -221,7 +228,7 @@ export class CMP_FullInst extends MP_Article {
 
     canLaunch(){
         let inst = this.ops.data;
-        if(inst.dirPath == undefined) return false;
+        if(inst.linkName == undefined) return false;
         
         return true;
     }
@@ -264,7 +271,7 @@ export class CMP_FullInst extends MP_Article {
                 className:"l-desc"
             }),
             new MP_OutlinedBox({
-                skipAdd:inst.dirPath != undefined,
+                skipAdd:inst.linkName != undefined,
             }).addParts(
                 new MP_P({
                     text:"This instance is not yet linked to a Prism Instance.",
@@ -276,7 +283,7 @@ export class CMP_FullInst extends MP_Article {
                     onclick:async e=>{
                         // window.gAPI.openMenu("prism_instances");
                         
-                        let res = await window.gAPI.linkInstance(inst.iid);
+                        let res = await window.gAPI.showLinkInstance(inst.iid,inst.customName??inst.meta.name);
                         console.log("RES:",res);
                     },
                 }),
@@ -285,15 +292,27 @@ export class CMP_FullInst extends MP_Article {
             new MP_HR(),
 
             new MP_Section().addParts(
-                new MP_Button({
-                    label:"Launch",
-                    className:"b-inst-launch",
-                    disabled:!this.canLaunch(),
-                    onclick:async e=>{
-                        // let res = await window.gAPI.addInstance(meta);
-                        // console.log("RES:",res);
-                    }
-                })
+                new MP_Flexbox({
+                    alignItems:"center",
+                    justifyContent:"space-between"
+                }).addParts(
+                    new MP_Button({
+                        label:"Launch",
+                        className:"b-inst-launch",
+                        disabled:!this.canLaunch(),
+                        onclick:async e=>{
+                            window.gAPI.launchInstance(inst.iid);
+                            // let res = await window.gAPI.addInstance(meta);
+                            // console.log("RES:",res);
+                        }
+                    }),
+                    new MP_Button({
+                        label:"Edit",
+                        onclick:e=>{
+                            window.gAPI.showEditInstance(inst.iid);
+                        }
+                    }),
+                )
             )
         );
         // footer.addParts(
@@ -352,12 +371,12 @@ export class CMP_FullInst extends MP_Article {
             )
         );
 
-        this.e.addEventListener("click", e => {
-            if (!this.e) return;
-            selectItem(selectedInst,this,this.e);
-            // loadModPackMetaPanel(this.ops.data.meta,document.querySelector("aside"));
-            // selectPack(this.ops.data, this.e);
-        });
+        // this.e.addEventListener("click", e => {
+        //     if (!this.e) return;
+        //     selectItem(selectedInst,this,this.e);
+        //     // loadModPackMetaPanel(this.ops.data.meta,document.querySelector("aside"));
+        //     // selectPack(this.ops.data, this.e);
+        // });
     }
 }
 
@@ -407,23 +426,65 @@ async function loadData(data:FSTestData){
     // }
 }
 
-
-
-async function initPage(){
-    let instList = await window.gAPI.getInstances();
-    let root = new MP_Div({
-        overrideDiv:document.querySelector(".instance-grid-items") as HTMLElement
-    });
-    console.log(root);
-    if(instList){
-        for(const inst of instList){
-            root.addPart(
-                new CMP_FullInst({
+const search = new MP_SearchStructure<CMP_FullInst>({
+    listId:"instance",
+    onSelect:(data,item)=>{
+        
+    },
+    onSubmit:async (t,e,q)=>{
+        if(!search.list) return;
+        
+        let instList = await window.gAPI.getInstances();
+        if(instList){
+            for(const inst of instList){
+                let part = new CMP_FullInst({
                     data:inst
-                })
-            );
+                });
+                search.list.addPart(part);
+                if(part.e) part.e.addEventListener("click",e=>{
+                    if(!part.e) return;
+                    selectItem(search.selected,part,part.e);
+                });
+            }
         }
+        console.log("INST LIST:",instList);
     }
-    console.log("INST LIST:",instList);
+});
+
+function autoSelectLastInstance(){
+    let lastSelected = localStorage.getItem("selected_modpack");
+    if(lastSelected){
+        let part = (search.list.parts as CMP_FullInst[]).find(v=>v.ops.data.iid == lastSelected);
+        if(part && part.e) selectItem(search.selected,part,part.e);
+        else localStorage.removeItem("selected_modpack");
+    }
+}
+async function initPage(){
+    search.selected.ops.onSelect = (data,item)=>{
+        localStorage.setItem("selected_modpack",data.ops.data.iid);
+        data.showData();
+    };
+    search.selected.ops.onDeselect = ()=>{
+        localStorage.removeItem("selected_modpack");
+        localStorage.removeItem("bob");
+    };
+
+    search.mainOptions.addPart(
+        new MP_Button({
+            label:"add",
+            className:"b-add-instance icon-cont accent",
+            onclick:e=>{
+                console.log(search.selected.data);
+                if(!search.selected.data) return;
+                // let res = window.gAPI.addInstance(search.selected.data.data.ops.data.meta);
+                // console.log("RES:",res);
+                window.gAPI.openMenu("search_packs");
+            }
+        })
+    );
+
+    mainSection.addPart(search);
+    await search.submit();
+    autoSelectLastInstance();
 }
 initPage();

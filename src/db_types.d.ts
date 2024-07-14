@@ -42,7 +42,7 @@ interface InstanceData{
     iid:string;
     meta:PackMetaData;
     
-    dirPath?:string;
+    linkName?:string;
 
     customName?:string;
     customDesc?:string;

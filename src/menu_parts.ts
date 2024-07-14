@@ -11,12 +11,26 @@ export interface MP_Ops{
     className?:string;
     id?:string;
     textContent?:string;
+    innerHTML?:string;
     __tag?:string;
     skipAdd?:boolean;
+
+    margin?:string;
+    marginTop?:string;
+    marginLeft?:string;
+    marginBottom?:string;
+    marginRight?:string;
+    padding?:string;
+    paddingTop?:string;
+    paddingLeft?:string;
+    paddingBottom?:string;
+    paddingRight?:string;
+
+    onAdded?:()=>void;
 }
 export interface MP_Text_Ops extends MP_Ops{
     overrideTag?:string;
-    text:string;
+    text?:string;
     style?:PartTextStyle;
 }
 export interface MP_Flexbox_Ops extends MP_Ops{
@@ -50,19 +64,23 @@ function addClassToOps(ops:MP_Ops,className:string){
     ops.classList.push(className);
 }
 
+export function makeDivPart(selector:string){
+    return new MP_Div({overrideDiv:document.querySelector(selector) ?? undefined});
+}
+
 export abstract class MenuPart{
     constructor(ops:MP_Ops){
         this.ops = ops;
         this.parts = [];
         this.init();
     }
-    e?:Element;
+    e?:HTMLElement;
     ops:MP_Ops;
     parts:MenuPart[];
 
     init(){
         if(this.ops.overrideDiv){
-            this.e = this.ops.overrideDiv;
+            this.e = this.ops.overrideDiv as HTMLElement;
             this._postLoad();
         }
         else this.create();
@@ -73,6 +91,7 @@ export abstract class MenuPart{
                 text:this.ops.textContent
             }));
         }
+        if(this.e) if(this.ops.innerHTML) this.e.innerHTML = this.ops.innerHTML;
 
     }
 
@@ -97,6 +116,8 @@ export abstract class MenuPart{
         part._load(); // I'm moving part loading to be immidiate so stuff can happen even before it's been appended
 
         if(part.e) this.e.appendChild(part.e);
+
+        if(part.ops.onAdded) part.ops.onAdded();
 
         return part;
     }
@@ -169,16 +190,34 @@ export abstract class MenuPart{
     }
     private _postLoad(){
         let o = this.ops;
-        let e = this.e;
+        let e = this.e as HTMLElement;
 
         if(e){
             if(o.className) e.className = o.className;
             if(o.classList) e.classList.add(...o.classList);
             if(o.id) e.id = o.id;
+            if(o.margin) e.style.margin = o.margin;
+            if(o.marginTop) e.style.marginTop = o.marginTop;
+            if(o.marginLeft) e.style.marginLeft = o.marginLeft;
+            if(o.marginBottom) e.style.marginBottom = o.marginBottom;
+            if(o.marginRight) e.style.marginRight = o.marginRight;
+            if(o.padding) e.style.padding = o.padding;
+            if(o.paddingTop) e.style.paddingTop = o.paddingTop;
+            if(o.paddingLeft) e.style.paddingLeft = o.paddingLeft;
+            if(o.paddingBottom) e.style.paddingBottom = o.paddingBottom;
+            if(o.paddingRight) e.style.paddingRight = o.paddingRight;
         }
 
         // if(this._onPostLoad) this._onPostLoad(this);
+
+        this.postLoad();
+        requestAnimationFrame(()=>{
+            this.onNextFrame();
+        });
     }
+
+    postLoad(){}
+    onNextFrame(){}
 
     abstract create():void;
     load():void {}
@@ -193,7 +232,7 @@ abstract class TextMenuPart extends MenuPart{
         if(!this.ops.overrideTag) return;
         
         this.e = document.createElement(this.ops.overrideTag);
-        this.e.textContent = this.ops.text;
+        if(this.ops.text) this.e.textContent = this.ops.text;
 
         let o = this.ops;
         if(o.style) applyTextStyle(this.e,o.style);
@@ -446,6 +485,110 @@ export class MP_SearchForm extends MP_Generic<HTMLFormElement>{
         let ev = new SubmitEvent("submit");
         await this.ops.onSubmit(this,ev,this.inp?.getValue());
         // this.e?.submit();
+    }
+}
+
+export interface ActivityBar_Ops extends MP_Ops{
+    style:"left"|"top"
+}
+
+export class MP_ActivityBar extends MP_Div{
+    constructor(ops:ActivityBar_Ops){
+        addClassToOps(ops,"activity-bar");
+        super(ops);
+    }
+    declare ops:ActivityBar_Ops;
+}
+
+export interface ActivityBarItem_Ops extends MP_Ops{
+    icon:string;
+}
+
+export class MP_ActivityBarItem extends MP_Div{
+    constructor(ops:ActivityBarItem_Ops){
+        addClassToOps(ops,"icon");
+        super(ops);
+    }
+    declare ops:ActivityBarItem_Ops;
+    load(): void {
+        super.load();
+        if(!this.e) return;
+
+        this.e.textContent = this.ops.icon;
+
+        this.e.role = "navigation";
+        (this.e as HTMLElement).tabIndex = 0;
+    }
+    getIndex(){
+        if(!this.e) return 0;
+        if(!this.e.parentElement) return 0;
+
+        return [...this.e.parentElement.children].indexOf(this.e);
+    }
+}
+
+export interface TabbedMain_Ops extends MP_Ops{
+    onLoadSection:(index:number,main:MP_Div)=>void;
+}
+
+export class MP_TabbedMenu extends MP_Div{
+    constructor(containerOps:MP_Ops,activityBarOps:ActivityBar_Ops,mainOps:TabbedMain_Ops){
+        addClassToOps(containerOps,"tabbed-menu");
+        addClassToOps(activityBarOps,"tabbed-activity-bar");
+        addClassToOps(mainOps,"tabbed-main");
+
+        super(containerOps);
+
+        this.activityBarOps = activityBarOps;
+        this.mainOps = mainOps;
+
+        this.activityBar = new MP_ActivityBar(activityBarOps);
+        this.main = new MP_Div(mainOps);
+    }
+
+    activityBarOps:ActivityBar_Ops;
+    mainOps:TabbedMain_Ops;
+
+    activityBar:MP_ActivityBar;
+    main:MP_Div;
+
+    active_section_index = 0;
+
+    load(): void {
+        super.load();
+
+        this.addParts(
+            this.activityBar,
+            this.main
+        );
+    }
+    onNextFrame(): void {
+        this.loadSection(0);
+    }
+
+    postSetup(){
+        for(let i = 0; i < this.activityBar.parts.length; i++){
+            let p = this.activityBar.parts[i];
+            if(!p.e) continue;
+            
+            p.e.addEventListener("mousedown",e=>{
+                if(e.button != 0) return;
+                this.loadSection(i);
+            });
+        }
+    }
+
+    loadSection(index:number){
+        if(!this.activityBar.e) return;
+        this.main.clearParts();
+
+        let selected = this.activityBar.e.querySelectorAll(".active");
+        for(const c of selected) c.classList.remove("active");
+
+        this.activityBar.parts[index].e?.classList.add("active");
+        this.active_section_index = index;
+
+        this.mainOps.onLoadSection(this.active_section_index,this.main);
     }
 }
 

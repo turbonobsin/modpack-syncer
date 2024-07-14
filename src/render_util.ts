@@ -1,4 +1,4 @@
-import { MP_Button, MP_Div, MP_Header, MP_P, MP_Text } from "./frontend/menu_parts";
+import { MP_Button, MP_Div, MP_Header, MP_P, MP_Text } from "./menu_parts";
 import { PackMetaData } from "./interface";
 
 export function loadDefaultAside(aside:MP_Div,ops:{
@@ -95,6 +95,7 @@ type SelectedItemData<T> = {
 };
 export interface SelectedItemOptions<T>{
     onSelect?:(data:T,item:SelectedItem<T>)=>void;
+    onDeselect?:(data:T,item:SelectedItem<T>)=>void;
 }
 export class SelectedItem<T>{
     constructor(ops:SelectedItemOptions<T>){
@@ -113,6 +114,7 @@ export function selectItem<T>(item:SelectedItem<T>,data:T,e:Element){
     if(allActive) for(const elm of allActive) elm.classList.remove("active");
     if(wasActive){
         if(aside) aside.textContent = "";
+        if(item.ops.onDeselect) item.ops.onDeselect(data,item);
         return;
     }
 
@@ -123,4 +125,10 @@ export function reselectItem<T>(item:SelectedItem<T>){
     if(!item.data) return;
 
     selectItem(item,item.data.data,item.data.e);
+}
+export function deselectItem<T>(item:SelectedItem<T>){
+    if(!item.data) return;
+    if(item.data.e.classList.contains("active")){
+        selectItem(item,item.data.data,item.data.e);
+    }
 }

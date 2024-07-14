@@ -30,12 +30,17 @@ hr{
         /* content:"* "; */
         content:"warning";
         font-family:"Material Symbols Outlined";
-        vertical-align:middle;
+        /* vertical-align:middle; */
         margin-right:3px;
         /* color:orangered; */
         font-size:15px;
         font-weight:normal;
+        transform:translate(0px, 3px);
+        display:inline-block;
     }
+}
+.textstyle-accent{
+    color:var(--accent-t1);
 }
 
 section{
@@ -66,6 +71,23 @@ aside{
     position:sticky;
     right:0px;
     top:0px;
+}
+
+/* General Componenets */
+.activity-bar{
+
+}
+
+/* Tabbed Menus */
+.tabbed-menu{
+    display:grid;
+    grid-template-columns:auto auto;
+}
+.tabbed-activity-bar{
+
+}
+.tabbed-main{
+    
 }
 
 /* Overlays */

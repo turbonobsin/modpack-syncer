@@ -14,8 +14,8 @@ type PackMetaData = {
     loader:string;
     version:string;
 };
-type InitMenuData = {
-    color:string;
+type InitMenuData<T> = {
+    data:T
 };
 
 type Arg_SearchPacks = {
@@ -28,6 +28,12 @@ interface Res_SearchPacksMeta{
     similar:PackMetaData[];
 }
 
+type ListPrismInstReason = "view" | "link";
+interface Data_PrismInstancesMenu{
+    reason:ListPrismInstReason;
+    iid:string;
+    instName:string;
+}
 interface PrismInstance{
     name:string;
     group:string;
@@ -35,9 +41,10 @@ interface PrismInstance{
     loader:string;
     loaderVersion:string;
     totalTimePlayed:number;
+    path:string;
 }
 interface Arg_GetPrismInstances{
-
+    query?:string;
 }
 interface Res_GetPrismInstances{
     list:PrismInstance[];
@@ -86,13 +93,19 @@ export interface IGlobalAPI{
 
     addInstance:(meta:PackMetaData)=>Promise<ModPackInst|undefined>;
     getInstances:(folder?:string)=>Promise<InstanceData[]|undefined>;
-    linkInstance:(iid:string)=>Promise<string|undefined>;
+    showLinkInstance:(iid:string,instName:string)=>Promise<string|undefined>;
+    linkInstance:(iid:string,pInstName:string)=>Promise<void>;
 
     getPrismInstances:(arg:Arg_GetPrismInstances)=>Promise<Res_GetPrismInstances>;
+
+    launchInstance:(iid:string)=>Promise<void>;
+
+    showEditInstance:(iid:string)=>Promise<void>;
     
     // main -> render
     onInitMenu:(cb:(data:InitMenuData)=>void)=>void;
     onInitReturnCB:(cb:(data:any)=>void)=>void;
+    refresh:(cb:(data:any)=>void)=>void;
 }
 
 declare global{
