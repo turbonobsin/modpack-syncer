@@ -59,9 +59,9 @@ export interface MP_SearchForm_Ops extends MP_Ops{
     onSubmit:(t:MP_SearchForm,e:SubmitEvent,query?:string)=>void|Promise<void>;
 }
 
-function addClassToOps(ops:MP_Ops,className:string){
+function addClassToOps(ops:MP_Ops,...className:string[]){
     if(!ops.classList) ops.classList = [];
-    ops.classList.push(className);
+    ops.classList.push(...className);
 }
 
 export function makeDivPart(selector:string){
@@ -528,7 +528,8 @@ export class MP_ActivityBarItem extends MP_Div{
 }
 
 export interface TabbedMain_Ops extends MP_Ops{
-    onLoadSection:(index:number,main:MP_Div)=>void;
+    onLoadSection:(index:number,menu:MP_TabbedMenu)=>void;
+    getSectionTitle:(index:number)=>string|undefined;
 }
 
 export class MP_TabbedMenu extends MP_Div{
@@ -544,6 +545,11 @@ export class MP_TabbedMenu extends MP_Div{
 
         this.activityBar = new MP_ActivityBar(activityBarOps);
         this.main = new MP_Div(mainOps);
+        
+        this.main_header = new MP_Section({ className:"section-header" });
+        this.main_body = new MP_Section({ className:"section-body" });
+        this.main_footer = new MP_Section({ className:"section-footer" });
+
     }
 
     activityBarOps:ActivityBar_Ops;
@@ -551,6 +557,10 @@ export class MP_TabbedMenu extends MP_Div{
 
     activityBar:MP_ActivityBar;
     main:MP_Div;
+
+    main_header:MP_Section;
+    main_body:MP_Section;
+    main_footer:MP_Section;
 
     active_section_index = 0;
 
@@ -567,6 +577,12 @@ export class MP_TabbedMenu extends MP_Div{
     }
 
     postSetup(){
+        this.main.addParts(
+            this.main_header,
+            this.main_body,
+            this.main_footer
+        );
+
         for(let i = 0; i < this.activityBar.parts.length; i++){
             let p = this.activityBar.parts[i];
             if(!p.e) continue;
@@ -588,7 +604,21 @@ export class MP_TabbedMenu extends MP_Div{
         this.activityBar.parts[index].e?.classList.add("active");
         this.active_section_index = index;
 
-        this.mainOps.onLoadSection(this.active_section_index,this.main);
+        let title = this.mainOps.getSectionTitle(index);
+        if(title){
+            this.main.addParts(
+                new MP_Div({
+                    className:"head-section"
+                }).addParts(
+                    new MP_Header({
+                        textContent:title
+                    })
+                )
+            );
+        }
+
+        // 
+        this.mainOps.onLoadSection(this.active_section_index,this);
     }
 }
 

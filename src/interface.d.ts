@@ -76,6 +76,11 @@ interface MMCPack{
     }[];
 }
 
+interface Arg_GetInstances{
+    folder?:string;
+    query?:string;
+}
+
 export type Err<T> = {
     err?:string;
     data?:T;
@@ -92,7 +97,7 @@ export interface IGlobalAPI{
     searchPacksMeta:(arg:Arg_SearchPacks)=>Promise<Res_SearchPacksMeta>;
 
     addInstance:(meta:PackMetaData)=>Promise<ModPackInst|undefined>;
-    getInstances:(folder?:string)=>Promise<InstanceData[]|undefined>;
+    getInstances:(arg:Arg_GetInstances)=>Promise<InstanceData[]|undefined>;
     showLinkInstance:(iid:string,instName:string)=>Promise<string|undefined>;
     linkInstance:(iid:string,pInstName:string)=>Promise<void>;
 

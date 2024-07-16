@@ -136,6 +136,11 @@ export function util_warn(...text:string[]){
     for(const item of text) console.log("\x1b[33m%s\x1b[0m","Warn: "+item);
 }
 
+export function searchStringCompare(s1?:string,s2?:string){
+    if(!s1 || !s2) return true;
+    return s1.toLowerCase().split(" ").some(v=>v.includes(s2??""));
+}
+
 /**
  * * @param path At this point, must not end with /
  * @param query Name of the item you are looking for

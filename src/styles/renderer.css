@@ -1,3 +1,7 @@
 main > section{
     margin:15px;
 }
+
+body{
+    grid-template-columns:1fr auto;
+}

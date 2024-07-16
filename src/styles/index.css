@@ -208,3 +208,8 @@ body {
 		border-color:var(--table-select-hover-border,var(--table-select-hover));
 	}
 }
+
+/* Util */
+.hide{
+	display:none;
+}

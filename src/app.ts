@@ -39,15 +39,25 @@ export async function preInit(){
     ipcMain.handle("addInstance",async (ev,meta:PackMetaData)=>{
         return (await addInstance(meta)).unwrap();
     });
-    ipcMain.handle("getInstances",async (ev,folder?:string)=>{
+    ipcMain.handle("getInstances",async (ev,arg:Arg_GetInstances)=>{
         let root = path.join(app.getAppPath(),"data","instances");
-        if(folder) root = path.join(root,folder);
+        if(arg.folder) root = path.join(root,arg.folder);
 
         let instanceIds = await util_readdir(root);
         let list:InstanceData[] = [];
 
         for(const iid of instanceIds){
             let inst = await new ModPackInst(path.join(root,iid,"meta.json")).load();
+            let instData = inst.meta;
+            if(!instData) continue;
+
+            // different search indexes for searching for your modpack instances
+            let searchRes:boolean[] = [];
+            searchRes.push(searchStringCompare(instData.meta.name,arg.query));
+            searchRes.push(searchStringCompare(instData.meta.desc,arg.query));
+            searchRes.push(searchStringCompare(instData.meta.loader,arg.query));
+            if(!searchRes.includes(true)) continue;
+
             if(!inst){
                 util_warn(iid+": failed to load instance");
                 continue;
@@ -167,7 +177,7 @@ async function getPrismInstances(w=mainWindow,arg:Arg_GetPrismInstances):Promise
         let gdata = groupData.groups[group];
 
         for(const inst of gdata.instances){
-            if(arg.query) if(!inst.toLowerCase().split(" ").some(v=>v.includes(arg.query??""))) continue;
+            if(arg.query) if(searchStringCompare(inst,arg.query)) continue;
 
             let cfg = parseCFGFile(await util_readText(path.join(instancePath,inst,"instance.cfg")));
             if(!cfg){
@@ -232,11 +242,12 @@ async function ensurePrismLinked(w?:BrowserWindow|null){
             properties:["openFile"],
             filters:[
                 {
-                    extensions:["exe"],
+                    // extensions:["exe"],
+                    extensions:[],
                     name:"prismlauncher"
                 }
             ],
-            title:"Please select your prismlauncher.exe"
+            title:"Please select your prismlauncher executable"
         });
         if(!res) return false;
         let filePath = res.filePaths[0];
@@ -264,8 +275,8 @@ async function alertBox(w:BrowserWindow,message:string,title="Error"){
 
 // 
 
-import { parseCFGFile, util_readdir, util_readdirWithTypes, util_readJSON, util_readText, util_warn, util_writeJSON, util_writeText, wait } from "./util";
-import { Arg_GetPrismInstances, Arg_SearchPacks, Data_PrismInstancesMenu, FSTestData, InstGroups, MMCPack, PackMetaData, Res_GetPrismInstances } from "./interface";
+import { parseCFGFile, searchStringCompare, util_readdir, util_readdirWithTypes, util_readJSON, util_readText, util_warn, util_writeJSON, util_writeText, wait } from "./util";
+import { Arg_GetInstances, Arg_GetPrismInstances, Arg_SearchPacks, Data_PrismInstancesMenu, FSTestData, InstGroups, MMCPack, PackMetaData, Res_GetPrismInstances } from "./interface";
 import { getPackMeta, searchPacks, searchPacksMeta } from "./network";
 import { ListPrismInstReason, openCCMenu, openCCMenuCB, SearchPacksMenu, ViewInstanceMenu } from "./menu_api";
 import { addInstance, getModpackInst, ModPackInst, sysInst } from "./db";

@@ -9,7 +9,12 @@ const tab_menu = new MP_TabbedMenu(
         style:"left"
     },
     {
-        onLoadSection:loadSection
+        onLoadSection:loadSection,
+        getSectionTitle:(index)=>{
+            return [
+                
+            ][index];
+        }
     }
 );
 

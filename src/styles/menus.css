@@ -81,13 +81,21 @@ aside{
 /* Tabbed Menus */
 .tabbed-menu{
     display:grid;
-    grid-template-columns:auto auto;
+    grid-template-columns:auto 1fr;
 }
 .tabbed-activity-bar{
 
 }
 .tabbed-main{
-    
+    & > *{
+        margin:15px;
+    }
+}
+.main-section{
+    margin:0px;
+}
+.main-section > *{
+    margin:15px;
 }
 
 /* Overlays */

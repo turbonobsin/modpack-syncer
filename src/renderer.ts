@@ -32,7 +32,7 @@ import "./render_lib";
 import "./styles/renderer.css";
 import { loadModPackMetaPanel, SelectedItem, selectItem } from "./render_util";
 import { InstanceData } from "./db_types";
-import { MP_Article, MP_Button, MP_Div, MP_Flexbox, MP_Header, MP_HR, MP_Ops, MP_OutlinedBox, MP_P, MP_Section, MP_Text, PartTextStyle } from "./menu_parts";
+import { makeDivPart, MP_ActivityBarItem, MP_Article, MP_Button, MP_Div, MP_Flexbox, MP_Header, MP_HR, MP_Ops, MP_OutlinedBox, MP_P, MP_Section, MP_TabbedMenu, MP_Text, PartTextStyle } from "./menu_parts";
 import { MP_SearchStructure, qElm } from "./render_lib";
 
 console.log('👋 This message is being logged by "renderer.ts", included via Vite');
@@ -428,13 +428,14 @@ async function loadData(data:FSTestData){
 
 const search = new MP_SearchStructure<CMP_FullInst>({
     listId:"instance",
+    // margin:"15px",
     onSelect:(data,item)=>{
         
     },
     onSubmit:async (t,e,q)=>{
         if(!search.list) return;
         
-        let instList = await window.gAPI.getInstances();
+        let instList = await window.gAPI.getInstances({query:q});
         if(instList){
             for(const inst of instList){
                 let part = new CMP_FullInst({
@@ -459,32 +460,65 @@ function autoSelectLastInstance(){
         else localStorage.removeItem("selected_modpack");
     }
 }
-async function initPage(){
-    search.selected.ops.onSelect = (data,item)=>{
-        localStorage.setItem("selected_modpack",data.ops.data.iid);
-        data.showData();
-    };
-    search.selected.ops.onDeselect = ()=>{
-        localStorage.removeItem("selected_modpack");
-        localStorage.removeItem("bob");
-    };
 
-    search.mainOptions.addPart(
-        new MP_Button({
-            label:"add",
-            className:"b-add-instance icon-cont accent",
-            onclick:e=>{
-                console.log(search.selected.data);
-                if(!search.selected.data) return;
-                // let res = window.gAPI.addInstance(search.selected.data.data.ops.data.meta);
-                // console.log("RES:",res);
-                window.gAPI.openMenu("search_packs");
+async function loadSection(index:number,main:MP_Div){
+    switch(index){
+        case 0:{
+            search.selected.ops.onSelect = (data,item)=>{
+                localStorage.setItem("selected_modpack",data.ops.data.iid);
+                data.showData();
+            };
+            search.selected.ops.onDeselect = ()=>{
+                localStorage.removeItem("selected_modpack");
+            };
+        
+            search.mainOptions.addPart(
+                new MP_Button({
+                    label:"add",
+                    className:"b-add-instance icon-cont accent",
+                    onclick:e=>{
+                        console.log(search.selected.data);
+                        if(!search.selected.data) return;
+                        // let res = window.gAPI.addInstance(search.selected.data.data.ops.data.meta);
+                        // console.log("RES:",res);
+                        window.gAPI.openMenu("search_packs");
+                    }
+                })
+            );
+        
+            main.addPart(search);
+            await search.submit();
+            autoSelectLastInstance();
+        } break;
+
+        case 1:{
+
+        } break;
+    }
+}
+
+async function initPage(){
+
+    let tabbed = new MP_TabbedMenu(
+        {},
+        {
+            style:"left"
+        },
+        {
+            onLoadSection:loadSection,
+            getSectionTitle:(i)=>{
+                return [
+                    "Instances"
+                ][i];
             }
-        })
+        }
+    );    
+    tabbed.postSetup();
+
+    tabbed.activityBar.addParts(
+        new MP_ActivityBarItem({ icon:"deployed_code" })
     );
 
-    mainSection.addPart(search);
-    await search.submit();
-    autoSelectLastInstance();
+    makeDivPart(".main").addPart(tabbed);
 }
 initPage();
