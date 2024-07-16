@@ -62,5 +62,6 @@ export const errors = {
 
     // prism
     instgroupsRead: Result.err("Failed to read instance group data"),
-    noPrismRoot: Result.err("No path for Prism Launcher has been set")
+    noPrismRoot: Result.err("No path for Prism Launcher has been set"),
+    failedToGetPrismInstPath: Result.err("Failed to get Prism Instance's path"),
 };

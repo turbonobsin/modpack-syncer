@@ -81,6 +81,23 @@ interface Arg_GetInstances{
     query?:string;
 }
 
+interface ScreenshotItem{
+    name:string;
+    path:string;
+    // buf:Uint8Array;
+}
+export interface Arg_GetInstScreenshots{
+    iid:string;
+}
+export interface Res_GetInstScreenshots{
+    list:ScreenshotItem[];
+    path:string;
+}
+
+interface EditInst_InitData{
+    iid:string;
+}
+
 export type Err<T> = {
     err?:string;
     data?:T;
@@ -100,12 +117,15 @@ export interface IGlobalAPI{
     getInstances:(arg:Arg_GetInstances)=>Promise<InstanceData[]|undefined>;
     showLinkInstance:(iid:string,instName:string)=>Promise<string|undefined>;
     linkInstance:(iid:string,pInstName:string)=>Promise<void>;
+    getInstScreenshots:(arg:Arg_GetInstScreenshots)=>Promise<Res_GetInstScreenshots>;
 
     getPrismInstances:(arg:Arg_GetPrismInstances)=>Promise<Res_GetPrismInstances>;
 
     launchInstance:(iid:string)=>Promise<void>;
 
     showEditInstance:(iid:string)=>Promise<void>;
+
+    getImage:(path:string)=>Promise<Uint8Array>;
     
     // main -> render
     onInitMenu:(cb:(data:InitMenuData)=>void)=>void;

@@ -64,6 +64,13 @@ export function util_readdirWithTypes(path:fs.PathLike,recursive=false){
         });
     });
 }
+export function util_readBinary(path:fs.PathOrFileDescriptor){
+    return new Promise<Buffer>(resolve=>{
+        fs.readFile(path,(err,data)=>{
+            resolve(data);
+        });
+    });
+}
 export function util_readText(path:fs.PathOrFileDescriptor){
     return new Promise<string>(resolve=>{
         fs.readFile(path,{encoding:"utf8"},(err,data)=>{
@@ -138,7 +145,13 @@ export function util_warn(...text:string[]){
 
 export function searchStringCompare(s1?:string,s2?:string){
     if(!s1 || !s2) return true;
-    return s1.toLowerCase().split(" ").some(v=>v.includes(s2??""));
+    // return s1.toLowerCase().split(" ").some(v=>v.includes(s2??""));
+    // let split2 = s2.toLowerCase().split(" ");
+    // return s1.toLowerCase().split(" ").some(v=>split2.includes(v));
+    s1 = s1.toLowerCase().replaceAll(" ","");
+    s2 = s2.toLowerCase().replaceAll(" ","");
+    
+    return s1.includes(s2) || s2.includes(s1);
 }
 
 /**

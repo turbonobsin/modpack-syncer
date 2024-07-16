@@ -221,6 +221,18 @@ export abstract class MenuPart{
 
     abstract create():void;
     load():void {}
+
+    /**
+     * @param amt 
+     * @param ops This parameter is cloned so can only contain JSON serializable data
+     */
+    createSubSections(amt:number,ops:MP_Ops={}){
+        let sections:MP_Section[] = [];
+        for(let i = 0; i < amt; i++){
+            sections.push(this.addPart(new MP_Section(JSON.parse(JSON.stringify(ops)))));
+        }
+        return sections;
+    }
 }
 abstract class TextMenuPart extends MenuPart{
     constructor(tag:string,ops:MP_Text_Ops){
@@ -530,6 +542,7 @@ export class MP_ActivityBarItem extends MP_Div{
 export interface TabbedMain_Ops extends MP_Ops{
     onLoadSection:(index:number,menu:MP_TabbedMenu)=>void;
     getSectionTitle:(index:number)=>string|undefined;
+    hasAside?:boolean;
 }
 
 export class MP_TabbedMenu extends MP_Div{
@@ -546,21 +559,23 @@ export class MP_TabbedMenu extends MP_Div{
         this.activityBar = new MP_ActivityBar(activityBarOps);
         this.main = new MP_Div(mainOps);
         
-        this.main_header = new MP_Section({ className:"section-header" });
-        this.main_body = new MP_Section({ className:"section-body" });
-        this.main_footer = new MP_Section({ className:"section-footer" });
-
+        this.main_header = new MP_Section({ className:"head-section" });
+        this.main_body = new MP_Section({ className:"body-section" });
+        this.main_footer = new MP_Section({ className:"footer-section" });
+        this.aside = new MP_Generic<HTMLElement>("aside",{});
     }
 
     activityBarOps:ActivityBar_Ops;
     mainOps:TabbedMain_Ops;
 
     activityBar:MP_ActivityBar;
-    main:MP_Div;
+    private main:MP_Div;
 
     main_header:MP_Section;
     main_body:MP_Section;
     main_footer:MP_Section;
+
+    aside:MP_Generic<HTMLElement>;
 
     active_section_index = 0;
 
@@ -571,6 +586,8 @@ export class MP_TabbedMenu extends MP_Div{
             this.activityBar,
             this.main
         );
+
+        if(this.mainOps.hasAside) this.addPart(this.aside);
     }
     onNextFrame(): void {
         this.loadSection(0);
@@ -596,7 +613,10 @@ export class MP_TabbedMenu extends MP_Div{
 
     loadSection(index:number){
         if(!this.activityBar.e) return;
-        this.main.clearParts();
+
+        this.main_header.clearParts();
+        this.main_body.clearParts();
+        this.main_footer.clearParts();
 
         let selected = this.activityBar.e.querySelectorAll(".active");
         for(const c of selected) c.classList.remove("active");
@@ -606,7 +626,7 @@ export class MP_TabbedMenu extends MP_Div{
 
         let title = this.mainOps.getSectionTitle(index);
         if(title){
-            this.main.addParts(
+            this.main_header.addParts(
                 new MP_Div({
                     className:"head-section"
                 }).addParts(
@@ -622,6 +642,30 @@ export class MP_TabbedMenu extends MP_Div{
     }
 }
 
+interface MP_Grid_Ops extends MP_Ops{
+    template_columns?:string;
+    template_rows?:string;
+    gap?:string;
+}
+
+export class MP_Grid extends MP_Div{
+    constructor(ops:MP_Grid_Ops){
+        super(ops);
+    }
+    declare ops:MP_Grid_Ops;
+    load(): void {
+        super.load();
+        if(!this.e) return;
+
+        let e = this.e;
+        let o = this.ops;
+
+        e.style.display = "grid";
+        if(o.template_columns) e.style.gridTemplateColumns = o.template_columns;
+        if(o.template_rows) e.style.gridTemplateRows = o.template_rows;
+        if(o.gap) e.style.gap = o.gap;
+    }
+}
 
 
 // ideas

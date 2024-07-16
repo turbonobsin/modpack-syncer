@@ -198,6 +198,26 @@ export class ModPackInst extends Inst<ModPackInstData>{
     getDefault(): ModPackInstData | undefined {
         return;
     }
+
+    getPrismInstPath(): string|undefined{
+        if(!sysInst.meta) return;
+        if(!sysInst.meta.prismRoot) return;
+        if(!this.meta) return;
+        if(!this.meta.linkName) return;
+
+        return path.join(sysInst.meta.prismRoot,"instances",this.meta.linkName);
+    }
+    /**
+     * Gets the instance's .minecraft folder
+     */
+    getRoot(): string|undefined{
+        if(!sysInst.meta) return;
+        if(!sysInst.meta.prismRoot) return;
+        if(!this.meta) return;
+        if(!this.meta.linkName) return;
+
+        return path.join(sysInst.meta.prismRoot,"instances",this.meta.linkName,".minecraft");
+    }
 }
 
 const fspath_modPacks = path.join(dataPath,"instances");

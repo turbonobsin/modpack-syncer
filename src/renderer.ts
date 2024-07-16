@@ -461,7 +461,7 @@ function autoSelectLastInstance(){
     }
 }
 
-async function loadSection(index:number,main:MP_Div){
+async function loadSection(index:number,menu:MP_TabbedMenu){
     switch(index){
         case 0:{
             search.selected.ops.onSelect = (data,item)=>{
@@ -486,7 +486,7 @@ async function loadSection(index:number,main:MP_Div){
                 })
             );
         
-            main.addPart(search);
+            menu.main_body.addPart(search);
             await search.submit();
             autoSelectLastInstance();
         } break;

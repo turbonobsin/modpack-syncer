@@ -2,7 +2,7 @@ import "../render_lib";
 import "../render_util";
 import "../styles/prism_instances.css";
 import { MP_Article, MP_Button, MP_Div, MP_Flexbox, MP_Header, MP_HR, MP_OutlinedBox, MP_P, MP_Section, MP_Text, PartTextStyle } from "../menu_parts";
-import { loadDefaultAside, SelectedItem, selectItem } from "../render_util";
+import { InitData, loadDefaultAside, SelectedItem, selectItem } from "../render_util";
 import { Data_PrismInstancesMenu, InitMenuData, PrismInstance } from "src/interface";
 import { MP_SearchStructure, qElm } from "../render_lib";
 
@@ -10,25 +10,26 @@ let hasLoadedPage = false;
 
 const mainSection = new MP_Div({overrideDiv:qElm(".main-section")});
 const aside = new MP_Div({overrideDiv:qElm("aside")});
-let pageData:Data_PrismInstancesMenu;
 
-window.gAPI.onInitMenu((data:InitMenuData<Data_PrismInstancesMenu>)=>{
-    console.log("INIT DATA:",data);
-    localStorage.setItem("initData",JSON.stringify(data));
-    pageData = data.data;
+// window.gAPI.onInitMenu((data:InitMenuData<Data_PrismInstancesMenu>)=>{
+//     console.log("INIT DATA:",data);
+//     sessionStorage.setItem("initData",JSON.stringify(data));
+//     pageData = data.data;
 
-    initPage();
-});
+//     initPage();
+// });
 
-setTimeout(()=>{
-    if(hasLoadedPage) return;
+// setTimeout(()=>{
+//     if(hasLoadedPage) return;
 
-    let cache = localStorage.getItem("initData");
-    if(cache){
-        pageData = JSON.parse(cache).data;
-        initPage();
-    }
-},1000);
+//     let cache = sessionStorage.getItem("initData");
+//     if(cache){
+//         pageData = JSON.parse(cache).data;
+//         initPage();
+//     }
+// },1000);
+
+let initData = new InitData<Data_PrismInstancesMenu>(initPage);
 
 async function initPage(){
     hasLoadedPage = true;
@@ -54,11 +55,11 @@ async function initPage(){
                 )
             );
 
-            console.log("reason:",pageData);
-            if(pageData.reason == "view"){
+            console.log("reason:",initData.d);
+            if(initData.d.reason == "view"){
 
             }
-            else if(pageData.reason == "link"){
+            else if(initData.d.reason == "link"){
                 a.body.addParts(
                     new MP_HR(),
                     new MP_OutlinedBox({
@@ -67,13 +68,13 @@ async function initPage(){
                     }).addParts(
                         new MP_P({
                             style:PartTextStyle.note,
-                            innerHTML:`Link <span class="textstyle-accent">${pageData.instName}</span> with <span class="textstyle-accent">${data.name}</span>?`
+                            innerHTML:`Link <span class="textstyle-accent">${initData.d.instName}</span> with <span class="textstyle-accent">${data.name}</span>?`
                         }),
                         new MP_Button({
                             label:"Link",
                             icon:"link",
                             onclick:async e=>{
-                                await window.gAPI.linkInstance(pageData.iid,data.name);
+                                await window.gAPI.linkInstance(initData.d.iid,data.name);
                                 window.close();
                             }
                         })
@@ -92,9 +93,11 @@ async function initPage(){
         onSubmit:async (t,e,q)=>{
             if(!search.list) return;
             // search.list.clearParts();
+            // mainSection.clearParts();
+            // mainSection.addPart(search);
             
             let res = await window.gAPI.getPrismInstances({query:q});
-            console.log("inst:",res);
+            console.log("inst:",q,res);
             if(!res) return;
 
             let groups:Record<string,MP_Div> = {};

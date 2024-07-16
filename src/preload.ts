@@ -49,12 +49,15 @@ contextBridge.exposeInMainWorld("gAPI",{
     getInstances:regf("getInstances"),
     showLinkInstance:regf("showLinkInstance"),
     linkInstance:regf("linkInstance"),
+    getInstScreenshots:regf("getInstScreenshots"),
 
     getPrismInstances:regf("getPrismInstances"),
 
     launchInstance:regf("launchInstance"),
 
     showEditInstance:regf("showEditInstance"),
+
+    getImage:regf("getImage"),
 
     onInitMenu: (cb) => ipcRenderer.on("initMenu",(ev,data)=>cb(data)),
     onInitReturnCB: (cb) => ipcRenderer.on("initReturnCB",(ev,data)=>cb(data)),

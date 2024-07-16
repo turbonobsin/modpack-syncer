@@ -135,8 +135,51 @@ export async function preInit(){
         let inst = await getModpackInst(iid);
         if(!inst || !inst.meta) return;
 
-        await openCCMenu("edit_instance_menu");
+        await openCCMenu("edit_instance_menu",{iid});
     });
+
+    ipcMain.handle("getInstScreenshots",async (ev,arg:Arg_GetInstScreenshots)=>{
+        return (await getInstScreenshots(arg)).unwrap();
+    });
+
+    ipcMain.handle("getImage",async (ev,fullPath:string)=>{
+        let buf = await util_readBinary(fullPath);
+        return buf;
+    });
+}
+
+async function getInstScreenshots(arg:Arg_GetInstScreenshots): Promise<Result<Res_GetInstScreenshots>>{
+    if(!sysInst.meta) return errors.noSys;
+    if(!sysInst.meta.prismRoot) return errors.noPrismRoot;
+    
+    let inst = await getModpackInst(arg.iid);
+    if(!inst.meta) return errors.couldNotFindPack;
+
+    let mainPath = inst.getRoot();
+    if(!mainPath) return errors.failedToGetPrismInstPath;
+
+    let screenshotPath = path.join(mainPath,"screenshots");
+
+    let data:Res_GetInstScreenshots = {
+        list:[],
+        path:screenshotPath
+    };
+
+    let list = await util_readdir(screenshotPath);
+    for(const name of list){
+        let fullPath = path.join(screenshotPath,name);
+        // let buf = await util_readBinary(fullPath);
+        // buf = buf.subarray(0,buf.length*0.5);
+        data.list.push({
+            name,
+            path:fullPath,
+            // buf
+            // file:new File([],"none.png"),
+            // url2:URL.createObjectURL(await (await fetch(fullPath)).blob())
+        });
+    }
+
+    return new Result(data);
 }
 
 function refreshMainWindow(){
@@ -177,7 +220,7 @@ async function getPrismInstances(w=mainWindow,arg:Arg_GetPrismInstances):Promise
         let gdata = groupData.groups[group];
 
         for(const inst of gdata.instances){
-            if(arg.query) if(searchStringCompare(inst,arg.query)) continue;
+            if(arg.query) if(!searchStringCompare(inst,arg.query)) continue;
 
             let cfg = parseCFGFile(await util_readText(path.join(instancePath,inst,"instance.cfg")));
             if(!cfg){
@@ -275,8 +318,8 @@ async function alertBox(w:BrowserWindow,message:string,title="Error"){
 
 // 
 
-import { parseCFGFile, searchStringCompare, util_readdir, util_readdirWithTypes, util_readJSON, util_readText, util_warn, util_writeJSON, util_writeText, wait } from "./util";
-import { Arg_GetInstances, Arg_GetPrismInstances, Arg_SearchPacks, Data_PrismInstancesMenu, FSTestData, InstGroups, MMCPack, PackMetaData, Res_GetPrismInstances } from "./interface";
+import { parseCFGFile, searchStringCompare, util_readBinary, util_readdir, util_readdirWithTypes, util_readJSON, util_readText, util_warn, util_writeJSON, util_writeText, wait } from "./util";
+import { Arg_GetInstances, Arg_GetInstScreenshots, Arg_GetPrismInstances, Arg_SearchPacks, Data_PrismInstancesMenu, FSTestData, InstGroups, MMCPack, PackMetaData, Res_GetInstScreenshots, Res_GetPrismInstances } from "./interface";
 import { getPackMeta, searchPacks, searchPacksMeta } from "./network";
 import { ListPrismInstReason, openCCMenu, openCCMenuCB, SearchPacksMenu, ViewInstanceMenu } from "./menu_api";
 import { addInstance, getModpackInst, ModPackInst, sysInst } from "./db";

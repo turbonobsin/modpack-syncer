@@ -3,3 +3,6 @@
     color:var(--text-dim);
     padding:10px;
 }
+.root{
+    overflow-y:scroll;
+}

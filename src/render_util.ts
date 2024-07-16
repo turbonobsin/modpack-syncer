@@ -1,5 +1,5 @@
 import { MP_Button, MP_Div, MP_Header, MP_P, MP_Text } from "./menu_parts";
-import { PackMetaData } from "./interface";
+import { InitMenuData, PackMetaData } from "./interface";
 
 export function loadDefaultAside(aside:MP_Div,ops:{
     title:string,
@@ -130,5 +130,43 @@ export function deselectItem<T>(item:SelectedItem<T>){
     if(!item.data) return;
     if(item.data.e.classList.contains("active")){
         selectItem(item,item.data.data,item.data.e);
+    }
+}
+
+// 
+export class InitData<T>{
+    constructor(init:()=>any){
+        this.init = init;
+        this.setup();
+    }
+    // @ts-ignore
+    d:T; // <-- I will only load the page if this is defined so it is garenteed to be defined
+    hasLoadedPage = false;
+    init:()=>any;
+    
+    // timeoutDelay = 1000;
+    timeoutDelay = 300;
+
+    setup(){
+        window.gAPI.onInitMenu((data:InitMenuData<any>)=>{
+            console.log("INIT DATA:",data);
+            sessionStorage.setItem("initData",JSON.stringify(data));
+            this.d = data.data;
+            if(!this.d) return;
+        
+            this.init();
+        });
+        
+        setTimeout(()=>{
+            if(this.hasLoadedPage) return;
+        
+            let cache = sessionStorage.getItem("initData");
+            if(cache){
+                this.d = JSON.parse(cache).data;
+                if(!this.d) return;
+
+                this.init();
+            }
+        },this.timeoutDelay);
     }
 }
