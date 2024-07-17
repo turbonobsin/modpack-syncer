@@ -161,12 +161,21 @@ img._loaded:active{
         justify-content:center;
         align-items:center;
         /* margin:15px; */
-
+        
         & img{
+            /* image-rendering:pixelated; */
+        }
+        & img.vert{
+            width:calc(100% - 400px);
             max-width:calc(100vw - 400px);
+        }
+        & img.horz{
+            height:calc(100% - 400px);
+            max-height:calc(100vw - 400px);
         }
     }
 }
+
 .fullscreen-cont.open{
     display:grid;
     /* animation:OpenFS 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275); */
@@ -177,6 +186,20 @@ img._loaded:active{
         animation:OpenFS_img 0.2s cubic-bezier(0.075, 0.82, 0.165, 1);
         animation-fill-mode:forwards;
     }
+}
+
+table{
+    border-collapse:collapse;
+    width:100%;
+    
+    display:grid;
+    /* grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); */
+    /* grid-template-columns:repeat(auto-fill,1fr); */
+    grid-auto-flow: row;
+    gap:10px;
+}
+td,th{
+    padding:0px;
 }
 
 @keyframes OpenFS {

@@ -4,9 +4,10 @@ import path from "path";
 import { DBSys, DBUser, InstanceData as ModPackInstData } from "./db_types";
 import { PackMetaData } from "./interface";
 import { errors, Result } from "./errors";
+import express from "express";
 
 let appPath = app.getAppPath();
-const dataPath = path.join(appPath,"data");
+export const dataPath = path.join(appPath,"data");
 const folderPath = path.join(dataPath,"folders");
 
 // 
@@ -160,11 +161,15 @@ abstract class Inst<T>{
         this.meta = res;
         await this.fillDefaults();
 
+        this.postLoad();
+
         return this;
     }
     async save(){ // not sure if I want to do save now or add it to a queue
         await util_writeJSON(this.filePath,this.meta);
     }
+
+    postLoad(){}
 }
 
 export class SysInst extends Inst<DBSys>{
@@ -179,8 +184,41 @@ export class SysInst extends Inst<DBSys>{
             fid:0,
             iid:0,
             uid:0,
-            ver:"0.0.1"
+            ver:"0.0.1",
+            port:"57152"
         };
+    }
+    postLoad(): void {
+        if(!this.meta){
+            util_warn("Failed to start internal server, system info not found/loaded");
+            return;
+        }
+        
+        const eApp = express();
+
+        eApp.get("/image",(req,res)=>{
+            // let filePath = req.params.path;
+            let filePath = req.query.path as string;
+            if(!filePath){
+                res.sendStatus(403);
+                return;
+            }
+            let newPath = filePath;
+            
+            res.sendFile(newPath);
+        });
+
+        eApp.listen(this.meta.port,()=>{
+            console.log(":: started internal server on port: "+this.meta?.port);
+        });
+        // eApp.use("/image",express.static);
+        // eApp.get("/image/:iid/:name",(req,res)=>{
+        //     let iid = req.params.iid;
+        //     let name = req.params.name;
+        //     if(!iid || !name) return;
+
+        //     let fullPath = path.join(dataPath,"instances",iid,);
+        // });
     }
 }
 export class UserInst extends Inst<DBUser>{

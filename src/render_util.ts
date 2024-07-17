@@ -133,6 +133,14 @@ export function deselectItem<T>(item:SelectedItem<T>){
     }
 }
 
+export async function wait(delay:number){
+    return new Promise<void>(resolve=>{
+        setTimeout(()=>{
+            resolve();
+        },delay);
+    });
+}
+
 // 
 export class InitData<T>{
     constructor(init:()=>any){
@@ -144,27 +152,32 @@ export class InitData<T>{
     hasLoadedPage = false;
     init:()=>any;
     
-    // timeoutDelay = 1000;
+    // timeoutDelay = 1500;
     timeoutDelay = 300;
 
     setup(){
         window.gAPI.onInitMenu((data:InitMenuData<any>)=>{
+            this.hasLoadedPage = true;
+
             console.log("INIT DATA:",data);
             sessionStorage.setItem("initData",JSON.stringify(data));
             this.d = data.data;
             if(!this.d) return;
         
+            console.log("...called init");
             this.init();
         });
         
         setTimeout(()=>{
             if(this.hasLoadedPage) return;
+            this.hasLoadedPage = true;
         
             let cache = sessionStorage.getItem("initData");
             if(cache){
                 this.d = JSON.parse(cache).data;
                 if(!this.d) return;
 
+                console.log("...called init");
                 this.init();
             }
         },this.timeoutDelay);

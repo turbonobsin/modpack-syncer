@@ -98,6 +98,30 @@ interface EditInst_InitData{
     iid:string;
 }
 
+interface Arg_GetInstMods{
+    iid:string;
+}
+interface ModInfo{
+    m:any;
+
+    name:string;
+    version:string;
+    desc:string;
+    authors:string[];
+    icon:string;
+    loader:string;
+}
+interface ModData{
+    name:string;
+    info?:ModInfo;
+}
+interface Res_GetInstMods{
+    mods:{
+        global:ModData[],
+        local:ModData[]
+    }
+}
+
 export type Err<T> = {
     err?:string;
     data?:T;
@@ -117,7 +141,9 @@ export interface IGlobalAPI{
     getInstances:(arg:Arg_GetInstances)=>Promise<InstanceData[]|undefined>;
     showLinkInstance:(iid:string,instName:string)=>Promise<string|undefined>;
     linkInstance:(iid:string,pInstName:string)=>Promise<void>;
+
     getInstScreenshots:(arg:Arg_GetInstScreenshots)=>Promise<Res_GetInstScreenshots>;
+    getInstMods:(arg:Arg_GetInstMods)=>Promise<Res_GetInstMods>;
 
     getPrismInstances:(arg:Arg_GetPrismInstances)=>Promise<Res_GetPrismInstances>;
 

@@ -30,6 +30,7 @@ interface DBSys{
     uid:number;
     iid:number;
     ver:string;
+    port:string;
 
     prismRoot?:string;
 };

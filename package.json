@@ -21,6 +21,7 @@
 		"@electron-forge/plugin-fuses": "^7.4.0",
 		"@electron-forge/plugin-vite": "^7.4.0",
 		"@electron/fuses": "^1.8.0",
+		"@types/node-7z": "^2.1.8",
 		"@typescript-eslint/eslint-plugin": "^5.62.0",
 		"@typescript-eslint/parser": "^5.62.0",
 		"electron": "31.1.0",
@@ -37,8 +38,13 @@
 	},
 	"license": "MIT",
 	"dependencies": {
+		"7zip-bin": "^5.2.0",
+		"canvas": "^2.11.2",
 		"electron-squirrel-startup": "^1.0.1",
+		"express": "^4.19.2",
 		"level": "^8.0.1",
-		"socket.io-client": "^4.7.5"
+		"node-7z": "^3.0.0",
+		"socket.io-client": "^4.7.5",
+		"toml": "^3.0.0"
 	}
 }

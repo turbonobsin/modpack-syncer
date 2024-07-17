@@ -6,6 +6,7 @@ import { BrowserWindow, ipcRenderer, Menu } from "electron";
 import path from "path";
 import { InitMenuData } from "src/interface";
 import { util_warn } from "./util";
+import { mainWindow } from "./main";
 
 abstract class CCMenu{
     constructor(startScript:string,w=800,h=600){
@@ -26,6 +27,8 @@ abstract class CCMenu{
             webPreferences: {
                 preload: path.join(__dirname, "preload.js"),
             },
+            parent:mainWindow,
+            center:true
         });
 
         // const menu = Menu.buildFromTemplate([

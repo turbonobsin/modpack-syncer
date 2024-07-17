@@ -26,6 +26,13 @@ export interface MP_Ops{
     paddingBottom?:string;
     paddingRight?:string;
 
+    width?:string;
+    height?:string;
+    maxWidth?:string;
+    maxHeight?:string;
+    minWidth?:string;
+    minHeight?:string;
+
     onAdded?:()=>void;
 }
 export interface MP_Text_Ops extends MP_Ops{
@@ -206,6 +213,13 @@ export abstract class MenuPart{
             if(o.paddingLeft) e.style.paddingLeft = o.paddingLeft;
             if(o.paddingBottom) e.style.paddingBottom = o.paddingBottom;
             if(o.paddingRight) e.style.paddingRight = o.paddingRight;
+
+            if(o.width) e.style.width = o.width;
+            if(o.height) e.style.height = o.height;
+            if(o.maxWidth) e.style.maxWidth = o.maxWidth;
+            if(o.maxHeight) e.style.maxHeight = o.maxHeight;
+            if(o.minWidth) e.style.minWidth = o.minWidth;
+            if(o.minHeight) e.style.minHeight = o.minHeight;
         }
 
         // if(this._onPostLoad) this._onPostLoad(this);
@@ -664,6 +678,82 @@ export class MP_Grid extends MP_Div{
         if(o.template_columns) e.style.gridTemplateColumns = o.template_columns;
         if(o.template_rows) e.style.gridTemplateRows = o.template_rows;
         if(o.gap) e.style.gap = o.gap;
+    }
+}
+
+interface MP_TableList_Ops extends MP_Ops{
+    header:{
+        label:string,
+        width?:string
+    }[]
+}
+export class MP_Table extends MenuPart{
+    create(): void {
+        this.e = document.createElement("table");
+    }
+}
+export class MP_TR extends MenuPart{
+    create(): void {
+        this.e = document.createElement("tr");
+    }
+}
+interface MP_TD_Ops extends MP_Ops{
+    header:boolean;
+}
+export class MP_TD extends MenuPart{
+    constructor(ops:MP_TD_Ops){
+        super(ops);
+    }
+    declare ops:MP_TD_Ops;
+
+    create(): void {
+        this.e = document.createElement(this.ops.header ? "th" : "td");
+    }
+}
+export class MP_TableList extends MP_Div{
+    constructor(ops:MP_TableList_Ops){
+        super(ops);
+    }
+    declare ops:MP_TableList_Ops;
+    table = new MP_Table({});
+
+    load(): void {
+        super.load();
+
+        this.addPart(this.table);
+    }
+    postLoad(): void {
+        super.postLoad();
+
+        this.addRow(true,this.ops.header.map(v=>new MP_TD({header:true,textContent:v.label})),(td,i)=>{
+            let w = this.ops.header[i].width;
+            if(!w) return;
+            if(td.e) td.e.style.minWidth = w;
+        });
+    }
+    addRow(header:boolean,parts:MenuPart[],post?:(td:MenuPart,i:number)=>void){
+        let tr = new MP_TR({});
+        this.table.addPart(tr);
+
+        let i = 0;
+        for(const p of parts){
+            let ops = {
+                header
+            } as MP_TD_Ops;
+            
+            let td = new MP_TD(ops);
+            tr.addPart(td);
+            td.addPart(p);
+
+            if(td.e){
+                td.e.style.verticalAlign = "middle";
+                td.e.style.fontSize = "12px";
+            }
+
+            if(post) post(td,i);
+
+            i++;
+        }
     }
 }
 

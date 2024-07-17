@@ -3,6 +3,12 @@
 import { app, BrowserWindow, dialog, ipcMain } from "electron";
 import path from "path";
 import { mainWindow } from "./main";
+import Seven from "node-7z";
+import sevenBin from "7zip-bin";
+import toml from "toml";
+
+// const pathTo7zip = sevenBin.path7za;
+const pathTo7zip = path.join(app.getAppPath(),"node_modules","7zip-bin","win","x64","7za.exe");
 
 export async function preInit(){
     console.log("pre init");
@@ -141,11 +147,189 @@ export async function preInit(){
     ipcMain.handle("getInstScreenshots",async (ev,arg:Arg_GetInstScreenshots)=>{
         return (await getInstScreenshots(arg)).unwrap();
     });
+    ipcMain.handle("getInstMods",async (ev,arg:Arg_GetInstMods)=>{
+        return (await getInstMods(arg)).unwrap();
+    });
 
     ipcMain.handle("getImage",async (ev,fullPath:string)=>{
         let buf = await util_readBinary(fullPath);
         return buf;
     });
+}
+
+async function getInstMods(arg:Arg_GetInstMods): Promise<Result<Res_GetInstMods>>{
+    if(!sysInst.meta) return errors.noSys;
+    if(!sysInst.meta.prismRoot) return errors.noPrismRoot;
+
+    let inst = await getModpackInst(arg.iid);
+    if(!inst.meta) return errors.couldNotFindPack;
+
+    let mainPath = inst.getRoot();
+    if(!mainPath) return errors.failedToGetPrismInstPath;
+    // 
+
+    let data:Res_GetInstMods = {
+        mods:{
+            global:[],
+            local:[]
+        }
+    };
+
+    let modList = await util_readdirWithTypes(path.join(mainPath,"mods"),false);
+    for(const mod of modList){
+        if(!mod.isFile()) continue;
+        if(!mod.name.endsWith(".jar")) continue;
+
+        let m = await getMod(mod);
+
+        let info:ModInfo|undefined;
+        
+        let cachePath = path.join(dataPath,"cache","mods",mod.name);
+        
+        if(m.__type == "fabric"){
+            info = {
+                m,
+                name:m.name,
+                desc:m.description,
+                version:m.version,
+                authors:m.authors,
+                loader:m.__type,
+                icon:path.join(cachePath,m.icon.split("/").pop())
+            };
+        }
+        else if(m.__type == "forge" || m.__type == "datapack"){
+            info = {
+                m,
+                name:m.mods.displayName,
+                desc:m.mods.description,
+                version:m.mods.version,
+                authors:m.mods.authors.replaceAll(", ",",").split(","),
+                loader:m.__type,
+                icon:path.join(cachePath,m.logoFile.split("/").pop())
+            };
+        }
+
+        data.mods.global.push({
+            name:mod.name,
+            info
+        });
+    }
+
+    return new Result(data);
+}
+
+async function getMod(mod:Dirent,update=0){
+    
+    // let info = 
+    // let cachePath = `"${path.join(dataPath,"cache","mods")}"`;
+    // let modPath = `"${path.join(mod.parentPath,mod.name)}"`;
+    let cachePath = path.join(dataPath,"cache","mods",mod.name);
+    let modPath = path.join(mod.parentPath,mod.name);
+
+    if((await util_lstat(cachePath))?.isDirectory()){
+        if(update != 2){
+            return await util_readJSON(path.join(cachePath,"m_info.json"));
+        }
+    }
+
+    // util_warn("FILE: "+modPath);
+    // util_warn("CACHE_PATH: "+cachePath);
+    // console.log("path:",pathTo7zip);
+
+    const jarStream = Seven.extract(modPath,cachePath,{
+        $bin:pathTo7zip,
+        recursive:true,
+        $cherryPick:[
+            // fabric/forge
+            "fabric.mod.json",
+            // "icon.png",
+            "MANIFEST.MF", // not sure if I'll need this but I'll add it anyways
+
+            // forge
+            "mods.toml", // for forge mod's decriptions
+
+            // datapack
+            // "pack.png",
+            "pack.mcmeta",
+            "README.md"
+        ]
+    });
+
+    jarStream.on('data', function (data) {
+        // doStuffWith(data) //? { status: 'extracted', file: 'extracted/file.txt" }
+        
+        // if(data.file == "")
+        console.log("FILE:",data.file);
+    });
+        
+    jarStream.on('progress', function (progress) {
+        // doStuffWith(progress) //? { percent: 67, fileCount: 5, file: undefinded }
+    });
+    
+    let res:()=>void;
+    let prom = new Promise<void>(resolve=>res = resolve);
+    jarStream.on('end', function () {
+            // end of the operation, get the number of folders involved in the operation
+        // myStream.info.get('Folders') //? '4'
+
+        res();
+    });
+        
+    jarStream.on('error', (err) => {
+        console.log("error:",err);
+    });
+
+    //   
+    
+    // console.log("path:",mod.parentPath);
+
+    await prom;
+
+    let type = 
+        (await util_lstat(path.join(cachePath,"fabric.mod.json"))) != null ? "fabric" :
+        (await util_lstat(path.join(cachePath,"mods.toml"))) != null ? "forge" : "datapack";
+
+    let iconPath:string|undefined;
+    let info:any;
+
+    if(type == "fabric"){
+        info = await util_readJSON(path.join(cachePath,"fabric.mod.json")) as any;
+
+        iconPath = info.icon;
+    }
+    else if(type == "forge"){
+        info = toml.parse(await util_readText(path.join(cachePath,"mods.toml")));
+
+        iconPath = info.logoFile;
+    }
+    else if(type == "datapack"){
+        info = toml.parse(await util_readText(path.join(cachePath,"mods.toml")));
+
+        iconPath = "pack.png";
+    }
+
+    if(info){
+        info.__formatVersion = "1";
+        info.__type = type;
+        await util_writeJSON(path.join(cachePath,"m_info.json"),info);
+    }
+
+    if(iconPath){
+        const jarStream2 = Seven.extract(modPath,cachePath,{
+            $bin:pathTo7zip,
+            recursive:false,
+            $cherryPick:[
+                iconPath
+            ]
+        });
+        await new Promise<void>(resolve=>{
+            jarStream2.on("end",()=>{
+                resolve();
+            });
+        });
+    }
+
+    return info;
 }
 
 async function getInstScreenshots(arg:Arg_GetInstScreenshots): Promise<Result<Res_GetInstScreenshots>>{
@@ -318,16 +502,17 @@ async function alertBox(w:BrowserWindow,message:string,title="Error"){
 
 // 
 
-import { parseCFGFile, searchStringCompare, util_readBinary, util_readdir, util_readdirWithTypes, util_readJSON, util_readText, util_warn, util_writeJSON, util_writeText, wait } from "./util";
-import { Arg_GetInstances, Arg_GetInstScreenshots, Arg_GetPrismInstances, Arg_SearchPacks, Data_PrismInstancesMenu, FSTestData, InstGroups, MMCPack, PackMetaData, Res_GetInstScreenshots, Res_GetPrismInstances } from "./interface";
+import { parseCFGFile, searchStringCompare, util_lstat, util_readBinary, util_readdir, util_readdirWithTypes, util_readJSON, util_readText, util_warn, util_writeJSON, util_writeText, wait } from "./util";
+import { Arg_GetInstances, Arg_GetInstMods, Arg_GetInstScreenshots, Arg_GetPrismInstances, Arg_SearchPacks, Data_PrismInstancesMenu, FSTestData, InstGroups, MMCPack, ModData, ModInfo, PackMetaData, Res_GetInstMods, Res_GetInstScreenshots, Res_GetPrismInstances } from "./interface";
 import { getPackMeta, searchPacks, searchPacksMeta } from "./network";
 import { ListPrismInstReason, openCCMenu, openCCMenuCB, SearchPacksMenu, ViewInstanceMenu } from "./menu_api";
-import { addInstance, getModpackInst, ModPackInst, sysInst } from "./db";
+import { addInstance, dataPath, getModpackInst, ModPackInst, sysInst } from "./db";
 import { InstanceData } from "./db_types";
 import { errors, Result } from "./errors";
 import { readConfigFile } from "typescript";
 import { getMaxListeners } from "stream";
 import { exec } from "child_process";
+import { Dirent } from "fs";
 
 async function fsTest(customPath?:string): Promise<FSTestData|undefined>{
     let instancePath:string;

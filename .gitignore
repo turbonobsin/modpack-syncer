@@ -1,3 +1,6 @@
+# Modpack Syncer Files
+data/
+
 # Logs
 logs
 *.log
