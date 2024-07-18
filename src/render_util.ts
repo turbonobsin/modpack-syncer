@@ -79,7 +79,7 @@ export async function loadModPackMetaPanel(meta:PackMetaData,panel?:HTMLElement|
         new MP_Button({
             label:"Add Mod Pack",
             className:"b-add-mod-pack",
-            onclick:async e=>{
+            onClick:async e=>{
                 let res = await window.gAPI.addInstance(meta);
                 window.close();
             }
@@ -105,6 +105,8 @@ export class SelectedItem<T>{
     data?:SelectedItemData<T>;
 };
 export function selectItem<T>(item:SelectedItem<T>,data:T,e:Element){
+    // deselectItem(item); // IF NOT MULTI-SELECT
+    
     item.data = {data,e};
     let aside = document.querySelector("aside");
     
@@ -113,8 +115,9 @@ export function selectItem<T>(item:SelectedItem<T>,data:T,e:Element){
     let allActive = e.parentElement?.querySelectorAll(".active");
     if(allActive) for(const elm of allActive) elm.classList.remove("active");
     if(wasActive){
-        if(aside) aside.textContent = "";
-        if(item.ops.onDeselect) item.ops.onDeselect(data,item);
+        deselectItem(item);
+        // if(aside) aside.textContent = "";
+        // if(item.ops.onDeselect) item.ops.onDeselect(data,item);
         return;
     }
 
@@ -124,12 +127,18 @@ export function selectItem<T>(item:SelectedItem<T>,data:T,e:Element){
 export function reselectItem<T>(item:SelectedItem<T>){
     if(!item.data) return;
 
+    let aside = document.querySelector("aside");
+
+    if(aside) aside.textContent = "";
+    if(item.ops.onDeselect) item.ops.onDeselect(item.data.data,item);
+
     selectItem(item,item.data.data,item.data.e);
 }
 export function deselectItem<T>(item:SelectedItem<T>){
     if(!item.data) return;
     if(item.data.e.classList.contains("active")){
-        selectItem(item,item.data.data,item.data.e);
+        // selectItem(item,item.data.data,item.data.e);
+        item.data.e.classList.remove("active");
     }
 }
 

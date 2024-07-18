@@ -280,7 +280,7 @@ export class CMP_FullInst extends MP_Article {
                 new MP_Button({
                     label:"Link",
                     icon:"link",
-                    onclick:async e=>{
+                    onClick:async e=>{
                         // window.gAPI.openMenu("prism_instances");
                         
                         let res = await window.gAPI.showLinkInstance(inst.iid,inst.customName??inst.meta.name);
@@ -300,7 +300,7 @@ export class CMP_FullInst extends MP_Article {
                         label:"Launch",
                         className:"b-inst-launch",
                         disabled:!this.canLaunch(),
-                        onclick:async e=>{
+                        onClick:async e=>{
                             window.gAPI.launchInstance(inst.iid);
                             // let res = await window.gAPI.addInstance(meta);
                             // console.log("RES:",res);
@@ -308,7 +308,7 @@ export class CMP_FullInst extends MP_Article {
                     }),
                     new MP_Button({
                         label:"Edit",
-                        onclick:e=>{
+                        onClick:e=>{
                             window.gAPI.showEditInstance(inst.iid);
                         }
                     }),
@@ -476,7 +476,7 @@ async function loadSection(index:number,menu:MP_TabbedMenu){
                 new MP_Button({
                     label:"add",
                     className:"b-add-instance icon-cont accent",
-                    onclick:e=>{
+                    onClick:e=>{
                         console.log(search.selected.data);
                         if(!search.selected.data) return;
                         // let res = window.gAPI.addInstance(search.selected.data.data.ops.data.meta);

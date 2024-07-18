@@ -73,7 +73,7 @@ async function initPage(){
                         new MP_Button({
                             label:"Link",
                             icon:"link",
-                            onclick:async e=>{
+                            onClick:async e=>{
                                 await window.gAPI.linkInstance(initData.d.iid,data.name);
                                 window.close();
                             }

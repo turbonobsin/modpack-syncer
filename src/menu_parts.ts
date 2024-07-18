@@ -33,6 +33,8 @@ export interface MP_Ops{
     minWidth?:string;
     minHeight?:string;
 
+    onClick?:(e:MouseEvent,elm:HTMLElement)=>any;
+
     onAdded?:()=>void;
 }
 export interface MP_Text_Ops extends MP_Ops{
@@ -47,7 +49,7 @@ export interface MP_Flexbox_Ops extends MP_Ops{
     alignItems?:string;
 }
 export interface MP_Button_Ops extends MP_Ops{
-    onclick:(e:MouseEvent)=>void;
+    // onClick:(e:MouseEvent)=>any;
     label:string;
     disabled?:boolean;
     icon?:string;
@@ -66,7 +68,7 @@ export interface MP_SearchForm_Ops extends MP_Ops{
     onSubmit:(t:MP_SearchForm,e:SubmitEvent,query?:string)=>void|Promise<void>;
 }
 
-function addClassToOps(ops:MP_Ops,...className:string[]){
+export function addClassToOps(ops:MP_Ops,...className:string[]){
     if(!ops.classList) ops.classList = [];
     ops.classList.push(...className);
 }
@@ -220,6 +222,11 @@ export abstract class MenuPart{
             if(o.maxHeight) e.style.maxHeight = o.maxHeight;
             if(o.minWidth) e.style.minWidth = o.minWidth;
             if(o.minHeight) e.style.minHeight = o.minHeight;
+
+            if(o.onClick) e.addEventListener("click",e=>{
+                if(!this.e) return;
+                if(o.onClick) o.onClick(e,this.e);
+            });
         }
 
         // if(this._onPostLoad) this._onPostLoad(this);
@@ -379,9 +386,9 @@ export class MP_Button extends MenuPart{
         if(!this.e) return;
         let o = this.ops;
 
-        this.e.addEventListener("click",e=>{
-            this.ops.onclick(e);
-        });
+        // this.e.addEventListener("click",e=>{
+        //     this.ops.onClick(e);
+        // });
 
         if(this.ops.icon){
             this.addParts(

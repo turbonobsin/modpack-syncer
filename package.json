@@ -39,7 +39,6 @@
 	"license": "MIT",
 	"dependencies": {
 		"7zip-bin": "^5.2.0",
-		"canvas": "^2.11.2",
 		"electron-squirrel-startup": "^1.0.1",
 		"express": "^4.19.2",
 		"level": "^8.0.1",

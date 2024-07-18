@@ -176,9 +176,20 @@ async function getInstMods(arg:Arg_GetInstMods): Promise<Result<Res_GetInstMods>
     };
 
     let modList = await util_readdirWithTypes(path.join(mainPath,"mods"),false);
+    let allowedExts = ["jar",".jar.disabled"];
     for(const mod of modList){
         if(!mod.isFile()) continue;
-        if(!mod.name.endsWith(".jar")) continue;
+        
+        let ext = mod.name.split(".").pop()?.toLowerCase();
+        if(!ext) continue;
+        let check = false;
+        for(const ext of allowedExts){
+            if(mod.name.toLowerCase().endsWith(ext)){
+                check = true;
+                break;
+            }
+        }
+        if(!check) continue;
 
         let m = await getMod(mod);
 
@@ -513,6 +524,7 @@ import { readConfigFile } from "typescript";
 import { getMaxListeners } from "stream";
 import { exec } from "child_process";
 import { Dirent } from "fs";
+import { CineonToneMapping } from "three";
 
 async function fsTest(customPath?:string): Promise<FSTestData|undefined>{
     let instancePath:string;

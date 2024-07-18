@@ -1,9 +1,9 @@
 import "../render_lib";
 import "../styles/edit_instance_menu.css";
-import { makeDivPart, MP_ActivityBarItem, MP_Div, MP_Flexbox, MP_Generic, MP_Grid, MP_HR, MP_TabbedMenu, MP_TableList, MP_Text, MP_TR } from "../menu_parts";
-import { qElm } from "../render_lib";
-import { EditInst_InitData } from "../interface";
-import { InitData, wait } from "../render_util";
+import { addClassToOps, makeDivPart, MP_ActivityBarItem, MP_Div, MP_Flexbox, MP_Flexbox_Ops, MP_Generic, MP_Grid, MP_Header, MP_HR, MP_TabbedMenu, MP_TableList, MP_Text, MP_TR } from "../menu_parts";
+import { MP_SearchStructure, qElm } from "../render_lib";
+import { EditInst_InitData, ModData } from "../interface";
+import { InitData, SelectedItem, selectItem, wait } from "../render_util";
 import { sysInst } from "src/db";
 import { io } from "socket.io-client";
 
@@ -29,6 +29,83 @@ const tab_menu = new MP_TabbedMenu(
     }
 );
 
+interface MP_ModRow_Ops extends MP_Flexbox_Ops{
+    mod:ModData;
+    onClick2?:(e:MouseEvent,elm:HTMLElement)=>any;
+}
+class MP_ModRow extends MP_Flexbox{
+    constructor(ops:MP_ModRow_Ops){
+        addClassToOps(ops,"mod-row");
+        ops.alignItems = "center";
+        ops.gap = "5px";
+        ops.marginBottom = "3px";
+        
+        super(ops);
+    }
+    declare ops:MP_ModRow_Ops;
+
+    load(): void {
+        super.load();
+        let mod = this.ops.mod;
+
+        this.addParts(
+            new MP_Generic<HTMLImageElement>("img",{}).onPostLoad(p=>{
+                if(!p.e) return;
+                if(!mod.info) return;
+
+                let e = p.e as HTMLImageElement;
+
+                e.style.width = "25px";
+                e.style.height = "25px";
+
+                e.setAttribute("full-path",mod.info.icon);
+                _loadImage(e,0);
+
+                e.onclick = function(){
+                    openImg(e);
+                };
+            }),
+            new MP_Div({
+                className:"mod-row-content",
+                onClick:this.ops.onClick2
+            }).addParts(
+                new MP_Text({
+                    text:mod.info ? mod.info.name : mod.name,
+                    marginRight:"auto"
+                }),
+                new MP_Text({
+                    text:mod.info ? mod.info.version : `(No Info)`
+                }).onPostLoad(p=>{
+                    if(!p.e) return;
+                    p.e.style.textAlign = "right";
+                    p.e.style.color = "var(--text-dim)";
+                })
+            )
+        );
+
+        this.update();
+    }
+
+    update(){
+        let rowContent = this.qPart(".mod-row-content");
+        if(!rowContent) return;
+        let mod = this.ops.mod;
+
+        this.e?.classList.toggle("disabled",mod.name.endsWith(".disabled"));
+    }
+
+    showData(){
+        let aside = tab_menu.aside;
+        if(!aside.e) return;
+        aside.clearParts();
+
+        aside.addParts(
+            new MP_Header({ textContent:"Updates" }),
+            new MP_HR()
+        );
+    }
+}
+
 async function loadSection(index:number,menu:MP_TabbedMenu){
     switch(index){
         case 0:{
@@ -48,124 +125,111 @@ async function loadSection(index:number,menu:MP_TabbedMenu){
                     }
                 ]
             });
-            
-            // 
-            
-            let grid = menu.main_body.addPart(
-                new MP_Grid({
-                    template_columns:"1fr auto"
-                })
-            );
-            
-            let cols = grid.createSubSections(2);
-            let col1 = cols[0]; //.addPart(new MP_Text({text:"hi"}));
-            let col2 = cols[1]; //.addPart(new MP_Text({text:"hi 2"}));
 
-            let res = await window.gAPI.getInstMods({iid:initData.d.iid});
-            console.log("RES:",res);
+            let search = new MP_SearchStructure<ModData>({
+                listId:"_",
+                // listId:"instance",
+                submitOnOpen:true,
+                onSelect:(data,item)=>{
+                    
+                },
+                onSubmit:async (t,e,q)=>{
+                    // let grid = menu.main_body.addPart(
+                    //     new MP_Grid({
+                    //         template_columns:"1fr auto"
+                    //     })
+                    // );
+                    
+                    // let cols = grid.createSubSections(2);
+                    // let col1 = cols[0]; //.addPart(new MP_Text({text:"hi"}));
+                    // let col2 = cols[1]; //.addPart(new MP_Text({text:"hi 2"}));
 
-            col1.addParts(
-                new MP_Flexbox({
-                    alignItems:"center",
-                    gap:"10px",
-                    marginBottom:"3px"
-                }).addParts(
-                    new MP_Div({width:"25px"}),
-                    new MP_Text({
-                        text:"Name",
-                        marginRight:"auto"
-                    }),
-                    new MP_Text({
-                        text:"Version"
-                    }).onPostLoad(p=>{
-                        if(!p.e) return;
-                        // p.e.style.textAlign = "right";
-                        // p.e.style.color = "var(--text-dim)";
-                    }),
-                ),
-                new MP_HR()
-            );
-            
-            // 
+                    let res = await window.gAPI.getInstMods({iid:initData.d.iid});
+                    console.log("RES:",res);
 
-            for(const mod of res.mods.global){
-                table.addRow(false,[
-                    new MP_Generic<HTMLImageElement>("img",{}).onPostLoad(p=>{
-                        if(!p.e) return;
-                        if(!mod.info) return;
+                    let col1 = search.list;
+                    // if(col1.e) col1.e.style.overflowY = "scroll";
+                    // if(menu.main_body.e?.parentElement) menu.main_body.e.parentElement.style.overflowY = "hidden";
 
-                        let e = p.e as HTMLImageElement;
+                    col1.addParts(
+                        new MP_Flexbox({
+                            alignItems:"center",
+                            gap:"10px",
+                            marginBottom:"3px"
+                        }).addParts(
+                            new MP_Div({width:"25px"}),
+                            new MP_Text({
+                                text:"Name",
+                                marginRight:"auto"
+                            }),
+                            new MP_Text({
+                                text:"Version"
+                            }).onPostLoad(p=>{
+                                if(!p.e) return;
+                                // p.e.style.textAlign = "right";
+                                // p.e.style.color = "var(--text-dim)";
+                            }),
+                        ),
+                        new MP_HR()
+                    );
+                    
+                    // 
 
-                        e.style.width = "25px";
-                        e.style.height = "25px";
+                    for(const mod of res.mods.global){
+                        table.addRow(false,[
+                            new MP_Generic<HTMLImageElement>("img",{}).onPostLoad(p=>{
+                                if(!p.e) return;
+                                if(!mod.info) return;
 
-                        e.setAttribute("full-path",mod.info.icon);
-                        _loadImage(e,0);
+                                let e = p.e as HTMLImageElement;
 
-                        e.onclick = function(){
-                            openImg(e);
-                        };
+                                e.style.width = "25px";
+                                e.style.height = "25px";
 
-                        // (p.e as HTMLImageElement).src = mod.info.icon;
-                    }),
-                    new MP_Text({
-                        text:mod.name,
-                        marginRight:"auto"
-                    }),
-                    new MP_Text({
-                        text:mod.info ? mod.info.version : `(No Info)`
-                    }).onPostLoad(p=>{
-                        if(!p.e) return;
-                        p.e.style.textAlign = "right";
-                        p.e.style.color = "var(--text-dim)";
-                    })
-                ],td=>{
-                    if(td.e){
-                        td.e.style.color = "var(--t2)";
+                                e.setAttribute("full-path",mod.info.icon);
+                                _loadImage(e,0);
+
+                                e.onclick = function(){
+                                    openImg(e);
+                                };
+
+                                // (p.e as HTMLImageElement).src = mod.info.icon;
+                            }),
+                            new MP_Text({
+                                text:mod.name,
+                                marginRight:"auto"
+                            }),
+                            new MP_Text({
+                                text:mod.info ? mod.info.version : `(No Info)`
+                            }).onPostLoad(p=>{
+                                if(!p.e) return;
+                                p.e.style.textAlign = "right";
+                                p.e.style.color = "var(--text-dim)";
+                            })
+                        ],td=>{
+                            if(td.e){
+                                td.e.style.color = "var(--t2)";
+                            }
+                        });
+                        
+                        let div = new MP_ModRow({
+                            mod,
+                            onClick2:(e,elm)=>{
+                                console.log("click 1");
+                                selectItem(search.selected,mod,elm);
+                            }
+                        });
+
+                        col1.addPart(div);
                     }
-                });
-                
-                let div = new MP_Flexbox({
-                    alignItems:"center",
-                    gap:"10px",
-                    marginBottom:"3px"
-                }).addParts(
-                    new MP_Generic<HTMLImageElement>("img",{}).onPostLoad(p=>{
-                        if(!p.e) return;
-                        if(!mod.info) return;
-
-                        let e = p.e as HTMLImageElement;
-
-                        e.style.width = "25px";
-                        e.style.height = "25px";
-
-                        e.setAttribute("full-path",mod.info.icon);
-                        _loadImage(e,0);
-
-                        e.onclick = function(){
-                            openImg(e);
-                        };
-
-                        // (p.e as HTMLImageElement).src = mod.info.icon;
-                    }),
-                    new MP_Text({
-                        text:mod.name,
-                        marginRight:"auto"
-                    }),
-                    new MP_Text({
-                        text:mod.info ? mod.info.version : `(No Info)`
-                    }).onPostLoad(p=>{
-                        if(!p.e) return;
-                        p.e.style.textAlign = "right";
-                        p.e.style.color = "var(--text-dim)";
-                    })
-                );
-                if(div.e){
-                    div.e.style.color = "var(--t2)";
-                    div.e.style.fontSize = "12px";
                 }
+            });
 
-                col1.addPart(div);
+            menu.main_body.addPart(search);
+            console.log(search.e);
+            if(search.e){
+                // search.e.style.display = "grid";
+                // search.e.style.gridTemplateRows = "auto 1fr";
             }
             
         } break;
@@ -275,18 +339,35 @@ function openImg(img?:HTMLImageElement){
 
     __curImg = img;
 
+    let can = document.createElement("canvas");
+    let ctx = can.getContext("2d");
+
     let clone = document.createElement("img");
     clone.style.userSelect = "none";
     clone.src = img.src;
 
-    if(clone.width > clone.height) clone.classList.add("vert");
-    else clone.classList.add("horz");
+    can.width = clone.width;
+    can.height = clone.height;
 
-    clone.addEventListener("click",e=>{
+    let e = can;
+
+    clone.addEventListener("load",e=>{
+        ctx?.drawImage(clone,0,0);
+    });
+
+    if(e.width <= 64 || e.height <= 64){
+        e.style.imageRendering = "pixelated";
+    }
+
+    if(e.width > clone.height) e.classList.add("vert");
+    else e.classList.add("horz");
+
+    e.addEventListener("click",e=>{
         e.stopPropagation();
     });
 
-    imgCont.appendChild(clone);
+    e.classList.add("img");
+    imgCont.appendChild(e);
 }
 function closeImg(){
     __curImg = undefined;

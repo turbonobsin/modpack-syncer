@@ -1,7 +1,9 @@
 import "./styles/index.css";
 import "./styles/home.css";
 import "./styles/menus.css";
-import { MenuPart, MP_Div, MP_Input, MP_SearchForm, MP_SearchForm_Ops, MP_Text } from "./menu_parts";
+import "./styles/menus_custom.css";
+
+import { addClassToOps, MenuPart, MP_Div, MP_Input, MP_SearchForm, MP_SearchForm_Ops, MP_Text } from "./menu_parts";
 import { deselectItem, reselectItem, SelectedItem } from "./render_util";
 
 const overlaysCont = new MP_Div({
@@ -27,6 +29,8 @@ export interface MP_SearchStructure_Ops<T> extends MP_SearchForm_Ops{
 }
 export class MP_SearchStructure<T> extends MP_Div{
     constructor(ops:MP_SearchStructure_Ops<T>){
+        addClassToOps(ops,"search-structure");
+        
         if(ops.submitOnOpen){
             ops.onAdded = ()=>{
                 this.submit();
@@ -37,6 +41,7 @@ export class MP_SearchStructure<T> extends MP_Div{
         this.selected = new SelectedItem<T>({
             onSelect:(data,item)=>{
                 // loadModPackMetaPanel(data,aside);
+
                 this.ops.onSelect(data,item);
             }
         });

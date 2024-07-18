@@ -162,14 +162,14 @@ img._loaded:active{
         align-items:center;
         /* margin:15px; */
         
-        & img{
+        & .img{
             /* image-rendering:pixelated; */
         }
-        & img.vert{
+        & .img.vert{
             width:calc(100% - 400px);
             max-width:calc(100vw - 400px);
         }
-        & img.horz{
+        & .img.horz{
             height:calc(100% - 400px);
             max-height:calc(100vw - 400px);
         }
@@ -186,6 +186,13 @@ img._loaded:active{
         animation:OpenFS_img 0.2s cubic-bezier(0.075, 0.82, 0.165, 1);
         animation-fill-mode:forwards;
     }
+}
+
+.search-structure .list-cont{
+    height:100%;
+}
+.search-structure .list{
+    height:100%;
 }
 
 table{
