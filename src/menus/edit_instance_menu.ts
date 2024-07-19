@@ -1,6 +1,6 @@
 import "../render_lib";
 import "../styles/edit_instance_menu.css";
-import { addClassToOps, makeDivPart, MP_ActivityBarItem, MP_Div, MP_Flexbox, MP_Flexbox_Ops, MP_Generic, MP_Grid, MP_Header, MP_HR, MP_TabbedMenu, MP_TableList, MP_Text, MP_TR } from "../menu_parts";
+import { addClassToOps, makeDivPart, MP_ActivityBarItem, MP_Button, MP_Div, MP_Flexbox, MP_Flexbox_Ops, MP_Generic, MP_Grid, MP_Header, MP_HR, MP_TabbedMenu, MP_TableList, MP_Text, MP_TR } from "../menu_parts";
 import { MP_SearchStructure, qElm } from "../render_lib";
 import { EditInst_InitData, ModData } from "../interface";
 import { InitData, SelectedItem, selectItem, wait } from "../render_util";
@@ -51,14 +51,13 @@ class MP_ModRow extends MP_Flexbox{
         this.addParts(
             new MP_Generic<HTMLImageElement>("img",{}).onPostLoad(p=>{
                 if(!p.e) return;
-                if(!mod.info) return;
 
                 let e = p.e as HTMLImageElement;
 
                 e.style.width = "25px";
                 e.style.height = "25px";
 
-                e.setAttribute("full-path",mod.info.icon);
+                if(mod.icon) e.setAttribute("full-path",mod.icon);
                 _loadImage(e,0);
 
                 e.onclick = function(){
@@ -70,11 +69,11 @@ class MP_ModRow extends MP_Flexbox{
                 onClick:this.ops.onClick2
             }).addParts(
                 new MP_Text({
-                    text:mod.info ? mod.info.name : mod.name,
+                    text:mod.name ?? mod.file,
                     marginRight:"auto"
                 }),
                 new MP_Text({
-                    text:mod.info ? mod.info.version : `(No Info)`
+                    text:mod.version ?? ""
                 }).onPostLoad(p=>{
                     if(!p.e) return;
                     p.e.style.textAlign = "right";
@@ -91,7 +90,7 @@ class MP_ModRow extends MP_Flexbox{
         if(!rowContent) return;
         let mod = this.ops.mod;
 
-        this.e?.classList.toggle("disabled",mod.name.endsWith(".disabled"));
+        this.e?.classList.toggle("disabled",mod.file.endsWith(".disabled"));
     }
 
     showData(){
@@ -131,7 +130,19 @@ async function loadSection(index:number,menu:MP_TabbedMenu){
                 // listId:"instance",
                 submitOnOpen:true,
                 onSelect:(data,item)=>{
-                    
+                    let a = menu.aside;
+                    if(!a.e) return;
+                    a.clearParts();
+
+                    a.addParts(
+                        new MP_Button({
+                            label:"Get Index Files",
+                            onClick:async (e,elm)=>{
+                                let res = await window.gAPI.getModIndexFiles({iid:initData.d.iid});
+                                console.log("RES:",res);
+                            }
+                        })
+                    );
                 },
                 onSubmit:async (t,e,q)=>{
                     // let grid = menu.main_body.addPart(
@@ -176,17 +187,16 @@ async function loadSection(index:number,menu:MP_TabbedMenu){
                     // 
 
                     for(const mod of res.mods.global){
-                        table.addRow(false,[
+                        if(false) table.addRow(false,[
                             new MP_Generic<HTMLImageElement>("img",{}).onPostLoad(p=>{
                                 if(!p.e) return;
-                                if(!mod.info) return;
 
                                 let e = p.e as HTMLImageElement;
 
                                 e.style.width = "25px";
                                 e.style.height = "25px";
 
-                                e.setAttribute("full-path",mod.info.icon);
+                                e.setAttribute("full-path",mod.icon);
                                 _loadImage(e,0);
 
                                 e.onclick = function(){
@@ -196,11 +206,11 @@ async function loadSection(index:number,menu:MP_TabbedMenu){
                                 // (p.e as HTMLImageElement).src = mod.info.icon;
                             }),
                             new MP_Text({
-                                text:mod.name,
+                                text:mod.name ?? mod.file,
                                 marginRight:"auto"
                             }),
                             new MP_Text({
-                                text:mod.info ? mod.info.version : `(No Info)`
+                                text:mod.version
                             }).onPostLoad(p=>{
                                 if(!p.e) return;
                                 p.e.style.textAlign = "right";

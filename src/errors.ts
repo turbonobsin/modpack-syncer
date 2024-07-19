@@ -50,6 +50,7 @@ export class Result<T>{
 
 export const errors = {
     noSys: Result.err("System data isn't loaded"),
+    responseErr: Result.err("Unknown network response error"),
     
     unknown: Result.err("Unknown error"),
     invalid_args: Result.err("Invalid arguments"),

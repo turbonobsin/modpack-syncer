@@ -2,6 +2,7 @@
 
 import { ModPackInst } from "./db";
 import { InstanceData } from "./db_types";
+import type { Mod as Mod2 } from "node-curseforge";
 
 type FSTestData = {
     instancePath:string;
@@ -98,8 +99,11 @@ interface EditInst_InitData{
     iid:string;
 }
 
-interface Arg_GetInstMods{
+interface Arg_IID{
     iid:string;
+}
+interface Arg_GetInstMods extends Arg_IID{
+
 }
 interface ModInfo{
     m:any;
@@ -112,13 +116,184 @@ interface ModInfo{
     loader:string;
 }
 interface ModData{
+    // name:string;
+    // info?:ModInfo;
+    _id:string; // slug
+
+    file:string;
     name:string;
-    info?:ModInfo;
+    description:string;
+    id:string;
+    version:string;
+    authors:string[];
+    icon:string;
+
+    fabric:any;
+    forge:any;
+    datapack:any;
+
+    _formatVersion:string;
+    _type:"fabric" | "forge" | "datapack";
 }
 interface Res_GetInstMods{
     mods:{
         global:ModData[],
         local:ModData[]
+    }
+}
+
+interface ModrinthUpdate{
+    "mod-id":string;
+    version:string;
+}
+interface CurseForgeUpdate{
+    "file-id":number;
+    "project-id":number;
+}
+interface ModIndex{
+    name:string;
+    filename:string;
+    side:string;
+
+    download:{
+        mode:string;
+        url:string;
+        "hash-format":string;
+        hash:string;
+    }
+
+    update:{
+        modrinth:ModrinthUpdate;
+        curseforge:CurseForgeUpdate;
+    }
+
+}
+type ModSideType = "required" | "optional" | "unsupported";
+type ModStatus = "approved" | "archived" | "rejected" | "draft" | "unlisted" | "processing" | "withheld" | "scheduled" | "private" | "unknown"
+type RequestedStatus = "approved" | "archived" | "unlisted" | "private" | "draft";
+type Modrinth_ProjectType = "mod" | "modpack" | "resourcepack" | "shader";
+type ISOString = string;
+interface Modrinth_DonationURL{
+    /** The ID of the donation platform */
+    id:string;
+    /** The donation platform this link is to */
+    platform:string;
+    /** The URL of the donation platform and user */
+    url:string;
+}
+interface Modrinth_License{
+    /** The SPDX license ID of a project */
+    id:string;
+    /** The long name of a license */
+    name:string;
+    /** The URL to this license */
+    url?:string;
+}
+interface Modrinth_GalleryImage{
+    /** The URL of the gallery image */
+    url:string;
+    /** Whether the image is featured in the gallery */
+    featured:boolean;
+    /** The title of the gallery image */
+    title?:string;
+    /** The description of the gallery image */
+    description?:string;
+    /** The date and time the gallery image was created */
+    created:ISOString;
+    /** The order of the gallery image. Gallery images are sorted by this field and then alphabetically by title. */
+    ordering:number;
+}
+
+interface ModrinthModData{
+    /** The slug of a project, used for vanity URLs. Regex: ^[\w!@$()`.+,"\-']{3,64}$ */
+    slug:string;
+    /** The title or name of the project */
+    title:string;
+    /** A short description of the project */
+    description:string;
+    /** A list of the categories that the project has */
+    categories:string[];
+    /** The client side support of the project */
+    client_side:ModSideType;
+    /** The server side support of the project */
+    server_side:ModSideType;
+    /** A long form description of the project */
+    body:string;
+    /** The status of the project */
+    status:ModStatus,
+
+    /** The requested status when submitting for review or scheduling the project for release */
+    requested_status?:string;
+    /** A list of categories which are searchable but non-primary */
+    additional_categories:string[];
+    /** An optional link to where to submit bugs or issues with the project */
+    issues_url?:string;
+    /** An optional link to the source code of the project */
+    source_url?:string;
+    /** An optional link to the project's wiki page or other relevant information */
+    wiki_url?:string;
+    /** An optional invite link to the project's discord */
+    discord_url?:string;
+    /** A list of donation links for the project */
+    donation_urls:Modrinth_DonationURL[],
+
+    /** The project type of the project */
+    project_type:Modrinth_ProjectType;
+    /** The total number of downloads of the project */
+    downloads:number;
+
+    /** The URL of the project's icon */
+    icon_url?:string;
+    /** The RGB color of the project, automatically generated from the project icon */
+    color?:number;
+    /** The ID of the moderation thread associated with this project */
+    thread_id:string;
+    monetization_status:"monetized" | "demonetized" | "force-demonetized";
+
+    /** The ID of the project, encoded as a base62 string */
+    id:string;
+    /** The ID of the team that has ownership of this project */
+    team:string;
+
+    /** The date the project was published */
+    published:ISOString;
+    /** The date the project was last updated */
+    updated:ISOString;
+    /** The date the project's status was set to an approved status */
+    approved?:ISOString;
+    /** The date the proejct's status was submitted to moderators for review */
+    queued?:ISOString;
+
+    /** The total number of users following the project */
+    followers:number;
+    /** The license of the project */
+    license?:Modrinth_License;
+
+    /** A list of the version IDs of the project (will never be empty unless draft status) */
+    versions:string[];
+    /** A list of all of the game versions supported by the project */
+    game_versions:string[];
+    /** A list of all of the loaders supported by the project */
+    loaders:string[];
+    /** A list of images that have been uploaded to the project's gallery */
+    gallery:(Modrinth_GalleryImage | undefined)[];
+}
+interface CurseForgeModData extends Mod2{
+
+}
+interface Res_GetModIndexFiles{
+    modrinth:ModrinthModData[];
+    curseforge:CurseForgeModData[];
+
+    server:{
+        required:string[],
+        optional:string[],
+        unsupported:string[]
+    },
+    client:{
+        required:string[],
+        optional:string[],
+        unsupported:string[]
     }
 }
 
@@ -144,6 +319,7 @@ export interface IGlobalAPI{
 
     getInstScreenshots:(arg:Arg_GetInstScreenshots)=>Promise<Res_GetInstScreenshots>;
     getInstMods:(arg:Arg_GetInstMods)=>Promise<Res_GetInstMods>;
+    getModIndexFiles:(arg:Arg_IID)=>Promise<Res_GetModIndexFiles>;
 
     getPrismInstances:(arg:Arg_GetPrismInstances)=>Promise<Res_GetPrismInstances>;
 

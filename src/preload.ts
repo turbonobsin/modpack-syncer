@@ -52,6 +52,7 @@ contextBridge.exposeInMainWorld("gAPI",{
 
     getInstScreenshots:regf("getInstScreenshots"),
     getInstMods:regf("getInstMods"),
+    getModIndexFiles:regf("getModIndexFiles"),
 
     getPrismInstances:regf("getPrismInstances"),
 

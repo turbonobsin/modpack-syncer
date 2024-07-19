@@ -204,6 +204,14 @@ export class SysInst extends Inst<DBSys>{
                 return;
             }
             let newPath = filePath;
+            if(!newPath || newPath == ""){
+                res.sendStatus(404);
+                return;
+            }
+            if(!newPath.includes(path.sep)){
+                res.sendStatus(404);
+                return;
+            }
             
             res.sendFile(newPath);
         });
