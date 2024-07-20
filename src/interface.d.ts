@@ -103,7 +103,7 @@ interface Arg_IID{
     iid:string;
 }
 interface Arg_GetInstMods extends Arg_IID{
-
+    query?:string;
 }
 interface ModInfo{
     m:any;
@@ -118,7 +118,7 @@ interface ModInfo{
 interface ModData{
     // name:string;
     // info?:ModInfo;
-    _id:string; // slug
+    slug:string; // slug
 
     file:string;
     name:string;
@@ -133,12 +133,16 @@ interface ModData{
     datapack:any;
 
     _formatVersion:string;
-    _type:"fabric" | "forge" | "datapack";
+    _type:"fabric" | "forge" | "datapack" | "other";
+}
+interface FullModData{
+    local:LocalModData;
+    remote?:RemoteModData;
 }
 interface Res_GetInstMods{
     mods:{
-        global:ModData[],
-        local:ModData[]
+        global:FullModData[],
+        local:FullModData[]
     }
 }
 
@@ -297,6 +301,17 @@ interface Res_GetModIndexFiles{
     }
 }
 
+interface LocalModData extends ModData{
+    pw:ModIndex;
+}
+interface RemoteModData{
+    modrinth?:ModrinthModData;
+    curseforge?:CurseForgeModData;
+}
+interface SlugMapData{
+    map:Record<string,string[]>;
+}
+
 export type Err<T> = {
     err?:string;
     data?:T;
@@ -320,6 +335,8 @@ export interface IGlobalAPI{
     getInstScreenshots:(arg:Arg_GetInstScreenshots)=>Promise<Res_GetInstScreenshots>;
     getInstMods:(arg:Arg_GetInstMods)=>Promise<Res_GetInstMods>;
     getModIndexFiles:(arg:Arg_IID)=>Promise<Res_GetModIndexFiles>;
+    cacheMods:(iid:string)=>Promise<void>;
+    toggleModEnabled:(iid:string,filename:string,force?:boolean)=>Promise<void>;
 
     getPrismInstances:(arg:Arg_GetPrismInstances)=>Promise<Res_GetPrismInstances>;
 
@@ -328,6 +345,11 @@ export interface IGlobalAPI{
     showEditInstance:(iid:string)=>Promise<void>;
 
     getImage:(path:string)=>Promise<Uint8Array>;
+
+    // dropdowns
+    dropdown:{
+        mod:(iid:string,files:string[])=>Promise<string[][]>;
+    }
     
     // main -> render
     onInitMenu:(cb:(data:InitMenuData)=>void)=>void;

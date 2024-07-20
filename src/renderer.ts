@@ -252,7 +252,7 @@ export class CMP_FullInst extends MP_Article {
                 textContent:meta.name
             }),
             new MP_Div({
-                className:"info-details"
+                className:"info-details accent"
             }).addParts(
                 new MP_Text({
                     text:meta.version,
@@ -442,10 +442,13 @@ const search = new MP_SearchStructure<CMP_FullInst>({
                     data:inst
                 });
                 search.list.addPart(part);
-                if(part.e) part.e.addEventListener("click",e=>{
-                    if(!part.e) return;
-                    selectItem(search.selected,part,part.e);
-                });
+
+                if(part.e) search.registerSelItem(part,part.e);
+
+                // if(part.e) part.e.addEventListener("click",e=>{
+                //     if(!part.e) return;
+                //     selectItem(search.selected,part,part.e);
+                // });
             }
         }
         console.log("INST LIST:",instList);
@@ -456,7 +459,11 @@ function autoSelectLastInstance(){
     let lastSelected = localStorage.getItem("selected_modpack");
     if(lastSelected){
         let part = (search.list.parts as CMP_FullInst[]).find(v=>v.ops.data.iid == lastSelected);
-        if(part && part.e) selectItem(search.selected,part,part.e);
+        if(part && part.e){
+            // selectItem(search.selected,part,part.e);
+            // RESELECT?
+            search.sel.items.find(v=>v.e == part.e)?.select();
+        }
         else localStorage.removeItem("selected_modpack");
     }
 }
@@ -464,12 +471,14 @@ function autoSelectLastInstance(){
 async function loadSection(index:number,menu:MP_TabbedMenu){
     switch(index){
         case 0:{
-            search.selected.ops.onSelect = (data,item)=>{
+            search.sel.onSelect = (data,item)=>{
                 localStorage.setItem("selected_modpack",data.ops.data.iid);
                 data.showData();
             };
-            search.selected.ops.onDeselect = ()=>{
+            search.sel.onNoSelection = ()=>{
+                console.warn("CLEAR");
                 localStorage.removeItem("selected_modpack");
+                if(viewPanel) viewPanel.innerHTML = "";
             };
         
             search.mainOptions.addPart(
@@ -477,8 +486,8 @@ async function loadSection(index:number,menu:MP_TabbedMenu){
                     label:"add",
                     className:"b-add-instance icon-cont accent",
                     onClick:e=>{
-                        console.log(search.selected.data);
-                        if(!search.selected.data) return;
+                        // console.log(search.selected.data);
+                        // if(!search.selected.data) return; // ????????????????
                         // let res = window.gAPI.addInstance(search.selected.data.data.ops.data.meta);
                         // console.log("RES:",res);
                         window.gAPI.openMenu("search_packs");

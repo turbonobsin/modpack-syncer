@@ -12,7 +12,7 @@ export function loadDefaultAside(aside:MP_Div,ops:{
     let footer = aside.addPart(new MP_Div({className:"info-footer"}));
 
     let details = new MP_Div({
-        className:"info-details"
+        className:"info-details accent"
     });
 
     head.addParts(
@@ -55,7 +55,7 @@ export async function loadModPackMetaPanel(meta:PackMetaData,panel?:HTMLElement|
             textContent:meta.name
         }),
         new MP_Div({
-            className:"info-details"
+            className:"info-details accent"
         }).addParts(
             new MP_Text({
                 text:meta.version,
@@ -87,8 +87,93 @@ export async function loadModPackMetaPanel(meta:PackMetaData,panel?:HTMLElement|
     )
 }
 
-// Simple Select API
+// Selection API 2
+type SAPI2_Bundle<T> = {
+    data:T;
+    e:Element
+};
+export class SelectionAPI2<T>{
+    constructor(){
+        this.items = [];
+        this.selected = new Set();
+    }
+    clear(){
+        for(const item of this.items){
+            item.deselect();
+        }
+        this.items = [];
+        this.selected = new Set();
+    }
+    addItems(...list:SAPI2_Bundle<T>[]){
+        let newList:SAPI2_Item<T>[] = [];
+        for(const d of list){
+            let item = new SAPI2_Item(this,d);
+            this.items.push(item);
+            newList.push(item);
+        }
+        return newList;
+    }
 
+    deselectAll(){
+        for(const item of this.items){
+            item.deselect();
+        }
+    }
+
+    onSelect?:(data:T,item:SAPI2_Item<T>)=>any;
+    onNoSelection?:()=>any;
+
+    items:SAPI2_Item<T>[];
+    selected:Set<SAPI2_Item<T>>;
+}
+export class SAPI2_Item<T>{
+    constructor(api:SelectionAPI2<T>,bundle:SAPI2_Bundle<T>){
+        this.api = api;
+        this.data = bundle.data;
+        this.e = bundle.e;
+    }
+    api:SelectionAPI2<T>;
+    data:T;
+    e:Element;
+    private selected = false;
+
+    isSelected(){
+        return this.selected;
+    }
+
+    toggle(e?:MouseEvent){
+        let multi_select = false;
+        if(e) if(e.shiftKey || e.ctrlKey) multi_select = true;
+        if(!multi_select) this.api.deselectAll();
+        
+        if(this.selected) this.deselect(e);
+        else this.select(e);
+    }
+    select(e?:MouseEvent){
+        if(this.selected) return;
+        
+        this.selected = true;
+        this.api.selected.add(this);
+        if(this.api.onSelect) this.api.onSelect(this.data,this);
+
+        this.update();
+    }
+    deselect(e?:MouseEvent){        
+        if(!this.selected) return;
+        
+        this.selected = false;
+        this.api.selected.delete(this);
+        if(this.api.selected.size == 0) if(this.api.onNoSelection) this.api.onNoSelection();
+
+        this.update();
+    }
+
+    update(){
+        this.e.classList.toggle("active",this.selected);
+    }
+}
+
+// Simple Select API
 type SelectedItemData<T> = {
     data:T;
     e:Element;

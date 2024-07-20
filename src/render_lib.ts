@@ -4,7 +4,7 @@ import "./styles/menus.css";
 import "./styles/menus_custom.css";
 
 import { addClassToOps, MenuPart, MP_Div, MP_Input, MP_SearchForm, MP_SearchForm_Ops, MP_Text } from "./menu_parts";
-import { deselectItem, reselectItem, SelectedItem } from "./render_util";
+import { deselectItem, reselectItem, SAPI2_Item, SelectedItem, SelectionAPI2 } from "./render_util";
 
 const overlaysCont = new MP_Div({
     overrideDiv:document.body
@@ -25,7 +25,9 @@ export interface MP_SearchStructure_Ops<T> extends MP_SearchForm_Ops{
     listId:string;
     customListFormat?:string;
     submitOnOpen?:boolean;
-    onSelect:(data:T,item:SelectedItem<T>)=>void;
+    onSelect:(data:T,item:SAPI2_Item<T>)=>void;
+    onNoSelected?:()=>void;
+    // getList:()=>Promise<MenuPart[]>;
 }
 export class MP_SearchStructure<T> extends MP_Div{
     constructor(ops:MP_SearchStructure_Ops<T>){
@@ -38,13 +40,16 @@ export class MP_SearchStructure<T> extends MP_Div{
         }
         
         super(ops);
-        this.selected = new SelectedItem<T>({
-            onSelect:(data,item)=>{
-                // loadModPackMetaPanel(data,aside);
+        // this.selected = new SelectedItem<T>({
+        //     onSelect:(data,item)=>{
+        //         // loadModPackMetaPanel(data,aside);
 
-                this.ops.onSelect(data,item);
-            }
-        });
+        //         this.ops.onSelect(data,item);
+        //     }
+        // });
+        this.sel = new SelectionAPI2();
+        this.sel.onSelect = ops.onSelect;
+        this.sel.onNoSelection = ops.onNoSelected;
     }
     declare ops:MP_SearchStructure_Ops<T>;
 
@@ -54,7 +59,24 @@ export class MP_SearchStructure<T> extends MP_Div{
     i_search?:MP_Input;
     mainOptions = new MP_Div({className:"main-options"});
 
-    selected:SelectedItem<T>;
+    // selected:SelectedItem<T>;
+    sel:SelectionAPI2<T>;
+    registerSelItem(data:T,e?:HTMLElement){
+        if(!e){
+            console.warn("Err: e was not defined when trying to register for selection event");
+            return;
+        }
+        
+        let [item] = this.sel.addItems({e,data});
+        
+        e.addEventListener("mouseup",e=>{
+            if(e.button == 0){
+                item.toggle(e);
+            }
+        });
+
+        return item;
+    }
 
     load(): void {
         super.load();
@@ -66,7 +88,8 @@ export class MP_SearchStructure<T> extends MP_Div{
                 this.list.clearParts();
                 await this.ops.onSubmit(t,e,query);
 
-                deselectItem(this.selected);
+                // deselectItem(this.selected);
+                this.sel.deselectAll();
             }
         });
 

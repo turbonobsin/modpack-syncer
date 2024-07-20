@@ -1,10 +1,11 @@
 import { app } from "electron";
-import { util_lstat, util_mkdir, util_readdir, util_readJSON, util_readText, util_warn, util_writeJSON } from "./util";
+import { util_lstat, util_mkdir, util_readdir, util_readJSON, util_readText, util_readTOML, util_warn, util_writeJSON } from "./util";
 import path from "path";
 import { DBSys, DBUser, InstanceData as ModPackInstData } from "./db_types";
-import { PackMetaData } from "./interface";
+import { LocalModData, ModIndex, ModrinthModData, PackMetaData, RemoteModData, SlugMapData } from "./interface";
 import { errors, Result } from "./errors";
 import express from "express";
+import toml from "toml";
 
 let appPath = app.getAppPath();
 export const dataPath = path.join(appPath,"data");
@@ -82,6 +83,7 @@ export async function initDB(){
     // }
 
     sysInst = await sysInst.load();
+    slugMap = await slugMap.load();
     
     // 
     let username = "Unnamed";
@@ -103,6 +105,33 @@ export async function initDB(){
     }
 }
 
+export async function getStandardInstData(iid:string): Promise<Result<{inst:ModPackInst,prismPath:string,modsPath:string}>>{
+    let inst = await getModpackInst(iid);
+    if(!inst) return errors.couldNotFindPack;
+
+    let prismPath = inst.getPrismInstPath();
+    if(!prismPath) return errors.failedToGetPrismInstPath;
+
+    let modsPath = path.join(prismPath,".minecraft","mods");
+    if(!modsPath) return Result.err("Could not find mods path");
+
+    return new Result({inst,prismPath,modsPath});
+}
+export function cleanModName(name:string){
+    if(name.endsWith(".disabled")) name = name.substring(0,name.length-9);
+
+    let ind = name.lastIndexOf(".");
+    if(ind != -1){
+        name = name.substring(0,ind);
+    }
+
+    return name;
+}
+export function cleanModNameDisabled(name:string){
+    if(name.endsWith(".disabled")) name = name.substring(0,name.length-9);
+    return name;
+}
+
 // 
 
 abstract class Inst<T>{
@@ -111,12 +140,16 @@ abstract class Inst<T>{
     }
     filePath:string;
     meta?:T;
+    getFileType(): "json" | "toml"{
+        return "json";
+    }
+
     useDefaultIfDNE(){
         return false;
     }
-    abstract getDefault():T|undefined;
+    abstract getDefault():Promise<T|undefined>;
     async fillDefaults(){
-        let def = this.getDefault() as any;
+        let def = await this.getDefault() as any;
         if(!def) return;
         let o = this.meta as any;
         let wasChange = false;
@@ -141,7 +174,7 @@ abstract class Inst<T>{
                 util_warn("couldn't read file [1]");
                 return this;
             }
-            let def = defMeta ?? this.getDefault();
+            let def = defMeta ?? await this.getDefault();
             if(!def){
                 util_warn("no default was provided");
                 return this;
@@ -152,24 +185,51 @@ abstract class Inst<T>{
 
             return this;
         }
-        let res = await util_readJSON<T>(this.filePath);
-        if(!res){
-            util_warn("couldn't read file [2]");
+        let res:T|undefined;
+        if(this.getFileType() == "json"){
+            res = await util_readJSON<T>(this.filePath);
+            if(!res){
+                util_warn("couldn't read file [2]");
+                return this;
+            }
+        }
+        else if(this.getFileType() == "toml"){
+            let text = await util_readText(this.filePath);
+            try{
+                res = toml.parse(text) as T;
+            }
+            catch(e){
+                util_warn("couldn't read file [2]");
+                return this;
+            }
+            if(!res){
+                util_warn("couldn't read file [2]");
+                return this;
+            }
+        }
+        else{
+            util_warn("couldn't read file with invalid file type: "+this.getFileType());
             return this;
         }
 
         this.meta = res;
         await this.fillDefaults();
 
-        this.postLoad();
+        await this.postLoad();
 
         return this;
     }
     async save(){ // not sure if I want to do save now or add it to a queue
+        if(!this.meta){
+            // util_warn("Couldn't save, meta doesn't exist for: "+this.filePath);
+            return;
+        }
+
+        if(!await util_lstat(this.filePath)) await util_mkdir(path.join(this.filePath,".."));
         await util_writeJSON(this.filePath,this.meta);
     }
 
-    postLoad(){}
+    async postLoad(){}
 }
 
 export class SysInst extends Inst<DBSys>{
@@ -179,7 +239,7 @@ export class SysInst extends Inst<DBSys>{
     useDefaultIfDNE(): boolean {
         return true;
     }
-    getDefault(): DBSys | undefined {
+    async getDefault(): Promise<DBSys | undefined> {
         return {
             fid:0,
             iid:0,
@@ -188,7 +248,7 @@ export class SysInst extends Inst<DBSys>{
             port:"57152"
         };
     }
-    postLoad(): void {
+    async postLoad() {
         if(!this.meta){
             util_warn("Failed to start internal server, system info not found/loaded");
             return;
@@ -233,15 +293,16 @@ export class UserInst extends Inst<DBUser>{
     constructor(filePath:string){
         super(filePath);
     }
-    getDefault(): DBUser | undefined {
+    async getDefault(): Promise<DBUser | undefined> {
         return;
     }
 }
+
 export class ModPackInst extends Inst<ModPackInstData>{
     constructor(filePath:string){
         super(filePath);
     }
-    getDefault(): ModPackInstData | undefined {
+    async getDefault(): Promise<ModPackInstData | undefined> {
         return;
     }
 
@@ -266,10 +327,104 @@ export class ModPackInst extends Inst<ModPackInstData>{
     }
 }
 
+export class LocalModInst extends Inst<LocalModData>{
+    constructor(modsPath:string,iid:string,filename:string){
+        super(path.join(modsPath,".cache",filename+".json"));
+        // super(path.join(modsPath,".cache",filename,"local.json"));
+
+        this.folderPath = modsPath;
+        this.iid = iid;
+        this.filename = filename;
+    }
+    folderPath:string;
+    iid:string;
+    filename:string;
+    
+    // static fromFilename(iid:string,filename:string){
+    //     let loc = path.join(getModFolderPath(iid),".cache",filename);
+    // }
+
+    async getDefault(): Promise<LocalModData | undefined> {
+        return;
+    }
+}
+
+export class RemoteModInst extends Inst<RemoteModData>{    
+    constructor(slug:string,indexPath:string){
+        super(path.join(dataPath,"cache","remote",slug+".json"));
+        this.slug = slug;
+        this.indexPath = indexPath;
+    }
+    slug:string;
+    indexPath:string;
+    pw?:ModIndex;
+
+    async postLoad(): Promise<void> {
+        let indexData = await util_readTOML<ModIndex>(path.join(this.indexPath,this.slug+".pw.toml"));
+        if(!indexData){
+            util_warn("Failed to read INDEX_DATA: "+this.slug);
+            return;
+        }
+        
+        this.pw = indexData;
+    }
+
+    async getDefault(): Promise<RemoteModData | undefined> {
+        return;
+    }
+}
+
+export class SlugMap extends Inst<SlugMapData>{
+    useDefaultIfDNE(): boolean {
+        return true;
+    }
+    async getDefault(): Promise<SlugMapData | undefined> {
+        return {
+            map:{}
+        };
+    }
+
+    getVal(k:string){
+        if(!this.meta) return;
+
+        return this.meta.map[k];
+    }
+    setVal(k:string,v:string){
+        if(!this.meta) return;
+        
+        // let v_old = this.meta.map[k];
+        // if(v_old){
+        //     delete this.meta.map[k];
+        //     delete this.meta.map[v_old];
+        // }
+
+        // this.meta.map[k] = v;
+        // this.meta.map[v] = k;
+
+        let ar = this.meta.map[k];
+        if(ar) ar.push(v);
+        else{
+            this.meta.map[k] = [v];
+        }
+    }
+}
+
+// 
+
 const fspath_modPacks = path.join(dataPath,"instances");
 
 export function getModpackInst(iid:string){
     return new ModPackInst(path.join(fspath_modPacks,iid,"meta.json")).load();
+}
+export function getModpackPath(iid:string){
+    return path.join(fspath_modPacks,iid);
+}
+export async function getModFolderPath(iid:string){
+    let inst = await getModpackInst(iid);
+    if(!inst.meta) return;
+    let prismPath = inst.getPrismInstPath();
+    if(!prismPath) return;
+    return path.join(prismPath,".minecraft","mods");
 }
 
 function makeInstanceData(meta:PackMetaData){
@@ -303,3 +458,4 @@ export async function addInstance(meta:PackMetaData):Promise<Result<ModPackInst>
 
 // 
 export let sysInst = new SysInst(path.join(dataPath,"sys.json"));
+export let slugMap = new SlugMap(path.join(dataPath,"slug_map.json"));

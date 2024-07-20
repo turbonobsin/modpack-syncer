@@ -14,6 +14,7 @@ export interface MP_Ops{
     innerHTML?:string;
     __tag?:string;
     skipAdd?:boolean;
+    fontSize?:string;
 
     margin?:string;
     marginTop?:string;
@@ -34,6 +35,7 @@ export interface MP_Ops{
     minHeight?:string;
 
     onClick?:(e:MouseEvent,elm:HTMLElement)=>any;
+    onMouseUp?:(e:MouseEvent,elm:HTMLElement)=>any;
 
     onAdded?:()=>void;
 }
@@ -205,6 +207,7 @@ export abstract class MenuPart{
             if(o.className) e.className = o.className;
             if(o.classList) e.classList.add(...o.classList);
             if(o.id) e.id = o.id;
+            if(o.fontSize) e.style.fontSize = o.fontSize;
             if(o.margin) e.style.margin = o.margin;
             if(o.marginTop) e.style.marginTop = o.marginTop;
             if(o.marginLeft) e.style.marginLeft = o.marginLeft;
@@ -226,6 +229,10 @@ export abstract class MenuPart{
             if(o.onClick) e.addEventListener("click",e=>{
                 if(!this.e) return;
                 if(o.onClick) o.onClick(e,this.e);
+            });
+            if(o.onMouseUp) e.addEventListener("mouseup",e=>{
+                if(!this.e) return;
+                if(o.onMouseUp) o.onMouseUp(e,this.e);
             });
         }
 
@@ -590,7 +597,7 @@ export class MP_TabbedMenu extends MP_Div{
     mainOps:TabbedMain_Ops;
 
     activityBar:MP_ActivityBar;
-    private main:MP_Div;
+    main:MP_Div;
 
     main_header:MP_Section;
     main_body:MP_Section;

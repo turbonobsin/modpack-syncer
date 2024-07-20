@@ -11,7 +11,7 @@ async function showError(msg:string){
 export class Result<T>{
     constructor(data:T,err?:string){
         let d = data as any;
-        if(d) if("isResult" in d){
+        if(d) if(typeof d == "object") if("isResult" in d){
             data = d.data;
             err = d.err;
         }
@@ -38,7 +38,7 @@ export class Result<T>{
         }
         return this.data as T;
     }
-    unwrapPanick(){
+    unwrapPanic(){
         let data = this.unwrap();
         if(data == null || !data || data == undefined){
             showError("Data was undefined");

@@ -1,6 +1,7 @@
 import { app } from "electron";
 import fs from "fs";
 import path from "path";
+import toml from "toml";
 
 export async function wait(delay:number){
     return new Promise<void>(resolve=>{
@@ -99,6 +100,20 @@ export function util_readJSON<T>(path:fs.PathOrFileDescriptor){
         });
     });
 }
+export async function util_readTOML<T>(path:fs.PathOrFileDescriptor){
+    let text = await util_readText(path);
+    if(!text) return;
+    
+    let data:T | undefined;
+    try{
+        data = toml.parse(text);
+    }
+    catch(e){
+        return;
+    }
+
+    return data;
+}
 export function util_writeText(path:fs.PathOrFileDescriptor,text:string){
     return new Promise<void>(resolve=>{
         fs.writeFile(path,text,{encoding:"utf8"},()=>{
@@ -129,6 +144,17 @@ export function util_mkdir(path:fs.PathLike){
         fs.mkdir(path,(err)=>{
             if(err){
                 // console.log("Err:",err);
+                resolve(false);
+            }
+            resolve(true);
+        });
+    });
+}
+export function util_rename(path:fs.PathLike,newPath:fs.PathLike){
+    return new Promise<boolean>(resolve=>{
+        fs.rename(path,newPath,(err)=>{
+            if(err){
+                util_warn("ERR: "+err.message);
                 resolve(false);
             }
             resolve(true);

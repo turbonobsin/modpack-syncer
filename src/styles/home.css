@@ -267,9 +267,10 @@ aside{
 /*  */
 aside{
     display:grid;
-    grid-template-rows:75px auto 75px;
+    grid-template-rows:auto 1fr 75px;
 
     & .info-head{
+        height:75px;
         padding:15px;
         & header{
             font-size:14px;
@@ -280,22 +281,25 @@ aside{
             text-transform:capitalize;
             display:flex;
             justify-content:space-between;
-            /* color:var(--text-dim); */
+            color:var(--text-dim);
+        }
+        & .info-details.accent{
             color:var(--accent-t1);
         }
     }
     & .info-body{
         padding:15px;
         font-size:12px;
-
-        & .l-desc{
-            color:var(--text-dim);
-        }
     }
     & .info-footer{
         padding:15px;
         display:flex;
         align-items:center;
         justify-content:center;
+    }
+
+    & .l-desc{
+        font-size:12px;
+        color:var(--text-dim);
     }
 }

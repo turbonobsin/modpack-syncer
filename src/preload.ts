@@ -53,6 +53,8 @@ contextBridge.exposeInMainWorld("gAPI",{
     getInstScreenshots:regf("getInstScreenshots"),
     getInstMods:regf("getInstMods"),
     getModIndexFiles:regf("getModIndexFiles"),
+    cacheMods:regf("cacheMods"),
+    toggleModEnabled:regf("toggleModEnabled"),
 
     getPrismInstances:regf("getPrismInstances"),
 
@@ -61,6 +63,10 @@ contextBridge.exposeInMainWorld("gAPI",{
     showEditInstance:regf("showEditInstance"),
 
     getImage:regf("getImage"),
+
+    dropdown:{
+        mod:regf("dropdown-mod")
+    },
 
     onInitMenu: (cb) => ipcRenderer.on("initMenu",(ev,data)=>cb(data)),
     onInitReturnCB: (cb) => ipcRenderer.on("initReturnCB",(ev,data)=>cb(data)),

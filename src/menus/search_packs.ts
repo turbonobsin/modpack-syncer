@@ -68,11 +68,12 @@ class CMP_Result extends MP_Article{
             )
         );
 
-        this.e.addEventListener("click",e=>{
-            if(!this.e) return;
-            if(!search) return;
-            selectItem(search?.selected,this.ops.data,this.e);
-        });
+        search?.registerSelItem(this.ops.data,this.e);
+        // this.e.addEventListener("click",e=>{
+        //     if(!this.e) return;
+        //     if(!search) return;
+        //     selectItem(search?.selected,this.ops.data,this.e);
+        // });
     }
 }
 

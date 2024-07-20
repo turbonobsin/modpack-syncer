@@ -6,10 +6,10 @@ import { mainWindow } from "./main";
 import Seven from "node-7z";
 import sevenBin from "7zip-bin";
 import toml from "toml";
-import Curseforge from "node-curseforge";
+import { Curseforge } from "node-curseforge";
 
-// const _cf = new Curseforge("$2a$10$/vPH6A3TRcGR9ahXyWmjo.p1lcpWAYQERThrNAT6Jrl/pT4G4qh.C");
-// const cf_mc = _cf.get_game("minecraft");
+const _cf = new Curseforge("$2a$10$/vPH6A3TRcGR9ahXyWmjo.p1lcpWAYQERThrNAT6Jrl/pT4G4qh.C");
+const cf_mc = _cf.get_game("minecraft");
 
 // const pathTo7zip = sevenBin.path7za;
 const pathTo7zip = path.join(app.getAppPath(),"node_modules","7zip-bin","win","x64","7za.exe");
@@ -157,6 +157,19 @@ export async function preInit(){
     ipcMain.handle("getModIndexFiles",async (ev,arg:Arg_IID)=>{
         return (await getModIndexFiles(arg)).unwrap();
     });
+    ipcMain.handle("cacheMods",async (ev,iid:string)=>{
+        return (await cacheMods(iid)).unwrap();
+    });
+    ipcMain.handle("toggleModEnabled",async (ev,iid:string,filename:string,force?:boolean)=>{
+        return (await toggleModEnabled(iid,filename,force)).unwrap();
+    });
+
+    // 
+    ipcMain.handle("dropdown-mod",async (ev,iid:string,files:string[])=>{
+        let w = getWindow(ev);
+        if(!w) return;
+        return await openModDropdown(w,iid,files);
+    });
 
     // 
     ipcMain.handle("getImage",async (ev,fullPath:string)=>{
@@ -165,7 +178,257 @@ export async function preInit(){
     });
 }
 
-const CF_api_key = "$2a$10$/vPH6A3TRcGR9ahXyWmjo.p1lcpWAYQERThrNAT6Jrl/pT4G4qh.C";
+async function cacheMods(iid:string): Promise<Result<any>>{
+    let res = await cacheModsLocal(iid);
+    if(res.err) return res;
+    // res = await cacheModsRemote(iid);
+    // if(res.err) return res;
+
+    return new Result({});
+}
+
+async function cacheModsLocal(iid:string): Promise<Result<LocalModData[]>>{
+    let inst = await getModpackInst(iid);
+    if(!inst) return errors.couldNotFindPack;
+
+    let prismPath = inst.getPrismInstPath();
+    if(!prismPath) return errors.failedToGetPrismInstPath;
+
+    let modsPath = path.join(prismPath,".minecraft","mods");
+    if(!modsPath) return Result.err("Could not find mods path");
+
+    let indexPath = path.join(modsPath,".index");
+    console.log(":: start cache mods (local)");
+    let cachePath = path.join(modsPath,".cache");
+    await util_mkdir(cachePath);
+
+    let localModCache:Map<string,LocalModInst> = new Map();
+
+    let req = {
+        indexScan:new Set<string>()
+    };
+
+    // scan
+    let localMods = await util_readdirWithTypes(modsPath,false);
+    for(const mod of localMods){
+        if(!mod.isFile()) continue;
+        // if(!mod.name.endsWith(".jar") && !mod.name.endsWith(".jar.disabled")) continue;
+
+        let filename = cleanModName(mod.name);
+        // if(filename.endsWith(".disabled")) filename = filename.replace(".disabled","");
+
+        let slug = slugMap.getVal(filename);
+        if(!slug){
+            req.indexScan.add(filename);
+            // continue;
+        }
+
+        localModCache.set(mod.name,await new LocalModInst(modsPath,iid,filename).load());
+    }
+
+    // temp force all mods to update slugs/.index data
+    if(false) for(const [filename,local] of localModCache){
+        req.indexScan.add(filename);
+    }
+
+    // extract
+    if(true) for(const mod of localMods){
+        if(!mod.isFile()) continue;
+        // if(!mod.name.endsWith(".jar") && !mod.name.endsWith(".jar.disabled")) continue;
+        
+        let filename = cleanModName(mod.name);
+
+        let info = await getMod(modsPath,mod.name);
+        let ok = Object.keys(info);
+        let local = localModCache.get(mod.name) as any;
+        if(!local) continue;
+        if(local.meta) for(const k of ok){
+            local.meta[k] = info[k];
+        }
+        else{
+            local.meta = info;
+        }
+    }
+
+    // link slugs
+    if(req.indexScan){
+        console.log("LMC: ",[...localModCache].map(v=>v[0]).join(", "));
+        let indexFiles = await util_readdir(indexPath);
+        for(const index of indexFiles){
+            let indexData = await util_readTOML<ModIndex>(path.join(indexPath,index));
+            if(!indexData){
+                util_warn("couldn't read pw.toml file for: "+index);
+                continue;
+            }
+
+            let slug = index.replace(".pw.toml","");
+
+            let filename = cleanModName(indexData.filename);
+            // if(filename.endsWith(".disabled")) filename = filename.replace(".disabled","");
+            
+            slugMap.setVal(slug,filename);
+
+            let local = localModCache.get(indexData.filename);
+            if(!local) local = localModCache.get(indexData.filename+".disabled");
+            if(local && local.meta){
+                let m = local.meta;
+                m.pw = indexData;
+                m.name = indexData.name;
+                m.slug = slug;
+                // await local.save();
+            }
+            else if(local){
+                console.log("Err [1]: failed to find local for saving index: ",index,indexData.filename,local != null);
+                // local.meta = 
+            }
+            else{
+                console.log("Err [2]: failed to find local for saving index: ",index,indexData.filename,local != null);
+                
+            }
+        }
+
+        await slugMap.save();
+    }
+
+    // save
+    for(const [filename,local] of localModCache){
+        await local.save();
+    }
+
+    console.log(":: FINISH cache mods (local)",localModCache.size);
+    
+    return new Result([...localModCache.entries()].map(v=>{
+        if(v[1].meta == null) v[1].meta = {
+            _formatVersion:"1",
+            _type:"other",
+            file:v[0],
+        } as any;
+        if(v[1].meta) v[1].meta.file = v[0];
+        return v;
+    }).map(v=>v[1].meta).filter(v=>v != null));
+}
+
+async function cacheModsRemote(iid:string): Promise<Result<RemoteModData[]>>{
+    let inst = await getModpackInst(iid);
+    if(!inst) return errors.couldNotFindPack;
+
+    let prismPath = inst.getPrismInstPath();
+    if(!prismPath) return errors.failedToGetPrismInstPath;
+
+    let modsPath = path.join(prismPath,".minecraft","mods");
+    if(!modsPath) return Result.err("Could not find mods path");
+
+    let indexPath = path.join(modsPath,".index");
+    console.log(":: start cache mods (remote)");
+
+    let modCache:Map<string,RemoteModInst> = new Map();
+    // 
+
+    let req = {
+        mr_needsUpdate:[] as string[],
+        cf_needsUpdate:[] as string[]
+    };
+    
+    // scan
+    let indexList = await util_readdir(indexPath);
+    for(const index of indexList){
+        let slug = index.replace(".pw.toml","");
+        
+        let remote = await new RemoteModInst(slug,indexPath).load();
+        if(!remote.meta) await remote.postLoad();
+        modCache.set(slug,remote);
+
+        if(!remote.meta){
+            // util_warn("Couldn't find remote meta for: "+slug);
+
+            if(remote.pw){
+                if(remote.pw.update.modrinth) req.mr_needsUpdate.push(remote.pw.update.modrinth["mod-id"]);
+                else if(remote.pw.update.curseforge) req.cf_needsUpdate.push(remote.pw.update.curseforge["project-id"].toString());
+                else{
+                    util_warn("Unknown mod update type: "+slug);
+                    console.log(remote.pw);
+                }
+            }
+            else{
+                util_warn("Unknown mod: "+slug);
+            }
+        }
+    }
+
+    let mr_updated:string[] = [];
+    let cf_updated:string[] = [];
+    
+    // get remote data
+    let err:Result<any>|undefined;
+    if(req.mr_needsUpdate.length){
+        console.log(`...getting from modrinth (${req.mr_needsUpdate.length})`);
+        await new Promise<void>(resolve=>{
+            axios.get("https://api.modrinth.com/v2/projects",{
+                params:{
+                    ids:`[${req.mr_needsUpdate.map(v=>'"'+v+'"').join(",")}]`
+                }
+            }).then(res=>{
+                for(const d of res.data as ModrinthModData[]){                
+                    let remote = modCache.get(d.slug);
+                    if(!remote){
+                        util_warn("Failed to find remote mod cache object after receiving remote data: "+d.slug);
+                        continue;
+                    }
+    
+                    remote.meta = {
+                        modrinth:d
+                    };
+                    mr_updated.push(d.title);
+                }
+                resolve();
+            }).catch(reason=>{
+                err = errors.responseErr;
+                util_warn("HTTP Error (Modrinth): "+reason);
+                resolve();
+            });
+        });
+    }
+    if(err) return err;
+
+    if(req.cf_needsUpdate.length){
+        console.log(`...getting from curseforge (${req.cf_needsUpdate.length})`);
+        await new Promise<void>(async resolve=>{
+            (await cf_mc)._client.get_mods(...req.cf_needsUpdate.map(v=>parseInt(v))).then(v=>{
+                for(const d of v){
+                    let remote = modCache.get(d.slug);
+                    if(!remote){
+                        util_warn("Failed to find remote mod cache object after receiving remote data: "+d.slug);
+                        continue;
+                    }
+    
+                    remote.meta = {
+                        curseforge:d
+                    };
+                    cf_updated.push(d.name);
+                }
+                resolve();
+            }).catch(reason=>{
+                err = errors.responseErr;
+                util_warn("HTTP Error (Curseforge):"+reason);
+                resolve();
+            });
+        });
+    }
+    if(err) return err;
+
+    // save
+    for(const [slug,remote] of modCache){
+        await remote.save();
+    }
+
+    console.log("Remote Stats (Modrinth):\nto update: "+req.mr_needsUpdate.length+" "+req.mr_needsUpdate.join(", ")+"\nupdated: "+mr_updated.length);
+    console.log("Remote Stats (Curseforge):\nto update: "+req.cf_needsUpdate.length+" "+req.cf_needsUpdate.join(", ")+"\nupdated: "+cf_updated.length);
+
+    console.log(":: FINISH cache mods (remote)",modCache.size);
+
+    return new Result([...modCache.entries()].map(v=>v[1].meta).filter(v=>v != null));
+    // return new Result({});
+}
 
 async function getModIndexFiles(arg:Arg_IID): Promise<Result<Res_GetModIndexFiles>>{
     if(!sysInst.meta) return errors.noSys;
@@ -362,76 +625,112 @@ async function getInstMods(arg:Arg_GetInstMods): Promise<Result<Res_GetInstMods>
             local:[]
         }
     };
+    let _map:Map<string,FullModData> = new Map();
+
+    let localList = (await cacheModsLocal(arg.iid)).unwrap();
+    if(localList){
+        for(const meta of localList){
+            _map.set(meta.file,{
+                local:meta
+            });
+        }
+    }
+
+    let remoteList = (await cacheModsRemote(arg.iid)).unwrap();
+    if(remoteList){
+        for(const meta of remoteList){
+            let slug = meta.modrinth?.slug ?? meta.curseforge?.slug;
+            if(!slug) continue;
+            let d = _map.get(slug);
+            if(!d) continue;
+
+            d.remote = meta;
+        }
+    }
+
+    console.log(">> local: "+localList?.length+" :: remote: "+remoteList?.length);
+
+    for(const [slug,meta] of _map){
+        data.mods.global.push(meta);
+    }
+
+    if(arg.query){
+        data.mods.global = data.mods.global.filter(v=>searchStringCompare(v.local.name,arg.query));
+    }
+
+    data.mods.global.sort((a,b)=>a.local.name.localeCompare(b.local.name));
+
+    return new Result(data);
 
     // await new Promise<void>(resolve=>{
     //     axios.get("https://api.modrinth.com/v2/projects");
     // });
 
-    let indexList = await util_readdir(path.join(prismPath,"mods",".index"));
-    let indexData:Map<string,any> = new Map();
-    let initedIndexData = false;
-    async function initIndexData(){
-        if(!prismPath) return;
-        if(initedIndexData) return;
-        initedIndexData = true;
+    // let indexList = await util_readdir(path.join(prismPath,"mods",".index"));
+    // let indexData:Map<string,any> = new Map();
+    // let initedIndexData = false;
+    // async function initIndexData(){
+    //     if(!prismPath) return;
+    //     if(initedIndexData) return;
+    //     initedIndexData = true;
 
-        for(const index of indexList){
-            let text = await util_readText(path.join(prismPath,"mods",".index",index));
-            if(!text) continue;
-            let data = toml.parse(text);
-            if(!data) continue;
+    //     for(const index of indexList){
+    //         let text = await util_readText(path.join(prismPath,"mods",".index",index));
+    //         if(!text) continue;
+    //         let data = toml.parse(text);
+    //         if(!data) continue;
     
-            data._id = index;
-            indexData.set(data.filename,data);
-        }
-    }
+    //         data._id = index;
+    //         indexData.set(data.filename,data);
+    //     }
+    // }
 
-    const cachePath = path.join(prismPath,"mods",".cache");
-    await util_mkdir(cachePath);
+    // const cachePath = path.join(prismPath,"mods",".cache");
+    // await util_mkdir(cachePath);
 
-    let modList = await util_readdirWithTypes(path.join(prismPath,"mods"),false);
-    let allowedExts = [".jar",".jar.disabled"];
-    for(const mod of modList){
-        if(!mod.isFile()) continue;
+    // let modList = await util_readdirWithTypes(path.join(prismPath,"mods"),false);
+    // let allowedExts = [".jar",".jar.disabled"];
+    // for(const mod of modList){
+    //     if(!mod.isFile()) continue;
 
-        let check = false;
-        for(const ext of allowedExts){
-            if(mod.name.toLowerCase().endsWith(ext)){
-                check = true;
-                break;
-            }
-        }
-        if(!check) continue;
-        // 
+    //     let check = false;
+    //     for(const ext of allowedExts){
+    //         if(mod.name.toLowerCase().endsWith(ext)){
+    //             check = true;
+    //             break;
+    //         }
+    //     }
+    //     if(!check) continue;
+    //     // 
 
-        let m = await getMod(path.join(prismPath,"mods"),mod.name);
-        if(!m){
-            // util_warn("Failed to getMod:",mod.name);
-            // continue;
+    //     let m = await getMod(path.join(prismPath,"mods"),mod.name);
+    //     if(!m){
+    //         // util_warn("Failed to getMod:",mod.name);
+    //         // continue;
 
-            await initIndexData();
-            let idata = indexData.get(mod.name);
-            // if(idata){
-            //     console.log(`>> ${mod.name} ~ ${idata.name} ~ ${idata._id}`);
-            // }
+    //         await initIndexData();
+    //         let idata = indexData.get(mod.name);
+    //         // if(idata){
+    //         //     console.log(`>> ${mod.name} ~ ${idata.name} ~ ${idata._id}`);
+    //         // }
 
-            m = {
-                _id:idata._id,
-                file:mod.name,
-                name:idata.name
-            } as ModData;
-        }
-        else if(!m._id){
-            await initIndexData();
-            let idata = indexData.get(mod.name);
+    //         m = {
+    //             _id:idata._id,
+    //             file:mod.name,
+    //             name:idata.name
+    //         } as ModData;
+    //     }
+    //     else if(!m._id){
+    //         await initIndexData();
+    //         let idata = indexData.get(mod.name);
 
-            if(idata) m._id = idata._id;
-        }
+    //         if(idata) m._id = idata._id;
+    //     }
 
-        data.mods.global.push(m);
-    }
-    // 
-    return new Result(data);
+    //     data.mods.global.push(m);
+    // }
+    // // 
+    // return new Result(data);
 }
 
 function getSimilarStringCount(s1?:string,s2?:string){
@@ -542,13 +841,21 @@ async function getMod(modPath:string,filename:string,update=0){
     // let cachePath = `"${path.join(dataPath,"cache","mods")}"`;
     // let modPath = `"${path.join(mod.parentPath,mod.name)}"`;
     // let cachePath = path.join(dataPath,"cache","mods",mod.name);
-    let cachePath = path.join(modPath,".cache",filename);
+    // let cachePath = path.join(modPath,".cache",filename); // THIS IS THE OLD CACHE PATH
     // let modPath = path.join(mod.parentPath,mod.name);
 
+    let cleanName = cleanModName(filename);
+
+    let cachePath = path.join(dataPath,"cache","mods",cleanName);
+
     // LOAD CACHE
-    if((await util_lstat(cachePath))?.isDirectory()){
+    if(true) if((await util_lstat(cachePath))?.isDirectory()){
         if(update != 2){
-            return await util_readJSON(path.join(cachePath,"info.json"));
+            let data = await util_readJSON(path.join(cachePath,"info.json"));
+            if(data) return data;
+            else{
+                util_warn("Failed to read data even though it was there!",cachePath);
+            }
         }
     }
 
@@ -603,7 +910,8 @@ async function getMod(modPath:string,filename:string,update=0){
 
     let type = 
         (await util_lstat(path.join(cachePath,"fabric.mod.json"))) != null ? "fabric" :
-        (await util_lstat(path.join(cachePath,"mods.toml"))) != null ? "forge" : "datapack";
+        (await util_lstat(path.join(cachePath,"mods.toml"))) != null ? "forge" :
+        (await util_lstat(path.join(cachePath,"pack.png"))) != null ? "datapack" : "other";
 
     let iconPaths:string[] = [];
     let fabric_info:any;
@@ -686,7 +994,7 @@ async function getMod(modPath:string,filename:string,update=0){
             // if(modData.logoFile) info.icon = path.join(cachePath,"assets",info.id,...modData.logoFile.split("/"));
             // else info.icon = path.join(cachePath,"assets",info.id,"icon.png");
 
-            console.log("logo:",info.icon,"  ~~~  ",iconPaths);
+            // console.log("logo:",info.icon,"  ~~~  ",iconPaths);
         }
     }
     else if(type == "datapack"){
@@ -717,8 +1025,11 @@ async function getMod(modPath:string,filename:string,update=0){
             iconPaths = info.icon;
         }
     }
+    else{ // other or just couldn't find data like with the Essential Mod & Kotlin for Forge
 
-    if(info1){
+    }
+
+    // if(info1){
         info._formatVersion = "1";
         info._type = type;
 
@@ -727,7 +1038,7 @@ async function getMod(modPath:string,filename:string,update=0){
         info.datapack = datapack_info;
         
         await util_writeJSON(path.join(cachePath,"info.json"),info);
-    }
+    // }
 
     if(true) if(iconPaths.length && iconPaths[0] != ""){
         // console.log("get icon: ",mod.name,iconPath);
@@ -918,11 +1229,11 @@ async function alertBox(w:BrowserWindow,message:string,title="Error"){
 
 // 
 
-import { parseCFGFile, searchStringCompare, util_lstat, util_mkdir, util_readBinary, util_readdir, util_readdirWithTypes, util_readJSON, util_readText, util_warn, util_writeJSON, util_writeText, wait } from "./util";
-import { Arg_GetInstances, Arg_GetInstMods, Arg_GetInstScreenshots, Arg_GetPrismInstances, Arg_IID, Arg_SearchPacks, CurseForgeUpdate, Data_PrismInstancesMenu, FSTestData, InstGroups, MMCPack, ModData, ModIndex, ModInfo, ModrinthUpdate, PackMetaData, Res_GetInstMods, Res_GetInstScreenshots, Res_GetModIndexFiles, Res_GetPrismInstances } from "./interface";
+import { parseCFGFile, searchStringCompare, util_lstat, util_mkdir, util_readBinary, util_readdir, util_readdirWithTypes, util_readJSON, util_readText, util_readTOML, util_rename, util_warn, util_writeJSON, util_writeText, wait } from "./util";
+import { Arg_GetInstances, Arg_GetInstMods, Arg_GetInstScreenshots, Arg_GetPrismInstances, Arg_IID, Arg_SearchPacks, CurseForgeUpdate, Data_PrismInstancesMenu, FSTestData, FullModData, InstGroups, LocalModData, MMCPack, ModData, ModIndex, ModInfo, ModrinthModData, ModrinthUpdate, PackMetaData, RemoteModData, Res_GetInstMods, Res_GetInstScreenshots, Res_GetModIndexFiles, Res_GetPrismInstances } from "./interface";
 import { getPackMeta, searchPacks, searchPacksMeta } from "./network";
 import { ListPrismInstReason, openCCMenu, openCCMenuCB, SearchPacksMenu, ViewInstanceMenu } from "./menu_api";
-import { addInstance, dataPath, getModpackInst, ModPackInst, sysInst } from "./db";
+import { addInstance, cleanModName, dataPath, getModFolderPath, getModpackInst, getModpackPath, LocalModInst, ModPackInst, RemoteModInst, slugMap, sysInst } from "./db";
 import { InstanceData } from "./db_types";
 import { errors, Result } from "./errors";
 import { readConfigFile } from "typescript";
@@ -931,6 +1242,7 @@ import { exec } from "child_process";
 import { Dirent } from "fs";
 import { CineonToneMapping } from "three";
 import axios from "axios";
+import { openModDropdown, toggleModEnabled } from "./dropdowns";
 
 async function fsTest(customPath?:string): Promise<FSTestData|undefined>{
     let instancePath:string;
