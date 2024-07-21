@@ -231,3 +231,60 @@ td,th{
         scale:1;
     }
 }
+
+.progress-cont{
+    margin-top:20px;
+    margin-bottom:20px;
+}
+.progress-bar-cont{
+    height:30px;
+    width:100%;
+    box-sizing:border-box;
+    background-color:var(--table-bg);
+    border:solid 1px var(--table-border);
+    border-radius:5px;
+    padding:3px;
+    position:relative;
+}
+.progress-bar::after{
+    content:var(--progress-text);
+    position:absolute;
+    top:-3px;
+    left:50%;
+    translate:-50% -100%;
+    font-family:monospace;
+    font-size:12px;
+}
+.progress-bar-cont::after2{
+    content:"50%";
+    position:absolute;
+    top:50%;
+    left:10px;
+    translate:0px -50%;
+    font-family:monospace;
+    /* font-size:12px; */
+    font-size:10px;
+    background-color:limegreen;
+    color:black;
+    border-radius:50%;
+    width:22px;
+    height:22px;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+}
+.progress-bar{
+    --progress-text:"0% | 0/0";
+    
+    background-color:limegreen;
+    height:100%;
+    /* width:100%; */
+    /* width:50%; */
+    width:0%;
+    /* width:30%; */
+    border-radius:3px;
+    /* margin:5px; */
+}
+.progress-details{
+
+}

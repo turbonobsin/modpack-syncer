@@ -11,3 +11,22 @@
         opacity:1;
     } */
 }
+
+.folder-tag{
+    font-size:10px;
+    /* background-color:var(--accent1); */
+    /* color:var(--accent1-t1); */
+    background-color:rgb(116, 88, 17);
+    color:whitesmoke;
+    /* border-radius:20px; */
+    /* border:solid 1px darkgoldenrod; */
+    border-radius:3px;
+    padding:4px 12px;
+    font-weight:bold;
+    user-select:none;
+    text-transform:capitalize;
+    opacity:0.5;
+}
+.folder-tag:hover{
+    opacity:1;
+}

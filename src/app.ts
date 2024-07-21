@@ -171,11 +171,210 @@ export async function preInit(){
         return await openModDropdown(w,iid,files);
     });
 
+    // sync
+    ipcMain.handle("syncMods",async (ev,arg:Arg_SyncMods)=>{
+        let w = getWindow(ev);
+        if(!w) return;
+        return (await syncMods(w,arg.iid)).unwrap();
+    });
+
     // 
     ipcMain.handle("getImage",async (ev,fullPath:string)=>{
         let buf = await util_readBinary(fullPath);
         return buf;
     });
+}
+
+async function syncMods(w:BrowserWindow,iid:string): Promise<Result<Res_SyncMods>>{
+    let inst = await getModpackInst(iid);
+    if(!inst || !inst.meta) return errors.couldNotFindPack;
+    if(!inst.meta.linkName) return errors.failedToGetPackLink;
+    
+    let needsUpdate = (await checkModUpdates({id:inst.meta.linkName,update:inst.meta.update})).unwrap();
+    if(needsUpdate == undefined) return errors.responseErr;
+
+    // if(!needsUpdate){
+    //     await dialog.showMessageBox(mainWindow,{
+    //         message:"Up to date"
+    //     });
+    //     return new Result({});
+    // }
+
+    // await dialog.showMessageBox(mainWindow,{
+    //     message:"Updates available"
+    // });
+
+    let currentMods:string[] = [];
+    let currentIndexes:string[] = [];
+
+    let prismPath = inst.getPrismInstPath();
+    if(!prismPath) return errors.failedToGetPrismInstPath;
+
+    const modsPath = path.join(prismPath,".minecraft","mods");
+    const indexPath = path.join(modsPath,".index");
+
+    let _curMods = await util_readdirWithTypes(modsPath);
+    let _curIndexes = await util_readdir(indexPath);
+    for(const mod of _curMods){
+        if(!mod.isFile()) continue;
+        currentMods.push(mod.name);
+    }
+    for(const index of _curIndexes){
+        currentIndexes.push(index);
+    }
+
+    let resWrapped = (await getModUpdates({
+        id:inst.meta.linkName,
+        currentMods,
+        currentIndexes
+    }));
+    let res = resWrapped.unwrap();
+    if(!res) return resWrapped ?? Result.err("Failed to get mod updates");
+
+    if(
+        res.indexes.add.length == 0 &&
+        res.indexes.remove.length == 0 &&
+        res.mods.add.length == 0 &&
+        res.mods.remove.length == 0
+    ){
+        await dialog.showMessageBox(mainWindow,{
+            message:"Up to date"
+        });
+        
+        return new Result(res);
+    }
+
+    // w.webContents.send("msg","hi there!");
+    let newW = await openCCMenu("update_progress_menu",{iid});
+    if(newW){
+        // newW.webContents.send("msg","hello 2!");
+        await util_mkdir(indexPath);
+        
+        // await wait(500);
+
+        let items:{
+            name:string;
+            ep:string;
+            action:ItemAction;
+            path:string;
+        }[] = [];
+
+        // 
+        for(const mod of res.mods.add){
+            items.push({
+                name:mod,
+                ep:"mod",
+                action:ItemAction.add,
+                path:path.join(modsPath,mod)
+            });
+        }
+        for(const mod of res.mods.remove){
+            if(mod.includes("..")) continue; // <-- PROBABLY GOOD FOR SAFETY/SECURITY
+            items.push({
+                name:mod,
+                ep:"mod",
+                action:ItemAction.remove,
+                path:path.join(modsPath,mod)
+            });
+        }
+        for(const file of res.indexes.add){
+            items.push({
+                name:file,
+                ep:"modindex",
+                action:ItemAction.add,
+                path:path.join(indexPath,file)
+            });
+        }
+        for(const file of res.indexes.remove){
+            if(file.includes("..")) continue;
+            items.push({
+                name:file,
+                ep:"modindex",
+                action:ItemAction.remove,
+                path:path.join(indexPath,file)
+            });
+        }
+        // 
+
+        let total = items.length;
+
+        let fails:{
+            name:string;
+            ep:string;
+            action:ItemAction;
+            path:string;
+        }[] = [];
+
+        console.log(">> STARTING UPDATE");
+        for(let i = 0; i < items.length; i++){
+            let item = items[i];
+
+            if(item.action == ItemAction.add){ // add
+                console.log("add: ",item.path);
+
+                let url = new URL(remoteServerURL+"/"+item.ep);
+                url.searchParams.set("id",inst.meta.linkName);
+                url.searchParams.set("name",item.name);
+                
+                let response = await fetch(url.href);
+                if(!response.ok){
+                    util_warn("Failed to get file: "+item.name+" ~ "+response.statusText+" ~ "+response.status);
+                    fails.push(item);
+                }
+                else{
+                    let buf = await response.arrayBuffer();
+                    await util_writeBinary(item.path,Buffer.from(buf));
+                }
+            }
+            else{ // remove
+                console.log("remove: ",item.path);
+
+                let response = await util_rm(item.path);
+                if(!response){
+                    util_warn("Failed to remove file: "+item.name);
+                    fails.push(item);
+                }
+            }
+
+            // await wait(1);
+            // await wait(1000);
+            
+            newW.webContents.send("updateProgress","main",i+1,total,item.action == ItemAction.add ? `Downloading: ${item.name}` : `Removing: ${item.name}`);
+        }
+        console.log(">> FINISHED UPDATE");
+
+        let sections:any[] = [];
+        // sections.push({
+        //     header:"Finished."
+        // });
+        let failSection:any|undefined;
+        if(fails.length){
+            failSection = {
+                header:"Failed Items:",
+                text:[]
+            };
+        }
+
+        if(failSection) for(const fail of fails){
+            failSection.text.push(`${fail.name} (${fail.action == ItemAction.add ? "downloading" : "removing"})`);
+        }
+        newW.webContents.send("updateProgress","main",total,total,"Finished.",{
+            sections:sections.concat(failSection)
+        });
+
+        // auto close if success
+        if(fails.length == 0){
+            await wait(1500);
+            newW.close();
+            w.reload();
+        }
+    }
+    
+    return new Result(res);
+}
+enum ItemAction{
+    add,
+    remove
 }
 
 async function cacheMods(iid:string): Promise<Result<any>>{
@@ -252,7 +451,6 @@ async function cacheModsLocal(iid:string): Promise<Result<LocalModData[]>>{
 
     // link slugs
     if(req.indexScan){
-        console.log("LMC: ",[...localModCache].map(v=>v[0]).join(", "));
         let indexFiles = await util_readdir(indexPath);
         for(const index of indexFiles){
             let indexData = await util_readTOML<ModIndex>(path.join(indexPath,index));
@@ -426,7 +624,9 @@ async function cacheModsRemote(iid:string): Promise<Result<RemoteModData[]>>{
 
     console.log(":: FINISH cache mods (remote)",modCache.size);
 
-    return new Result([...modCache.entries()].map(v=>v[1].meta).filter(v=>v != null));
+    let resultList = [...modCache.entries()].map(v=>v[1].meta).filter(v=>v != null);
+    // console.log("RESULT LIST:",resultList.map(v=>v.modrinth?.icon_url));
+    return new Result(resultList);
     // return new Result({});
 }
 
@@ -619,46 +819,103 @@ async function getInstMods(arg:Arg_GetInstMods): Promise<Result<Res_GetInstMods>
     if(!prismPath) return errors.failedToGetPrismInstPath;
     // 
 
-    let data:Res_GetInstMods = {
-        mods:{
-            global:[],
-            local:[]
-        }
-    };
-    let _map:Map<string,FullModData> = new Map();
-
     let localList = (await cacheModsLocal(arg.iid)).unwrap();
+    let remoteList = (await cacheModsRemote(arg.iid)).unwrap();
+    
+    // 
+    let data:Res_GetInstMods = {
+        folders:[]
+    };
+    let rootFolder:ModsFolder = {
+        name:"root",
+        type:"root",
+        mods:[]
+    };
+    data.folders.push(rootFolder);
+
+    // mod_name -> folder_name
+    let _cache = new Map<string,string>();
+    let _cache2 = new Map<string,ModsFolder>();
+    for(const folder of inst.meta.folders){
+        for(const mod of folder.mods){
+            _cache.set(mod,folder.name);
+        }
+
+        let f:ModsFolder = {
+            name:folder.name,
+            type:folder.type,
+            mods:[]
+        };
+        data.folders.push(f);
+        _cache2.set(folder.name,f);
+    }
+
+    util_warn("DEBUG caches:");
+    console.log(_cache,_cache2);
+    
+    let _map:Map<string,FullModData[]> = new Map();
+
+    
     if(localList){
         for(const meta of localList){
-            _map.set(meta.file,{
+            if(!_map.has(meta.slug)) _map.set(meta.slug,[]);
+            _map.get(meta.slug)?.push({
                 local:meta
             });
+            // _map.set(meta.file,{
+            //     local:meta
+            // });
         }
     }
 
-    let remoteList = (await cacheModsRemote(arg.iid)).unwrap();
     if(remoteList){
         for(const meta of remoteList){
+            // console.log("remote cache item: ",meta.modrinth?.title ?? meta.curseforge?.name);
+            // console.log("remote cache item: ",meta.modrinth?.slug ?? meta.curseforge?.slug);
             let slug = meta.modrinth?.slug ?? meta.curseforge?.slug;
             if(!slug) continue;
             let d = _map.get(slug);
             if(!d) continue;
 
-            d.remote = meta;
+            // d.remote = meta;
+            for(const meta2 of d){
+                meta2.remote = meta;
+            }
+        }
+    }
+    else util_warn("Remote cache list was undefined");
+
+    for(const [slug,metas] of _map){
+        for(const meta of metas){
+            let folderName = _cache.get(cleanModName(meta.local.file));
+            if(!folderName) rootFolder.mods.push(meta);
+            else{
+                let folder = _cache2.get(folderName);
+                if(!folder){
+                    util_warn("Weird error happened, found folder name but not it's cache: "+folderName+" ~ "+meta.local.file);
+                    rootFolder.mods.push(meta);
+                }
+                else{
+                    folder.mods.push(meta);
+                }
+            }
         }
     }
 
-    console.log(">> local: "+localList?.length+" :: remote: "+remoteList?.length);
-
-    for(const [slug,meta] of _map){
-        data.mods.global.push(meta);
-    }
+    // let folder2:ModsFolder = {
+    //     name:"Extra Folder",
+    //     type:"custom",
+    //     mods:data.folders[0].mods.slice(0,3)
+    // };
+    // data.folders.push(folder2);
 
     if(arg.query){
-        data.mods.global = data.mods.global.filter(v=>searchStringCompare(v.local.name,arg.query));
+        for(const folder of data.folders){
+            folder.mods = folder.mods.filter(v=>searchStringCompare(v.local.name,arg.query));
+        }
     }
 
-    data.mods.global.sort((a,b)=>a.local.name.localeCompare(b.local.name));
+    // data.mods.global.sort((a,b)=>a.local.name.localeCompare(b.local.name));
 
     return new Result(data);
 
@@ -1229,14 +1486,14 @@ async function alertBox(w:BrowserWindow,message:string,title="Error"){
 
 // 
 
-import { parseCFGFile, searchStringCompare, util_lstat, util_mkdir, util_readBinary, util_readdir, util_readdirWithTypes, util_readJSON, util_readText, util_readTOML, util_rename, util_warn, util_writeJSON, util_writeText, wait } from "./util";
-import { Arg_GetInstances, Arg_GetInstMods, Arg_GetInstScreenshots, Arg_GetPrismInstances, Arg_IID, Arg_SearchPacks, CurseForgeUpdate, Data_PrismInstancesMenu, FSTestData, FullModData, InstGroups, LocalModData, MMCPack, ModData, ModIndex, ModInfo, ModrinthModData, ModrinthUpdate, PackMetaData, RemoteModData, Res_GetInstMods, Res_GetInstScreenshots, Res_GetModIndexFiles, Res_GetPrismInstances } from "./interface";
-import { getPackMeta, searchPacks, searchPacksMeta } from "./network";
+import { parseCFGFile, searchStringCompare, util_lstat, util_mkdir, util_readBinary, util_readdir, util_readdirWithTypes, util_readJSON, util_readText, util_readTOML, util_rename, util_rm, util_warn, util_writeBinary, util_writeJSON, util_writeText, wait } from "./util";
+import { Arg_CheckModUpdates, Arg_GetInstances, Arg_GetInstMods, Arg_GetInstScreenshots, Arg_GetPrismInstances, Arg_IID, Arg_SearchPacks, Arg_SyncMods, CurseForgeUpdate, Data_PrismInstancesMenu, FSTestData, FullModData, InstGroups, LocalModData, MMCPack, ModData, ModIndex, ModInfo, ModrinthModData, ModrinthUpdate, ModsFolder, ModsFolderDef, PackMetaData, RemoteModData, Res_GetInstMods, Res_GetInstScreenshots, Res_GetModIndexFiles, Res_GetPrismInstances, Res_SyncMods } from "./interface";
+import { checkModUpdates, getModUpdates, getPackMeta, remoteServerURL, searchPacks, searchPacksMeta } from "./network";
 import { ListPrismInstReason, openCCMenu, openCCMenuCB, SearchPacksMenu, ViewInstanceMenu } from "./menu_api";
 import { addInstance, cleanModName, dataPath, getModFolderPath, getModpackInst, getModpackPath, LocalModInst, ModPackInst, RemoteModInst, slugMap, sysInst } from "./db";
 import { InstanceData } from "./db_types";
 import { errors, Result } from "./errors";
-import { readConfigFile } from "typescript";
+import { readConfigFile, StringMappingType } from "typescript";
 import { getMaxListeners } from "stream";
 import { exec } from "child_process";
 import { Dirent } from "fs";

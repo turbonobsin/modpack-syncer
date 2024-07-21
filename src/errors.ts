@@ -56,6 +56,7 @@ export const errors = {
     invalid_args: Result.err("Invalid arguments"),
     couldNotFindPack: Result.err("Couldn't find pack"),
     failedToReadPack: Result.err("Failed to read pack meta"),
+    failedToGetPackLink: Result.err("Failed to get pack link"),
 
     instDataConvert: Result.err("Failed to make instance data from pack meta"),
     addInstance: Result.err("Failed to add instnace"),

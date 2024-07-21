@@ -1,4 +1,4 @@
-import { PackMetaData } from "./interface";
+import { ModsFolder, ModsFolderDef, PackMetaData } from "./interface";
 
 type IId = string;
 type FId = string;
@@ -41,6 +41,7 @@ type javaId = string;
 
 interface InstanceData{
     iid:string;
+    update:number;
     meta:PackMetaData;
     
     linkName?:string;
@@ -52,4 +53,6 @@ interface InstanceData{
     resourcePackFolder?:FId;
     shaderPackFolder?:FId;
     dataPackFolder?:FId;
+
+    folders:ModsFolderDef[];
 }

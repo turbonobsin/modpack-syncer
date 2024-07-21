@@ -53,6 +53,11 @@ abstract class CCMenu{
         if(data) w.webContents.send("initMenu",<InitMenuData<T>>{
             data
         });
+        // w.webContents.send("initMenu",<InitMenuData<T>>{
+        //     data
+        // });
+
+        return w;
     }
 }
 
@@ -92,6 +97,22 @@ export class EditInstanceMenu extends CCMenu{
         return "edit_instance_menu";
     }
 }
+export class UpdateProgressMenu extends CCMenu{
+    constructor(){
+        // super("update_progress_menu",500,300);
+        super("update_progress_menu",635,800);
+    }
+    getId(): string {
+        return "update_progress_menu";
+    }
+    async init<T>(data?: T | undefined): Promise<BrowserWindow> {
+        let w = await super.init(data);
+
+        // w.webContents.openDevTools();
+
+        return w;
+    }
+}
 
 class CCMenuRegistry{
     constructor(){
@@ -113,7 +134,7 @@ export async function openCCMenu<T>(id:string,data?:T){
         return;
     }
 
-    await menu.init(data);
+    return await menu.init(data);
 }
 export async function openCCMenuCB(id:string,w:Electron.WebContents,...args:any[]){
     let menu = ccMenuRegistry.reg.get(id);
@@ -142,3 +163,4 @@ ccMenuRegistry.register(new SearchPacksMenu());
 ccMenuRegistry.register(new ViewInstanceMenu());
 ccMenuRegistry.register(new PrismInstancesMenu());
 ccMenuRegistry.register(new EditInstanceMenu());
+ccMenuRegistry.register(new UpdateProgressMenu());

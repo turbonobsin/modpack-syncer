@@ -2,7 +2,7 @@ import { app } from "electron";
 import { util_lstat, util_mkdir, util_readdir, util_readJSON, util_readText, util_readTOML, util_warn, util_writeJSON } from "./util";
 import path from "path";
 import { DBSys, DBUser, InstanceData as ModPackInstData } from "./db_types";
-import { LocalModData, ModIndex, ModrinthModData, PackMetaData, RemoteModData, SlugMapData } from "./interface";
+import { FolderType, LocalModData, ModIndex, ModrinthModData, ModsFolder, ModsFolderDef, PackMetaData, RemoteModData, SlugMapData } from "./interface";
 import { errors, Result } from "./errors";
 import express from "express";
 import toml from "toml";
@@ -148,8 +148,10 @@ abstract class Inst<T>{
         return false;
     }
     abstract getDefault():Promise<T|undefined>;
+    async getAnyDefault():Promise<any|undefined>{}
     async fillDefaults(){
         let def = await this.getDefault() as any;
+        if(!def) def = await this.getAnyDefault();
         if(!def) return;
         let o = this.meta as any;
         let wasChange = false;
@@ -305,6 +307,22 @@ export class ModPackInst extends Inst<ModPackInstData>{
     async getDefault(): Promise<ModPackInstData | undefined> {
         return;
     }
+    async getAnyDefault(): Promise<any | undefined> {
+        return {
+            folders:[]
+        };
+    }
+
+    async postLoad(): Promise<void> {
+        await super.postLoad();
+
+        if(!this.meta) return;
+
+        if(this.meta.update == undefined){
+            this.meta.update = 0;
+            await this.save();
+        }
+    }
 
     getPrismInstPath(): string|undefined{
         if(!sysInst.meta) return;
@@ -324,6 +342,39 @@ export class ModPackInst extends Inst<ModPackInstData>{
         if(!this.meta.linkName) return;
 
         return path.join(sysInst.meta.prismRoot,"instances",this.meta.linkName,".minecraft");
+    }
+
+    // 
+    createFolder(name:string,type:FolderType){
+        if(!this.meta) return false;
+
+        if(this.meta.folders.some(v=>v.name == name)) return false;
+
+        let folder:ModsFolderDef = {
+            name,type,mods:[]
+        };
+        this.meta.folders.push(folder);
+
+        return true;
+    }
+    changeFolderType(name:string,newType:FolderType){
+        if(!this.meta) return false;
+
+        let folder = this.meta.folders.find(v=>v.name == name);
+        if(!folder) return false;
+
+        folder.type = newType;
+    }
+    addModToFolder(name:string,modPath:string){
+        if(!this.meta) return;
+
+        let folder = this.meta.folders.find(v=>v.name == name);
+        if(!folder) return false;
+
+        if(folder.mods.includes(modPath)) return false;
+        folder.mods.push(modPath);
+        
+        return true;
     }
 }
 
@@ -433,7 +484,9 @@ function makeInstanceData(meta:PackMetaData){
     
     let data:ModPackInstData = {
         iid,
-        meta
+        update:0,
+        meta,
+        folders:[]
     };
     return data;
 }

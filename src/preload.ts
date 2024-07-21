@@ -2,7 +2,6 @@
 // https://www.electronjs.org/docs/latest/tutorial/process-model#preload-scripts
 
 import { contextBridge, ContextBridge, ipcRenderer } from "electron";
-import { wait } from "./util";
 import { IGlobalAPI, PackMetaData } from "./interface";
 
 function promiseWrapper<T>(channel:string,...args:unknown[]){
@@ -32,8 +31,17 @@ function invoke(channel:string,...args:unknown[]){
 //     _tmp[v] = async (...args:unknown[])=>await invoke(v,...args);
 // }
 
+/**
+ * Register function
+ */
 function regf(cmdId:string){
     return async (...args:unknown[]) => await invoke(cmdId,...args);
+}
+/**
+ * Register listener
+ */
+function regl(cmdId:string){
+    return (cb:(...data:any[])=>void) => ipcRenderer.on(cmdId,(ev,...data)=>cb(...data));
 }
 
 contextBridge.exposeInMainWorld("gAPI",{
@@ -68,9 +76,17 @@ contextBridge.exposeInMainWorld("gAPI",{
         mod:regf("dropdown-mod")
     },
 
+    // sync
+    sync:{
+        mods:regf("syncMods")
+    },
+
     onInitMenu: (cb) => ipcRenderer.on("initMenu",(ev,data)=>cb(data)),
     onInitReturnCB: (cb) => ipcRenderer.on("initReturnCB",(ev,data)=>cb(data)),
     refresh: (cb) => ipcRenderer.on("refresh",(ev,data)=>cb(data)),
+    onMsg: (cb) => ipcRenderer.on("msg",(ev,data)=>cb(data)),
+
+    onUpdateProgress:regl("updateProgress")
 } as IGlobalAPI);
 
 // contextBridge.exposeInMainWorld("gAPI",{

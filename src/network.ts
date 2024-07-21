@@ -1,11 +1,14 @@
 import { io } from "socket.io-client";
-import { Arg_SearchPacks, PackMetaData, Res_SearchPacks, Res_SearchPacksMeta } from "./interface";
+import { Arg_CheckModUpdates, Arg_GetModUpdates, Arg_SearchPacks, PackMetaData, Res_GetModUpdates, Res_SearchPacks, Res_SearchPacksMeta } from "./interface";
 import { util_warn } from "./util";
 import { Result } from "./errors";
 // const socket = io({
 //     host:"http://localhost:3000"
 // });
-const socket = io("http://localhost:3000");
+
+export let remoteServerURL = "http://localhost:3001";
+
+const socket = io(remoteServerURL);
 
 socket.emit("msg","hello!");
 
@@ -56,4 +59,12 @@ export function searchPacks(arg:Arg_SearchPacks){
 }
 export function searchPacksMeta(arg:Arg_SearchPacks){
     return semit<Arg_SearchPacks,Res_SearchPacksMeta>("searchPacksMeta",arg);
+}
+
+// sync
+export function checkModUpdates(arg:Arg_CheckModUpdates){
+    return semit<Arg_CheckModUpdates,boolean>("checkModUpdates",arg);
+}
+export function getModUpdates(arg:Arg_GetModUpdates){
+    return semit<Arg_GetModUpdates,Res_GetModUpdates>("getModUpdates",arg);
 }

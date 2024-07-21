@@ -303,3 +303,8 @@ aside{
         color:var(--text-dim);
     }
 }
+
+.l-details{
+    font-size:12px;
+    color:var(--text-dim);
+}

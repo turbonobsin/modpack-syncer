@@ -5,8 +5,6 @@ import { util_rename } from "./util";
 import path from "path";
 
 export async function openModDropdown(w:BrowserWindow,iid:string,files:string[]){
-    console.log("open dropdown...");
-
     // let end:(changed:string[][])=>void;
     // let prom = new Promise<string[][]>(resolve=>end = resolve);
     let end:(data?:any)=>void;

@@ -241,8 +241,7 @@ export class InitData<T>{
         this.init = init;
         this.setup();
     }
-    // @ts-ignore
-    d:T; // <-- I will only load the page if this is defined so it is garenteed to be defined
+    d!:T; // <-- I will only load the page if this is defined so it is garenteed to be defined
     hasLoadedPage = false;
     init:()=>any;
     
@@ -258,7 +257,6 @@ export class InitData<T>{
             this.d = data.data;
             if(!this.d) return;
         
-            console.log("...called init");
             this.init();
         });
         
@@ -271,9 +269,12 @@ export class InitData<T>{
                 this.d = JSON.parse(cache).data;
                 if(!this.d) return;
 
-                console.log("...called init");
                 this.init();
             }
         },this.timeoutDelay);
     }
 }
+
+window.gAPI.onMsg(msg=>{
+    console.log("MSG: ",msg);
+});

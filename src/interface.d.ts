@@ -14,6 +14,8 @@ type PackMetaData = {
     desc:string;
     loader:string;
     version:string;
+
+    update:number;
 };
 type InitMenuData<T> = {
     data:T
@@ -98,6 +100,10 @@ export interface Res_GetInstScreenshots{
 interface EditInst_InitData{
     iid:string;
 }
+interface UpdateProgress_InitData{
+    iid:string;
+    update:Res_GetModUpdates;
+}
 
 interface Arg_IID{
     iid:string;
@@ -139,11 +145,23 @@ interface FullModData{
     local:LocalModData;
     remote?:RemoteModData;
 }
+type FolderType = "root" | "custom";
+interface ModsFolderDef{
+    name:string;
+    type:FolderType;
+    mods:string[];
+}
+interface ModsFolder{
+    name:string;
+    type:FolderType;
+    mods:FullModData[];
+}
 interface Res_GetInstMods{
-    mods:{
-        global:FullModData[],
-        local:FullModData[]
-    }
+    // mods:{
+    //     global:FullModData[],
+    //     local:FullModData[]
+    // }
+    folders:ModsFolder[];
 }
 
 interface ModrinthUpdate{
@@ -317,6 +335,32 @@ export type Err<T> = {
     data?:T;
 };
 
+interface Arg_SyncMods extends Arg_IID{
+
+}
+interface Res_SyncMods{
+
+}
+interface Arg_CheckModUpdates{
+    id:string;
+    update:number;
+}
+interface Arg_GetModUpdates{
+    id:string;
+    currentMods:string[];
+    currentIndexes:string[];
+}
+interface Res_GetModUpdates{
+    mods:{
+        add:string[],
+        remove:string[]
+    },
+    indexes:{
+        add:string[],
+        remove:string[]
+    }
+}
+
 export interface IGlobalAPI{
     // render -> main
     fsTest:(path?:string)=>Promise<FSTestData>;
@@ -346,6 +390,11 @@ export interface IGlobalAPI{
 
     getImage:(path:string)=>Promise<Uint8Array>;
 
+    // sync
+    sync:{
+        mods:(arg:Arg_SyncMods)=>Promise<Res_SyncMods>;
+    }
+
     // dropdowns
     dropdown:{
         mod:(iid:string,files:string[])=>Promise<string[][]>;
@@ -355,6 +404,9 @@ export interface IGlobalAPI{
     onInitMenu:(cb:(data:InitMenuData)=>void)=>void;
     onInitReturnCB:(cb:(data:any)=>void)=>void;
     refresh:(cb:(data:any)=>void)=>void;
+    onMsg:(cb:(msg:string)=>void)=>void;
+    
+    onUpdateProgress:(cb:(id:string,i:number,total:number,item:string,extra:any)=>void)=>void;
 }
 
 declare global{

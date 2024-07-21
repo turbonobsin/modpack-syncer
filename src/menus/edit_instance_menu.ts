@@ -2,9 +2,8 @@ import "../render_lib";
 import "../styles/edit_instance_menu.css";
 import { addClassToOps, makeDivPart, MP_ActivityBarItem, MP_Button, MP_Div, MP_Flexbox, MP_Flexbox_Ops, MP_Generic, MP_Grid, MP_Header, MP_HR, MP_P, MP_TabbedMenu, MP_TableList, MP_Text, MP_TR, PartTextStyle } from "../menu_parts";
 import { MP_SearchStructure, qElm } from "../render_lib";
-import { EditInst_InitData, FullModData, ModData } from "../interface";
+import { EditInst_InitData, FullModData, ModData, ModsFolder, Res_GetInstMods } from "../interface";
 import { deselectItem, InitData, SelectedItem, selectItem, wait } from "../render_util";
-import { sysInst } from "src/db";
 import { io } from "socket.io-client";
 
 let initData = new InitData<EditInst_InitData>(init);
@@ -127,26 +126,107 @@ class MP_ModRow extends MP_Flexbox{
     }
 }
 
+async function loadFolder(folder:ModsFolder,menu:MP_TabbedMenu,search:MP_SearchStructure<FullModData>){
+    let col1 = search.list;
+
+    if(folder.type != "root") col1.addPart(
+        new MP_Flexbox({
+            gap:"10px",
+            alignItems:"center"
+        }).addParts(
+            new MP_Div({
+                className:"material-symbols-outlined",
+                innerHTML:"folder",
+                fontSize:"20px",
+            }).onPostLoad(p=>{
+                p.e!.style.userSelect = "none";
+            }),
+            new MP_P({
+                text:folder.name
+            }),
+
+            new MP_Flexbox({
+                marginLeft:"auto",
+                gap:"5px"
+            }).addParts(
+                new MP_Div({
+                    className:"folder-tag",
+                    innerHTML:folder.type
+                }),
+                new MP_Div({
+                    className:"folder-tag",
+                    innerHTML:"Local"
+                })
+            )
+        )
+    );
+    
+    col1.addParts(
+        new MP_Flexbox({
+            alignItems:"center",
+            gap:"10px",
+            marginBottom:"3px"
+        }).addParts(
+            new MP_Div({width:"25px"}),
+            new MP_Text({
+                text:"Name",
+                marginRight:"auto"
+            }),
+            new MP_Text({
+                text:"Version"
+            }).onPostLoad(p=>{
+                if(!p.e) return;
+                // p.e.style.textAlign = "right";
+                // p.e.style.color = "var(--text-dim)";
+            }),
+        ),
+        new MP_HR()
+    );
+    
+    // 
+
+    for(const mod of folder.mods){
+        let div = new MP_ModRow({
+            mod,
+            onClick2:(e,elm)=>{
+
+            },
+            onMouseUp2:async (e,elm)=>{
+                if(e.button != 2) return;
+                if(!sel_item) return;
+
+                if(!sel_item.isSelected()) sel_item.toggle(e);
+                let s_top = menu.main.e!.scrollTop;
+                let res = await window.gAPI.dropdown.mod(initData.d.iid,[...sel_item.api.selected].map(v=>v.data.local.file));
+
+                if(res.length){
+                    for(const [name,newName] of res){
+                        let d = col1.parts.filter(v=>v instanceof MP_ModRow).find((v:MP_ModRow)=>v.ops.mod.local.file == name);
+                        if(!d) continue;
+                        d.ops.mod.local.file = newName;
+                        if(newName.endsWith(".disabled")){
+                            d.e?.classList.add("disabled");
+                        }
+                        else{
+                            d.e?.classList.remove("disabled");
+                        }
+                    }
+                }
+
+                menu.main.e!.scrollTop = s_top;
+            }
+        });
+
+        col1.addPart(div);
+        let sel_item = search.registerSelItem(mod,div.main?.e);
+    }
+
+    col1.addPart(new MP_Div({height:"30px"}));
+}
+
 async function loadSection(index:number,menu:MP_TabbedMenu){
     switch(index){
         case 0:{
-            let table = new MP_TableList({
-                header:[
-                    {
-                        label:"",
-                        width:"0px"
-                    },
-                    {
-                        label:"Name",
-                        width:"100%"
-                    },
-                    {
-                        label:"Version",
-                        width:"auto"
-                    }
-                ]
-            });
-
             let search = new MP_SearchStructure<FullModData>({
                 listId:"_",
                 // listId:"instance",
@@ -185,6 +265,7 @@ async function loadSection(index:number,menu:MP_TabbedMenu){
                             gap:"10px"
                         }).addParts(
                             new MP_Button({
+                                skipAdd:true,
                                 label:"Cache Mods",
                                 onClick:async (e,elm)=>{
                                     let res = await window.gAPI.cacheMods(initData.d.iid);
@@ -192,6 +273,7 @@ async function loadSection(index:number,menu:MP_TabbedMenu){
                                 }
                             }),
                             new MP_Button({
+                                skipAdd:true,
                                 label:"Get Index Files",
                                 onClick:async (e,elm)=>{
                                     let res = await window.gAPI.getModIndexFiles({iid:initData.d.iid});
@@ -205,119 +287,26 @@ async function loadSection(index:number,menu:MP_TabbedMenu){
                     menu.aside.clearParts();
                 },
                 onSubmit:async (t,e,q)=>{
-                    // let grid = menu.main_body.addPart(
-                    //     new MP_Grid({
-                    //         template_columns:"1fr auto"
-                    //     })
-                    // );
-                    
-                    // let cols = grid.createSubSections(2);
-                    // let col1 = cols[0]; //.addPart(new MP_Text({text:"hi"}));
-                    // let col2 = cols[1]; //.addPart(new MP_Text({text:"hi 2"}));
-
                     let res = await window.gAPI.getInstMods({iid:initData.d.iid,query:q});
                     console.log("RES:",res);
 
-                    let col1 = search.list;
-                    // if(col1.e) col1.e.style.overflowY = "scroll";
-                    // if(menu.main_body.e?.parentElement) menu.main_body.e.parentElement.style.overflowY = "hidden";
-
-                    col1.addParts(
-                        new MP_Flexbox({
-                            alignItems:"center",
-                            gap:"10px",
-                            marginBottom:"3px"
-                        }).addParts(
-                            new MP_Div({width:"25px"}),
-                            new MP_Text({
-                                text:"Name",
-                                marginRight:"auto"
-                            }),
-                            new MP_Text({
-                                text:"Version"
-                            }).onPostLoad(p=>{
-                                if(!p.e) return;
-                                // p.e.style.textAlign = "right";
-                                // p.e.style.color = "var(--text-dim)";
-                            }),
-                        ),
-                        new MP_HR()
-                    );
-                    
-                    // 
-
-                    for(const mod of res.mods.global){
-                        // if(false) table.addRow(false,[
-                        //     new MP_Generic<HTMLImageElement>("img",{}).onPostLoad(p=>{
-                        //         if(!p.e) return;
-
-                        //         let e = p.e as HTMLImageElement;
-
-                        //         e.style.width = "25px";
-                        //         e.style.height = "25px";
-
-                        //         e.setAttribute("full-path",mod.icon);
-                        //         _loadImage(e,0);
-
-                        //         e.onclick = function(){
-                        //             openImg(e);
-                        //         };
-
-                        //         // (p.e as HTMLImageElement).src = mod.info.icon;
-                        //     }),
-                        //     new MP_Text({
-                        //         text:mod.name ?? mod.file,
-                        //         marginRight:"auto"
-                        //     }),
-                        //     new MP_Text({
-                        //         text:mod.version
-                        //     }).onPostLoad(p=>{
-                        //         if(!p.e) return;
-                        //         p.e.style.textAlign = "right";
-                        //         p.e.style.color = "var(--text-dim)";
-                        //     })
-                        // ],td=>{
-                        //     if(td.e){
-                        //         td.e.style.color = "var(--t2)";
-                        //     }
-                        // });
-                        
-                        let div = new MP_ModRow({
-                            mod,
-                            onClick2:(e,elm)=>{
-
-                            },
-                            onMouseUp2:async (e,elm)=>{
-                                if(e.button != 2) return;
-                                if(!sel_item) return;
-
-                                if(!sel_item.isSelected()) sel_item.toggle(e);
-                                let s_top = menu.main.e!.scrollTop;
-                                let res = await window.gAPI.dropdown.mod(initData.d.iid,[...sel_item.api.selected].map(v=>v.data.local.file));
-
-                                if(res.length){
-                                    for(const [name,newName] of res){
-                                        let d = col1.parts.filter(v=>v instanceof MP_ModRow).find((v:MP_ModRow)=>v.ops.mod.local.file == name);
-                                        if(!d) continue;
-                                        d.ops.mod.local.file = newName;
-                                        if(newName.endsWith(".disabled")){
-                                            d.e?.classList.add("disabled");
-                                        }
-                                        else{
-                                            d.e?.classList.remove("disabled");
-                                        }
-                                    }
-                                }
-
-                                menu.main.e!.scrollTop = s_top;
-                            }
-                        });
-
-                        col1.addPart(div);
-                        let sel_item = search.registerSelItem(mod,div.main?.e);
+                    for(const folder of res.folders){
+                        await loadFolder(folder,menu,search);
                     }
                 }
             });
+
+            search.mainOptions.addParts(
+                new MP_Button({
+                    label:"Sync",
+                    className:"accent",
+                    icon:"sync_alt",
+                    onClick:async (e,elm)=>{
+                        let res = await window.gAPI.sync.mods({iid:initData.d.iid});
+                        console.log("RES:",res);
+                    }
+                })
+            );
 
             menu.main_body.addPart(search);
             console.log(search.e);

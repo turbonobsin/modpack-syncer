@@ -106,6 +106,15 @@ export abstract class MenuPart{
 
     }
 
+    /**
+     * Inverse of addPart, runs `parent.addPart(this)`
+     * @returns this
+     */
+    addTo(parent:MenuPart){
+        parent.addPart(this);
+        return this;
+    }
+
     addParts(...parts:MenuPart[]){
         if(this.ops.skipAdd) return this;
         
@@ -771,6 +780,59 @@ export class MP_TableList extends MP_Div{
     }
 }
 
+interface MP_Progress_Ops extends MP_Ops{
+
+}
+export class MP_Progress extends MP_Div{
+    constructor(ops:MP_Progress_Ops){
+        addClassToOps(ops,"progress-cont");
+        super(ops);
+    }
+    declare ops:MP_Progress_Ops;
+
+    barCont = new MP_Div({
+        className:"progress-bar-cont"
+    });
+    bar = new MP_Div({
+        className:"progress-bar"
+    });
+    details = new MP_Div({
+        className:"progress-details-cont l-details"
+    });
+
+    load(): void {
+        super.load();
+
+        this.barCont.addPart(this.bar);
+        this.addParts(
+            this.barCont,this.details
+        );
+    }
+
+    updateProgress(amt:number,total:number,curItem:string,extra?:{sections?:{header?:string,text:string[]}[]}){
+        if(!this.bar.e) return;
+        if(!this.details.e) return;
+        
+        let percent = amt == 0 ? 0 : (amt/total*100);
+        
+        this.bar.e.style.setProperty("--progress-text",`"${Math.floor(percent)}% | ${amt}/${total}"`);
+        this.bar.e.style.width = `${percent}%`;
+        this.details.clearParts();
+
+        this.details.addPart(new MP_P({text:curItem}));
+        
+        if(extra){
+            if(extra.sections){
+                for(const section of extra.sections){
+                    if(section.header) this.details.addPart(new MP_P({text:section.header}));
+                    if(section.text) for(const line of section.text){
+                        this.details.addPart(new MP_Div({textContent:line.length ? line : " "}));
+                    }
+                }
+            }
+        }
+    }
+}
 
 // ideas
 /**

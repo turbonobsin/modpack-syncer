@@ -128,6 +128,13 @@ export function util_writeJSON(path:fs.PathOrFileDescriptor,data:any){
         });
     });
 }
+export function util_writeBinary(path:fs.PathOrFileDescriptor,data:Buffer){
+    return new Promise<void>(resolve=>{
+        fs.writeFile(path,data,(err)=>{
+            resolve();
+        });
+    });
+}
 export function util_lstat(path:fs.PathLike){
     return new Promise<fs.Stats|undefined>(resolve=>{
         fs.lstat(path,(err,stats)=>{
@@ -159,6 +166,17 @@ export function util_rename(path:fs.PathLike,newPath:fs.PathLike){
             }
             resolve(true);
         });
+    });
+}
+export function util_rm(path:fs.PathLike){
+    return new Promise<boolean>(resolve=>{
+        fs.rm(path,(err=>{
+            if(err){
+                util_warn("Failed to delete file: "+path);
+                resolve(false);
+            }
+            else resolve(true);
+        }));
     });
 }
 
