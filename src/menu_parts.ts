@@ -10,7 +10,11 @@ export interface MP_Ops{
     classList?:string[];
     className?:string;
     id?:string;
+    /** adds a span and sets that textContent */
     textContent?:string;
+    /** sets textContent */
+    text?:string;
+    /** sets innerHTML */
     innerHTML?:string;
     __tag?:string;
     skipAdd?:boolean;
@@ -41,7 +45,6 @@ export interface MP_Ops{
 }
 export interface MP_Text_Ops extends MP_Ops{
     overrideTag?:string;
-    text?:string;
     style?:PartTextStyle;
 }
 export interface MP_Flexbox_Ops extends MP_Ops{
@@ -99,6 +102,9 @@ export abstract class MenuPart{
         else this.create();
         // else this._load();
 
+        if(this.e && this.ops.text){
+            this.e.textContent = this.ops.text;
+        }
         if(this.ops.textContent){
             this.addPart(new MP_Text({
                 text:this.ops.textContent
@@ -169,7 +175,7 @@ export abstract class MenuPart{
             this.e.textContent = "";
         }
     }
-    onPostLoad(f:(p:MenuPart)=>void){
+    onPostLoad(f:(p:this)=>void){
         // this._onPostLoad = f;
         f(this);
         return this;
@@ -960,6 +966,27 @@ export class MP_MultiSelectGroup extends MP_Grid{
                 inp.e.value = op.value;
             }
         }
+    }
+}
+
+export interface MP_Img_Ops extends MP_Ops{
+    src:string;
+}
+export class MP_Img extends MenuPart{
+    constructor(ops:MP_Img_Ops){
+        super(ops)
+    }
+    declare ops:MP_Img_Ops;
+    declare e?:HTMLImageElement;
+
+    create(): void {
+        this.e = document.createElement("img");
+    }
+    load(): void {
+        super.load();
+        if(!this.e) return;
+
+        if(this.ops.src) this.e.src = this.ops.src;
     }
 }
 

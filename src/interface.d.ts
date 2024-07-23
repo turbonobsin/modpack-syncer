@@ -238,6 +238,45 @@ interface Res_GetInstMods{
     folders:ModsFolder[];
 }
 
+interface RP_MCMeta{
+    pack:{
+        pack_format:number;
+        description:string;
+    }
+}
+interface RP_Data{
+    name:string;
+    data?:{ // data will be defined only if the Resource Pack has been unpacked into a folder (because I can't efficiently read the data otherwise)
+        icon?:string;
+        meta?:RP_MCMeta;
+    }
+}
+interface FItem{
+    name:string;
+}
+interface FFolder extends FItem{
+    items:FItem[];
+}
+interface FFile extends FItem{
+    buf:Uint8Array;
+}
+interface ResourcePack{
+    data:RP_Data;
+    root:FFolder;
+}
+interface Arg_GetResourcePack{
+    name:string;
+}
+interface Res_GetResourcePack{
+    pack:ResourcePack;
+}
+interface Arg_GetInstResourcePacks{
+    iid:string;
+}
+interface Res_GetInstResourcePacks{
+    packs:RP_Data[];
+}
+
 interface ModrinthUpdate{
     "mod-id":string;
     version:string;
@@ -478,6 +517,8 @@ export interface IGlobalAPI{
 
     getInstScreenshots:(arg:Arg_GetInstScreenshots)=>Promise<Res_GetInstScreenshots>;
     getInstMods:(arg:Arg_GetInstMods)=>Promise<Res_GetInstMods>;
+    getInstRPs:(arg:Arg_GetInstResourcePacks)=>Promise<Res_GetInstResourcePacks|undefined>;
+    
     getModIndexFiles:(arg:Arg_IID)=>Promise<Res_GetModIndexFiles>;
     cacheMods:(iid:string)=>Promise<void>;
     toggleModEnabled:(iid:string,filename:string,force?:boolean)=>Promise<void>;

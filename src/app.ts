@@ -158,6 +158,16 @@ export async function preInit(){
     ipcMain.handle("getInstMods",async (ev,arg:Arg_GetInstMods)=>{
         return (await getInstMods(arg)).unwrap();
     });
+    ipcMain.handle("getInstRPs",async (ev,arg:Arg_GetInstResourcePacks)=>{
+        let inst = await getModpackInst(arg.iid);
+        if(!inst) return errors.couldNotFindPack.unwrap();
+        
+        let res = inst.getResourcePacks();
+        if(!res) return;
+
+        return res;
+    });
+
     ipcMain.handle("getModIndexFiles",async (ev,arg:Arg_IID)=>{
         return (await getModIndexFiles(arg)).unwrap();
     });
@@ -1641,7 +1651,7 @@ async function alertBox(w:BrowserWindow,message:string,title="Error"){
 // 
 
 import { ETL_Generic, evtTimeline, parseCFGFile, searchStringCompare, util_lstat, util_mkdir, util_readBinary, util_readdir, util_readdirWithTypes, util_readJSON, util_readText, util_readTOML, util_rename, util_rm, util_warn, util_writeBinary, util_writeJSON, util_writeText, wait } from "./util";
-import { Arg_AddModToFolder, Arg_ChangeFolderType, Arg_CheckModUpdates, Arg_CreateFolder, Arg_GetInstances, Arg_GetInstMods, Arg_GetInstScreenshots, Arg_GetPrismInstances, Arg_IID, Arg_SearchPacks, Arg_SyncMods, CurseForgeUpdate, Data_PrismInstancesMenu, FSTestData, FullModData, InputMenu_InitData, InstGroups, LocalModData, MMCPack, ModData, ModIndex, ModInfo, ModrinthModData, ModrinthUpdate, ModsFolder, ModsFolderDef, PackMetaData, RemoteModData, Res_GetInstMods, Res_GetInstScreenshots, Res_GetModIndexFiles, Res_GetPrismInstances, Res_InputMenu, Res_SyncMods } from "./interface";
+import { Arg_AddModToFolder, Arg_ChangeFolderType, Arg_CheckModUpdates, Arg_CreateFolder, Arg_GetInstances, Arg_GetInstMods, Arg_GetInstResourcePacks, Arg_GetInstScreenshots, Arg_GetPrismInstances, Arg_IID, Arg_SearchPacks, Arg_SyncMods, CurseForgeUpdate, Data_PrismInstancesMenu, FSTestData, FullModData, InputMenu_InitData, InstGroups, LocalModData, MMCPack, ModData, ModIndex, ModInfo, ModrinthModData, ModrinthUpdate, ModsFolder, ModsFolderDef, PackMetaData, RemoteModData, Res_GetInstMods, Res_GetInstResourcePacks, Res_GetInstScreenshots, Res_GetModIndexFiles, Res_GetPrismInstances, Res_InputMenu, Res_SyncMods } from "./interface";
 import { getModUpdates, getPackMeta, searchPacks, searchPacksMeta, updateSocketURL } from "./network";
 import { ListPrismInstReason, openCCMenu, openCCMenuCB, SearchPacksMenu, ViewInstanceMenu } from "./menu_api";
 import { addInstance, cleanModName, cleanModNameDisabled, dataPath, getModFolderPath, getModpackInst, getModpackPath, LocalModInst, ModPackInst, RemoteModInst, slugMap, sysInst } from "./db";

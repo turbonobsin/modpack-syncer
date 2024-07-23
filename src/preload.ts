@@ -61,6 +61,8 @@ contextBridge.exposeInMainWorld("gAPI",{
 
     getInstScreenshots:regf("getInstScreenshots"),
     getInstMods:regf("getInstMods"),
+    getInstRPs:regf("getInstRPs"),
+
     getModIndexFiles:regf("getModIndexFiles"),
     cacheMods:regf("cacheMods"),
     toggleModEnabled:regf("toggleModEnabled"),

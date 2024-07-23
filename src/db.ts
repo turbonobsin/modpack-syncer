@@ -1,8 +1,8 @@
 import { app } from "electron";
-import { util_lstat, util_mkdir, util_readdir, util_readJSON, util_readText, util_readTOML, util_warn, util_writeJSON } from "./util";
+import { util_lstat, util_mkdir, util_readdir, util_readdirWithTypes, util_readJSON, util_readText, util_readTOML, util_warn, util_writeJSON } from "./util";
 import path from "path";
 import { DBSys, DBUser, InstanceData as ModPackInstData } from "./db_types";
-import { Arg_AddModToFolder, Arg_ChangeFolderType, Arg_CreateFolder, Arg_EditFolder, FolderType, LocalModData, ModIndex, ModrinthModData, ModsFolder, ModsFolderDef, PackMetaData, RemoteModData, SlugMapData } from "./interface";
+import { Arg_AddModToFolder, Arg_ChangeFolderType, Arg_CreateFolder, Arg_EditFolder, FolderType, LocalModData, ModIndex, ModrinthModData, ModsFolder, ModsFolderDef, PackMetaData, RemoteModData, Res_GetInstResourcePacks, RP_Data, SlugMapData } from "./interface";
 import { errors, Result } from "./errors";
 import express from "express";
 import toml from "toml";
@@ -139,6 +139,11 @@ export function cleanModNameDisabled(name:string){
 
 // 
 
+const instCache = {
+    user:new Map<string,UserInst>(),
+    modpack:new Map<string,ModPackInst>()
+};
+
 abstract class Inst<T>{
     constructor(filePath:string){
         this.filePath = filePath;
@@ -147,6 +152,16 @@ abstract class Inst<T>{
     meta?:T;
     getFileType(): "json" | "toml"{
         return "json";
+    }
+
+    getCacheMap():Map<string,Inst<T>> | undefined{
+        return;
+    }
+    storeInCache(){
+        let map = this.getCacheMap();
+        if(!map) return;
+        
+        map.set(this.filePath,this);
     }
 
     useDefaultIfDNE(){
@@ -175,6 +190,12 @@ abstract class Inst<T>{
     }
 
     async load(defMeta?:T){ // todo - add some point need to have an instance cache and it'll just grab from that if needed, that way I can queue all write operations
+        let cache = this.getCacheMap();
+        if(cache){
+            let v = cache.get(this.filePath);
+            if(v) return v as this; // MAY NEED SOME EXTRA WORK LIKE WHEN IT BECOMES STALE
+        }
+        
         let stats = await util_lstat(this.filePath);
         if(!stats){
             if(!defMeta && !this.useDefaultIfDNE()){
@@ -304,6 +325,9 @@ export class UserInst extends Inst<DBUser>{
     async getDefault(): Promise<DBUser | undefined> {
         return;
     }
+    getCacheMap(): Map<string, Inst<DBUser>> | undefined {
+        return instCache.user;
+    }
 }
 
 export class ModPackInst extends Inst<ModPackInstData>{
@@ -317,6 +341,10 @@ export class ModPackInst extends Inst<ModPackInstData>{
         return {
             folders:[]
         };
+    }
+
+    getCacheMap(): Map<string, Inst<ModPackInstData>> | undefined {
+        return instCache.modpack;
     }
 
     async postLoad(): Promise<void> {
@@ -422,6 +450,10 @@ export class ModPackInst extends Inst<ModPackInstData>{
         folder.mods.push(arg.modCleaned);
         
         return new Result(folder);
+    }
+
+    async getResourcePacks(){
+        return (await getInstResourcePacks(this)).unwrap();
     }
 }
 
@@ -554,6 +586,43 @@ export async function addInstance(meta:PackMetaData):Promise<Result<ModPackInst>
     console.log("ADDED INSTANCE:",inst);
 
     return new Result(inst);
+}
+
+// MODPACK INST METHODS
+async function getInstResourcePacks(inst:ModPackInst): Promise<Result<Res_GetInstResourcePacks>>{
+    let resData:Res_GetInstResourcePacks = {
+        packs:[],
+    };
+
+    const prismPath = inst.getPrismInstPath();
+    if(!prismPath) return errors.failedToGetPrismInstPath;
+
+    const loc = path.join(prismPath,".minecraft","resourcepacks");
+    let packList = await util_readdirWithTypes(loc,false);
+    for(const fi_pack of packList){ // fileItem_pack
+        if(fi_pack.isFile()){
+            resData.packs.push({
+                name:fi_pack.name
+            });
+            continue;
+        }
+
+        let packLoc = path.join(loc,fi_pack.name);
+
+        let d:RP_Data = {
+            name:fi_pack.name,
+            data:{
+                icon:path.join(packLoc,"pack.png")
+            }
+        };
+        
+        let packMCMeta = await util_readJSON<any>(path.join(packLoc,"pack.mcmeta"));
+        if(packMCMeta) d.data!.meta = packMCMeta;
+        
+        resData.packs.push(d);
+    }
+    
+    return new Result(resData);
 }
 
 // 

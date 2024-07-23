@@ -1,8 +1,8 @@
 import "../render_lib";
 import "../styles/edit_instance_menu.css";
-import { addClassToOps, makeDivPart, MP_ActivityBarItem, MP_Button, MP_Div, MP_Flexbox, MP_Flexbox_Ops, MP_Generic, MP_Grid, MP_Header, MP_HR, MP_P, MP_TabbedMenu, MP_TableList, MP_Text, MP_TR, PartTextStyle } from "../menu_parts";
+import { addClassToOps, makeDivPart, MP_ActivityBarItem, MP_Button, MP_Combobox, MP_Div, MP_Flexbox, MP_Flexbox_Ops, MP_Generic, MP_Grid, MP_Header, MP_HR, MP_Img, MP_P, MP_TabbedMenu, MP_TableList, MP_Text, MP_TR, PartTextStyle } from "../menu_parts";
 import { MP_SearchStructure, qElm } from "../render_lib";
-import { EditInst_InitData, FullModData, ModData, ModsFolder, Res_GetInstMods } from "../interface";
+import { EditInst_InitData, FullModData, ModData, ModsFolder, Res_GetInstMods, RP_Data } from "../interface";
 import { deselectItem, InitData, SelectedItem, selectItem, wait } from "../render_util";
 import { io } from "socket.io-client";
 import { allDropdowns } from "src/dropdowns";
@@ -234,7 +234,48 @@ async function loadFolder(folder:ModsFolder,menu:MP_TabbedMenu,search:MP_SearchS
     col1.addPart(new MP_Div({height:"30px"}));
 }
 
+interface CMP_RP_Ops extends MP_Flexbox_Ops{
+    data:RP_Data;
+}
+class CMP_ResourcePackSimple extends MP_Flexbox{
+    constructor(ops:CMP_RP_Ops){
+        addClassToOps(ops,"mod-row");
+        ops.gap = "5px";
+        ops.alignItems = "center";
+        ops.marginBottom = "3px";
+
+        super(ops);
+    }
+    declare ops:CMP_RP_Ops;
+
+    load(): void {
+        super.load();
+
+        let d = this.ops.data;
+        let data = d.data;
+        
+        let icon = new MP_Img({
+            src:getImageURL(data?.icon),
+            width:"25px",
+            height:"25px",
+            className:"_loaded",
+            onClick:(e,elm)=>{
+                if(data?.icon) openImg(elm as HTMLImageElement);
+            }
+        }).addTo(this);
+
+        let cont = new MP_Div({className:"mod-row-content"}).addTo(this);
+
+        let name = new MP_Text({
+            text:d.name,
+            marginRight:"auto"
+        }).addTo(cont);
+    }
+}
+
 async function loadSection(index:number,menu:MP_TabbedMenu){
+    menu.aside.clearParts();
+
     switch(index){
         case 0:{
             let search = new MP_SearchStructure<FullModData>({
@@ -337,7 +378,44 @@ async function loadSection(index:number,menu:MP_TabbedMenu){
             
         } break;
         case 1:{
+            let search = new MP_SearchStructure({
+                listId:"_",
+                submitOnOpen:true,
+                onSelect:(data,item)=>{
 
+                },
+                onNoSelected:()=>{
+                    menu.aside.clearParts();
+                },
+                onSubmit:async (t,e,q)=>{
+                    let res = await window.gAPI.getInstRPs({iid:initData.d.iid});
+                    console.log("RP:",res);
+                    if(!res) return;
+
+                    for(const pack of res.packs){
+                        search.list.addPart(new CMP_ResourcePackSimple({data:pack}));
+                    }
+                }
+            });
+            menu.main_body.addPart(search);
+
+            let combo = new MP_Combobox({
+                options:[
+                    {
+                        label:"(Local Folder)",
+                        value:"_local"
+                    },
+                    {
+                        label:"High Rez Packs",
+                        value:"high_rez_packs"
+                    },
+                    {
+                        label:"Medieval Packs",
+                        value:"medieval_packs"
+                    }
+                ]
+            });
+            search.mainOptions.addPart(combo);
         } break;
         case 2:{
             let res = await window.gAPI.getInstScreenshots({iid:initData.d.iid});
@@ -534,6 +612,16 @@ async function checkVis(){
     checkingVis = false;
 }
 let loadingImageCache:number[] = [];
+
+function getImageURL(path?:string){
+    if(!path) return "";
+    if(!path.startsWith("http")){
+        let url1 = new URL("http://localhost:57152/image");
+        url1.searchParams.set("path",path);
+        path = url1.href;
+    }
+    return path;
+}
 
 let _scrollY = 0;
 async function _loadImage(e:HTMLImageElement,i:number){

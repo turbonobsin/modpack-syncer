@@ -83,6 +83,25 @@ const appMenu = Menu.buildFromTemplate([
 				}
 			}
 		]
+	},
+	{
+		label:"View",
+		submenu:[
+			{
+				role:"toggleDevTools"
+			}
+		]
+	},
+	{
+		label:"Window",
+		submenu:[
+			{
+				role:"reload"
+			},
+			{
+				role:"forceReload"
+			}
+		]
 	}
 ]);
 Menu.setApplicationMenu(appMenu);
