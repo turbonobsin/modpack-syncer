@@ -40,11 +40,17 @@ form.query{
     float:right;
 
     & #i-query{
-        margin-right:5px;
+        margin-right:10px;
     }
 }
 
-input[type="search"]{
+label{
+    user-select:none;
+}
+
+input[type="search"],
+input[type="text"],
+input[type="password"]{
     padding:5px 10px;
     background-color:var(--input-bg);
     border:solid 1px var(--input-border);
@@ -53,6 +59,31 @@ input[type="search"]{
     font-weight:bold;
     font-size:13px;
 }
+select{
+    padding:5px 10px;
+    background-color:var(--input-bg);
+    border:solid 1px var(--input-border);
+    color:var(--input-t1);
+    font-weight:bold;
+    font-size:13px;
+    border-radius:5px;
+}
+option{
+    padding:5px 10px;
+    background-color:var(--input-bg);
+    border:solid 1px var(--input-border);
+    color:var(--input-t1);
+    font-size:13px;
+}
+select[multiple]{
+    padding:5px;
+    background-color:var(--menu-bg);
+}
+select[multiple] option{
+    border-radius:3px;
+    margin-bottom:5px;
+}
+
 input[type="submit"]{
     background:none;
     border:none;

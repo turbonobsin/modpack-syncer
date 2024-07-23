@@ -3,6 +3,7 @@
 import { ModPackInst } from "./db";
 import { InstanceData } from "./db_types";
 import type { Mod as Mod2 } from "node-curseforge";
+import { allDropdowns } from "./dropdowns";
 
 type FSTestData = {
     instancePath:string;
@@ -105,6 +106,77 @@ interface UpdateProgress_InitData{
     update:Res_GetModUpdates;
 }
 
+// type InputMenuOptionType = "text" | "combobox" | "multiselect";
+type InputMenuOption = IMO_Title | IMO_Input | IMO_Search | IMO_Combobox | IMO_MultiSelect;
+// interface InputMenuOption{
+//     readonly type:InputMenuOptionType;
+// }
+
+interface IMO_MultiSelect{
+    readonly type:"multi_select",
+    id:string;
+    label:string;
+    options:OptionItem[];
+    selected?:string[];
+}
+interface IMO_Title extends InputMenuOption{
+    readonly type:"title";
+    title?:string;
+    desc?:string;
+}
+interface IMO_Text extends InputMenuOption{
+    readonly type:"text";
+    id:string;
+    label:string;
+}
+interface IMO_Input extends InputMenuOption{
+    readonly type:"input";
+    id:string;
+    label:string;
+    inputType:string;
+    value?:any;
+    checked?:boolean;
+    placeholder?:string;
+}
+interface IMO_Search extends InputMenuOption{
+    readonly type:"search";
+    id:string;
+    label:string;
+    placeholder?:string;
+    value?:string;
+}
+
+export interface OptionItem{
+    label:string;
+    value:string;
+}
+interface IMO_Combobox extends InputMenuOption{
+    readonly type:"combobox";
+    id:string;
+    label:string;
+    options:OptionItem[];
+    default:number;
+    multiple?:boolean;
+    selected?:string[];
+}
+
+interface InputMenuSection{
+    options:InputMenuOption[];
+}
+interface InputMenu_InitData{
+    cmd:string;
+    args:any[];
+
+    title:string;
+    sections:InputMenuSection[];
+
+    width?:number;
+    height?:number;
+}
+interface Res_InputMenu{
+    data:Record<string,any>;
+}
+
 interface Arg_IID{
     iid:string;
 }
@@ -149,11 +221,13 @@ type FolderType = "root" | "custom";
 interface ModsFolderDef{
     name:string;
     type:FolderType;
+    tags:string[];
     mods:string[];
 }
 interface ModsFolder{
     name:string;
     type:FolderType;
+    tags:string[];
     mods:FullModData[];
 }
 interface Res_GetInstMods{
@@ -349,6 +423,7 @@ interface Arg_GetModUpdates{
     id:string;
     currentMods:string[];
     currentIndexes:string[];
+    ignoreMods:string[];
 }
 interface Res_GetModUpdates{
     mods:{
@@ -361,12 +436,37 @@ interface Res_GetModUpdates{
     }
 }
 
+// folders
+interface Arg_CreateFolder extends Arg_IID{
+    name:string;
+    type:FolderType;
+    tags:string[];
+}
+interface Arg_EditFolder extends Arg_IID{
+    folderName:string;
+    name:string;
+    type:FolderType;
+    tags:string[];
+}
+interface Arg_ChangeFolderType extends Arg_IID{
+    name:string;
+    newType:FolderType;
+}
+interface Arg_AddModToFolder extends Arg_IID{
+    name:string;
+    modCleaned:string;
+    type:FolderType;
+}
+
+// 
+
 export interface IGlobalAPI{
     // render -> main
     fsTest:(path?:string)=>Promise<FSTestData>;
     getPackMeta:(id?:string)=>Promise<Err<PackMetaData>>;
     alert:(msg?:string)=>Promise<void>;
     openMenu:(type:string)=>void;
+    triggerEvt:(id:string,data:any)=>void;
     
     searchPacks:(arg:Arg_SearchPacks)=>Promise<Res_SearchPacks>;
     searchPacksMeta:(arg:Arg_SearchPacks)=>Promise<Res_SearchPacksMeta>;
@@ -389,6 +489,14 @@ export interface IGlobalAPI{
     showEditInstance:(iid:string)=>Promise<void>;
 
     getImage:(path:string)=>Promise<Uint8Array>;
+    changeServerURL:()=>Promise<boolean>;
+
+    // folders
+    folder:{
+        create:(arg:Arg_CreateFolder)=>Promise<boolean>;
+        changeType:(arg:Arg_ChangeFolderType)=>Promise<boolean>;
+        addMod:(arg:Arg_AddModToFolder)=>Promise<boolean>;
+    }
 
     // sync
     sync:{
@@ -399,6 +507,7 @@ export interface IGlobalAPI{
     dropdown:{
         mod:(iid:string,files:string[])=>Promise<string[][]>;
     }
+    openDropdown:(id:string,...args:any[])=>Promise<any>;
     
     // main -> render
     onInitMenu:(cb:(data:InitMenuData)=>void)=>void;

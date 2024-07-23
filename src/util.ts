@@ -260,3 +260,80 @@ async function testtest(){
     // });
 }
 testtest();
+
+// EVT TIMELINE SCHEDULER
+
+export abstract class EvtTL_Event<T>{
+    abstract getId():string;
+    // abstract run():Promise<any>;
+
+    start(){
+        this._prom = new Promise(resolve=>this._end = resolve);
+    }
+    
+    _end?:(data:T)=>void;
+    _prom?:Promise<T>;
+}
+export class ETL_Generic<T> extends EvtTL_Event<T>{
+    constructor(id:string){
+        super();
+        this._id = id;
+    }
+    _id:string;
+
+    getId(): string {
+        return this._id;
+    }
+}
+export class EvtTimeline{
+    constructor(){
+        this.evts = new Map();
+    }
+    evts:Map<string,EvtTL_Event<any>>;
+
+    // server
+    subEvt<T>(evt:EvtTL_Event<T>){
+        let id = evt.getId();
+        if(this.evts.has(id)){
+            this.cancelEvtID(id);
+        }
+        this.evts.set(id,evt);
+        evt.start();
+        return evt;
+    }
+    async waitFor<T>(evt:EvtTL_Event<T>){
+        if(!evt._prom) return;
+        return evt._prom;
+    }
+    async waitForId<T>(id:string){
+        let evt = this.evts.get(id) as EvtTL_Event<T> | undefined;
+        if(!evt) return;
+        return evt._prom;
+    }
+    // cancelEvt(evt:EvtTL_Event){
+    //     this.evts.delete(evt.getId());
+    // }
+    cancelEvtID(id:string){
+        this.evts.delete(id);
+    }
+
+    // client
+    exec(id:string,data:any){
+        let evt = this.evts.get(id);
+        if(!evt){
+            util_warn("Couldn't finish evt, it wasn't in the list: "+id);
+            return;
+        }
+        this.finishEvt(evt,data);
+    }
+    finishEvt<T>(evt:EvtTL_Event<T>,data:any){
+        // await evt.run();
+        if(!evt._end){
+            util_warn("Something seriously wrong has happened, this should never, ever print. Probably need an app restart because the event schedule is probably screwed up.");
+            return;
+        }
+        evt._end(data);
+        this.cancelEvtID(evt.getId());
+    }
+}
+export const evtTimeline = new EvtTimeline();

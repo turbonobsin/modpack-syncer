@@ -65,6 +65,7 @@ export interface MP_Input_Ops extends MP_Ops{
     checked?:boolean;
 
     name?:string;
+    placeholder?:string;
 }
 export interface MP_SearchForm_Ops extends MP_Ops{
     onSubmit:(t:MP_SearchForm,e:SubmitEvent,query?:string)=>void|Promise<void>;
@@ -87,6 +88,7 @@ export abstract class MenuPart{
     }
     e?:HTMLElement;
     ops:MP_Ops;
+    parent:MenuPart|undefined;
     parts:MenuPart[];
 
     init(){
@@ -115,6 +117,25 @@ export abstract class MenuPart{
         return this;
     }
 
+    /**
+     * [BETA] May not always work correctly
+     */
+    replaceWith(newPart:MenuPart){
+        if(!newPart.e || !this.e) return this;
+        this.e.replaceWith(newPart.e);
+        
+        if(this.parent){
+            let ind = this.parent.parts.indexOf(this);
+            if(ind != -1) this.parent.parts.splice(ind,1);
+            this.parent.parts[ind] = newPart;
+        }
+
+        return newPart;
+    }
+    replace(oldPart:MenuPart){
+        return oldPart.replaceWith(this);
+    }
+
     addParts(...parts:MenuPart[]){
         if(this.ops.skipAdd) return this;
         
@@ -139,6 +160,7 @@ export abstract class MenuPart{
 
         if(part.ops.onAdded) part.ops.onAdded();
 
+        part.parent = this;
         return part;
     }
 
@@ -409,10 +431,13 @@ export class MP_Button extends MenuPart{
         if(this.ops.icon){
             this.addParts(
                 new MP_Text({text:this.ops.icon,className:"icon"}),
-                new MP_Text({text:this.ops.label})
+                new MP_Text({
+                    skipAdd:!this.ops.label,
+                    text:this.ops.label
+                })
             );
         }
-        else this.e.textContent = this.ops.label;
+        else if(this.ops.label) this.e.textContent = this.ops.label;
 
         this.e.disabled = !!o.disabled;
     }
@@ -436,6 +461,7 @@ export class MP_Input extends MenuPart{
         if(o.valueAsNumber) e.valueAsNumber = o.valueAsNumber;
         if(o.valueAsDate) e.valueAsDate = e.valueAsDate;
         if(o.checked) e.checked = o.checked;
+        if(o.placeholder) e.placeholder = o.placeholder;
     }
 
     getValue(){
@@ -683,6 +709,10 @@ interface MP_Grid_Ops extends MP_Ops{
     template_columns?:string;
     template_rows?:string;
     gap?:string;
+    justifyContent?:string;
+    alignItems?:string;
+    justifyItems?:string;
+    alignContent?:string;
 }
 
 export class MP_Grid extends MP_Div{
@@ -700,6 +730,10 @@ export class MP_Grid extends MP_Div{
         e.style.display = "grid";
         if(o.template_columns) e.style.gridTemplateColumns = o.template_columns;
         if(o.template_rows) e.style.gridTemplateRows = o.template_rows;
+        if(o.justifyContent) e.style.justifyContent = o.justifyContent;
+        if(o.alignItems) e.style.alignItems = o.alignItems;
+        if(o.justifyItems) e.style.justifyItems = o.justifyItems;
+        if(o.alignContent) e.style.alignContent = o.alignContent;
         if(o.gap) e.style.gap = o.gap;
     }
 }
@@ -829,6 +863,101 @@ export class MP_Progress extends MP_Div{
                         this.details.addPart(new MP_Div({textContent:line.length ? line : " "}));
                     }
                 }
+            }
+        }
+    }
+}
+
+export interface OptionItem{
+    label:string;
+    value:string;
+}
+export interface MP_Combobox_Ops extends MP_Ops{
+    options:OptionItem[];
+    default?:number;
+    multiple?:boolean;
+    selected?:string[]; // <- selected values
+}
+export class MP_Combobox extends MP_Generic<HTMLSelectElement>{
+    constructor(ops:MP_Combobox_Ops){
+        super("select",ops);
+    }
+    declare ops:MP_Combobox_Ops;
+    
+    load(): void {
+        super.load();
+        if(!this.e) return;
+
+        this.e.multiple = !!this.ops.multiple;
+        
+        for(let i = 0; i < this.ops.options.length; i++){
+            let op = document.createElement("option");
+            let option = this.ops.options[i];
+            op.text = option.label;
+            op.value = option.value;
+            this.e.appendChild(op);
+
+            if(this.ops.selected?.includes(option.value)) op.selected = true;
+        }
+
+        if(!this.ops.selected || this.ops.selected.length == 0){
+            if(this.ops.default == undefined) this.ops.default = 0;
+            this.e.options.selectedIndex = this.ops.default;
+        }
+    }
+
+    getI(){
+        if(!this.e) return Math.min(this.ops.options.length-1,0); // return index of first item or -1 if there are no items
+        return this.e.options.selectedIndex;
+    }
+}
+
+export interface MP_MultiSelectGroup_Ops extends MP_Grid_Ops{
+    options:OptionItem[];
+    selected?:string[];
+}
+
+export interface MP_Label_Ops extends MP_Text_Ops{
+    for:string;
+}
+export class MP_Label extends TextMenuPart{
+    constructor(ops:MP_Label_Ops){
+        super("label",ops);
+    }
+    create(): void {
+        super.create();
+        if(this.e) this.e.htmlFor = this.ops.for;
+    }
+    declare ops:MP_Label_Ops;
+    declare e?:HTMLLabelElement;
+}
+export class MP_MultiSelectGroup extends MP_Grid{
+    constructor(ops:MP_MultiSelectGroup_Ops){
+        if(!ops.gap) ops.gap = "5px";
+        super(ops);
+    }
+    declare ops:MP_MultiSelectGroup_Ops;
+
+    load(): void {
+        super.load();
+        if(!this.e) return;
+        // 
+        
+        for(let i = 0; i < this.ops.options.length; i++){
+            let op = this.ops.options[i];
+            let inp = new MP_Input({type:"checkbox",checked:false,id:this.ops.id??"multiselect"+"__i-"+i});
+
+            let row = new MP_Flexbox({alignItems:"center",justifyContent:"space-between",width:"100%",gap:"15px"});
+            this.addPart(row);
+            row.addParts(
+                new MP_Label({text:op.label,for:inp.ops.id??""}),
+                inp
+            );
+
+            
+            if(inp.e){
+                if(this.ops.selected?.includes(op.value)) inp.e.checked = true;
+                inp.e.value = op.value;
             }
         }
     }

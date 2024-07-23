@@ -232,7 +232,7 @@ export class CMP_FullInst extends MP_Article {
         
         return true;
     }
-    showData(panel?:HTMLElement|null){
+    showData(panel?:HTMLElement|null){        
         if(!panel) panel = viewPanel;
         if(!panel) return;
         let inst = this.ops.data;
@@ -370,6 +370,10 @@ export class CMP_FullInst extends MP_Article {
                 })
             )
         );
+
+        this.e.addEventListener("dblclick",e=>{
+            window.gAPI.showEditInstance(this.ops.data.iid);
+        });
 
         // this.e.addEventListener("click", e => {
         //     if (!this.e) return;

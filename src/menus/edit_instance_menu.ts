@@ -5,6 +5,7 @@ import { MP_SearchStructure, qElm } from "../render_lib";
 import { EditInst_InitData, FullModData, ModData, ModsFolder, Res_GetInstMods } from "../interface";
 import { deselectItem, InitData, SelectedItem, selectItem, wait } from "../render_util";
 import { io } from "socket.io-client";
+import { allDropdowns } from "src/dropdowns";
 
 let initData = new InitData<EditInst_InitData>(init);
 
@@ -20,6 +21,7 @@ const tab_menu = new MP_TabbedMenu(
         getSectionTitle:(index)=>{
             return [
                 "Mods",
+                "Resource Packs",
                 "Screenshots",
                 "Java Configuration",
                 "Settings"
@@ -132,7 +134,11 @@ async function loadFolder(folder:ModsFolder,menu:MP_TabbedMenu,search:MP_SearchS
     if(folder.type != "root") col1.addPart(
         new MP_Flexbox({
             gap:"10px",
-            alignItems:"center"
+            alignItems:"center",
+            onMouseUp:(e,elm)=>{
+                if(e.button != 2) return;
+                window.gAPI.openDropdown("modFolder",initData.d.iid,folder.name);
+            }
         }).addParts(
             new MP_Div({
                 className:"material-symbols-outlined",
@@ -149,14 +155,18 @@ async function loadFolder(folder:ModsFolder,menu:MP_TabbedMenu,search:MP_SearchS
                 marginLeft:"auto",
                 gap:"5px"
             }).addParts(
-                new MP_Div({
+                // new MP_Div({
+                //     className:"folder-tag",
+                //     innerHTML:folder.type
+                // }),
+                // new MP_Div({
+                //     className:"folder-tag",
+                //     innerHTML:"Local"
+                // })
+                ...folder.tags.sort((a,b)=>a.localeCompare(b)).map(v=>new MP_Div({
                     className:"folder-tag",
-                    innerHTML:folder.type
-                }),
-                new MP_Div({
-                    className:"folder-tag",
-                    innerHTML:"Local"
-                })
+                    innerHTML:v
+                }))
             )
         )
     );
@@ -296,6 +306,7 @@ async function loadSection(index:number,menu:MP_TabbedMenu){
                 }
             });
 
+            search.mainOptions = search.mainOptions.replaceWith(new MP_Flexbox({gap:"7.5px"}));
             search.mainOptions.addParts(
                 new MP_Button({
                     label:"Sync",
@@ -303,6 +314,15 @@ async function loadSection(index:number,menu:MP_TabbedMenu){
                     icon:"sync_alt",
                     onClick:async (e,elm)=>{
                         let res = await window.gAPI.sync.mods({iid:initData.d.iid});
+                        console.log("RES:",res);
+                    }
+                }),
+                new MP_Button({
+                    label:"",
+                    className:"",
+                    icon:"more_vert",
+                    onClick:async (e,elm)=>{
+                        let res = await window.gAPI.openDropdown("editModsAdditional",initData.d.iid);
                         console.log("RES:",res);
                     }
                 })
@@ -317,6 +337,9 @@ async function loadSection(index:number,menu:MP_TabbedMenu){
             
         } break;
         case 1:{
+
+        } break;
+        case 2:{
             let res = await window.gAPI.getInstScreenshots({iid:initData.d.iid});
             if(!res) return;
             console.log("RES:",res);
@@ -611,6 +634,7 @@ async function init(){
         // new MP_ActivityBarItem({ icon:"public" }),
         // new MP_ActivityBarItem({ icon:"outdoor_grill" }),
         new MP_ActivityBarItem({ icon:"inbox_customize" }),
+        new MP_ActivityBarItem({ icon:"texture" }),
         new MP_ActivityBarItem({ icon:"landscape" }),
         new MP_ActivityBarItem({ icon:"coffee" }),
         new MP_ActivityBarItem({ icon:"settings" }),

@@ -40,6 +40,10 @@ export async function preInit(){
 
         ev.sender.send("initReturnCB",...args);
     });
+    ipcMain.handle("triggerEvt",async (ev,id:string,data:any)=>{
+        evtTimeline.exec(id,data);
+    });
+
     ipcMain.handle("searchPacks",async (ev,arg:Arg_SearchPacks)=>{
         return (await searchPacks(arg)).unwrap();
     });
@@ -168,7 +172,14 @@ export async function preInit(){
     ipcMain.handle("dropdown-mod",async (ev,iid:string,files:string[])=>{
         let w = getWindow(ev);
         if(!w) return;
-        return await openModDropdown(w,iid,files);
+        return await allDropdowns.modItem(w,iid,files);
+    });
+    ipcMain.handle("openDropdown",async (ev,id:string,...args:any[])=>{
+        let w = getWindow(ev);
+        if(!w) return;
+        let f = (allDropdowns as any)[id];
+        if(!f) return;
+        return await f(w,...args);
     });
 
     // sync
@@ -183,15 +194,121 @@ export async function preInit(){
         let buf = await util_readBinary(fullPath);
         return buf;
     });
+
+    // dbSys
+    ipcMain.handle("changeServerURL",async (ev)=>{
+        return await changeServerURL();
+    });
+
+    // folders
+    ipcMain.handle("folder-create",async (ev,arg:Arg_CreateFolder)=>{
+        let inst = await getModpackInst(arg.iid);
+        if(!inst) return;
+
+        if(!inst) return false;
+        
+        // let res = inst.addModToFolder(arg);
+
+        // return res;
+
+        // NOT FINISHED
+        return false;
+    });
+    ipcMain.handle("folder-changeType",async (ev,arg:Arg_ChangeFolderType)=>{
+        // NOT FINISHED
+        return false;
+    });
+    ipcMain.handle("folder-addMod",async (ev,arg:Arg_AddModToFolder)=>{
+        let inst = await getModpackInst(arg.iid);
+        if(!inst) return false;
+        
+        let res = inst.addModToFolder(arg);
+
+        return res;
+    });
 }
 
-async function syncMods(w:BrowserWindow,iid:string): Promise<Result<Res_SyncMods>>{
+export async function changeServerURL(url?:string){
+    if(!sysInst || !sysInst.meta) return errors.noSys.unwrap() ?? false;
+
+    if(!url){
+        let evt = evtTimeline.subEvt(new ETL_Generic<Res_InputMenu>("i_changeServerURL"));
+        await openCCMenu<InputMenu_InitData>("input_menu",{
+            cmd:"triggerEvt",args:[evt.getId()],
+            title:"Set Server URL",
+            width:400,
+            height:400,
+            sections:[
+                {options:[
+                    {
+                        type:"title",
+                        title:"Set Server URL",
+                        desc:"This is the URL or IP Address of the server where your mod packs will be synced from."
+                    }
+                ]},
+                {options:[
+                    {
+                        type:"input",
+                        label:"URL",
+                        id:"url",
+                        inputType:"text",
+                        value:sysInst.meta.serverURL,
+                        placeholder:sysInst.meta.serverURL,
+                    }
+                ]}
+            ]
+        });
+        let res = await evtTimeline.waitFor(evt);
+        if(!res) return false;
+        url = res.data.url;
+    }
+    
+    if(url == undefined) return false;
+
+    sysInst.meta.serverURL = url;
+    await sysInst.save();
+    updateSocketURL();
+    
+    return true;
+}
+
+export async function areModsUpToDate(iid:string){
+    let res = (await getModUpdatesData(iid)).unwrap();
+    if(!res) return;
+    return res.upToDate;
+}
+export async function checkForModUpdates(w:BrowserWindow,iid:string){
+    let res = await areModsUpToDate(iid);
+    if(res == undefined){
+        // await dialog.showMessageBox({
+        //     message:"Something went wrong while checking for updates"
+        // });
+    }
+    else if(res){
+        await dialog.showMessageBox({
+            message:"Up to date"
+        });
+    }
+    else{
+        let res2 = await dialog.showMessageBox({
+            message:"This pack has updates available!",
+            buttons:[
+                "Cancel",
+                "Sync",
+            ]
+        });
+        if(res2.response == 1){
+            syncMods(w,iid);
+        }
+    }
+}
+async function getModUpdatesData(iid:string){
     let inst = await getModpackInst(iid);
     if(!inst || !inst.meta) return errors.couldNotFindPack;
     if(!inst.meta.linkName) return errors.failedToGetPackLink;
     
-    let needsUpdate = (await checkModUpdates({id:inst.meta.linkName,update:inst.meta.update})).unwrap();
-    if(needsUpdate == undefined) return errors.responseErr;
+    // let needsUpdate = (await checkModUpdates({id:inst.meta.linkName,update:inst.meta.update})).unwrap();
+    // if(needsUpdate == undefined) return errors.responseErr;
 
     // if(!needsUpdate){
     //     await dialog.showMessageBox(mainWindow,{
@@ -206,6 +323,7 @@ async function syncMods(w:BrowserWindow,iid:string): Promise<Result<Res_SyncMods
 
     let currentMods:string[] = [];
     let currentIndexes:string[] = [];
+    let ignoreMods:string[] = [];
 
     let prismPath = inst.getPrismInstPath();
     if(!prismPath) return errors.failedToGetPrismInstPath;
@@ -217,6 +335,12 @@ async function syncMods(w:BrowserWindow,iid:string): Promise<Result<Res_SyncMods
     let _curIndexes = await util_readdir(indexPath);
     for(const mod of _curMods){
         if(!mod.isFile()) continue;
+        let cleanName = cleanModName(mod.name);
+        let existingFolder = inst.meta.folders.find(v=>v.mods.includes(cleanName));
+        if(existingFolder?.tags.includes("local")){
+            ignoreMods.push(mod.name,cleanModNameDisabled(mod.name)); // <- TEMP FOR NOW
+        }
+        // currentMods.push(cleanModNameDisabled(mod.name));
         currentMods.push(mod.name);
     }
     for(const index of _curIndexes){
@@ -226,22 +350,46 @@ async function syncMods(w:BrowserWindow,iid:string): Promise<Result<Res_SyncMods
     let resWrapped = (await getModUpdates({
         id:inst.meta.linkName,
         currentMods,
-        currentIndexes
+        currentIndexes,
+        ignoreMods
     }));
     let res = resWrapped.unwrap();
-    if(!res) return resWrapped ?? Result.err("Failed to get mod updates");
+    if(!res) return new Result(undefined);
+    // if(!res) return resWrapped ?? Result.err("Failed to get mod updates");
 
+    let upToDate = false;
     if(
         res.indexes.add.length == 0 &&
         res.indexes.remove.length == 0 &&
         res.mods.add.length == 0 &&
         res.mods.remove.length == 0
     ){
-        await dialog.showMessageBox(mainWindow,{
+        upToDate = true;
+        // await dialog.showMessageBox(mainWindow,{
+        //     message:"Up to date"
+        // });
+        
+        // return new Result(res);
+    }
+
+    return new Result({
+        res,indexPath,modsPath,ignoreMods,inst,upToDate
+    });
+}
+async function syncMods(w:BrowserWindow,iid:string): Promise<Result<Res_SyncMods|undefined>>{
+    if(!sysInst.meta) return errors.noSys;
+    
+    let _res = await getModUpdatesData(iid);
+    if(!_res) return new Result(undefined);
+    let _d = _res.unwrap();
+    if(!_d) return _res;
+    let {res,indexPath,modsPath,ignoreMods,inst,upToDate} = _d;
+
+    if(upToDate){
+        await dialog.showMessageBox({
             message:"Up to date"
         });
-        
-        return new Result(res);
+        return _res;
     }
 
     // w.webContents.send("msg","hi there!");
@@ -269,6 +417,7 @@ async function syncMods(w:BrowserWindow,iid:string): Promise<Result<Res_SyncMods
             });
         }
         for(const mod of res.mods.remove){
+            if(ignoreMods.includes(mod)) continue;
             if(mod.includes("..")) continue; // <-- PROBABLY GOOD FOR SAFETY/SECURITY
             items.push({
                 name:mod,
@@ -285,15 +434,16 @@ async function syncMods(w:BrowserWindow,iid:string): Promise<Result<Res_SyncMods
                 path:path.join(indexPath,file)
             });
         }
-        for(const file of res.indexes.remove){
-            if(file.includes("..")) continue;
-            items.push({
-                name:file,
-                ep:"modindex",
-                action:ItemAction.remove,
-                path:path.join(indexPath,file)
-            });
-        }
+        // : GOING TO DISABLE THIS FOR NOW BC IT DOESN'T REALLY MAKE SENSE
+        // for(const file of res.indexes.remove){ 
+        //     if(file.includes("..")) continue;
+        //     items.push({
+        //         name:file,
+        //         ep:"modindex",
+        //         action:ItemAction.remove,
+        //         path:path.join(indexPath,file)
+        //     });
+        // }
         // 
 
         let total = items.length;
@@ -312,7 +462,7 @@ async function syncMods(w:BrowserWindow,iid:string): Promise<Result<Res_SyncMods
             if(item.action == ItemAction.add){ // add
                 console.log("add: ",item.path);
 
-                let url = new URL(remoteServerURL+"/"+item.ep);
+                let url = new URL(sysInst.meta.serverURL+"/"+item.ep);
                 url.searchParams.set("id",inst.meta.linkName);
                 url.searchParams.set("name",item.name);
                 
@@ -364,7 +514,8 @@ async function syncMods(w:BrowserWindow,iid:string): Promise<Result<Res_SyncMods
 
         // auto close if success
         if(fails.length == 0){
-            await wait(1500);
+            // await wait(1500);
+            await wait(500);
             newW.close();
             w.reload();
         }
@@ -829,6 +980,7 @@ async function getInstMods(arg:Arg_GetInstMods): Promise<Result<Res_GetInstMods>
     let rootFolder:ModsFolder = {
         name:"root",
         type:"root",
+        tags:[],
         mods:[]
     };
     data.folders.push(rootFolder);
@@ -844,14 +996,12 @@ async function getInstMods(arg:Arg_GetInstMods): Promise<Result<Res_GetInstMods>
         let f:ModsFolder = {
             name:folder.name,
             type:folder.type,
+            tags:folder.tags,
             mods:[]
         };
         data.folders.push(f);
         _cache2.set(folder.name,f);
     }
-
-    util_warn("DEBUG caches:");
-    console.log(_cache,_cache2);
     
     let _map:Map<string,FullModData[]> = new Map();
 
@@ -913,6 +1063,10 @@ async function getInstMods(arg:Arg_GetInstMods): Promise<Result<Res_GetInstMods>
         for(const folder of data.folders){
             folder.mods = folder.mods.filter(v=>searchStringCompare(v.local.name,arg.query));
         }
+    }
+
+    for(const folder of data.folders){
+        folder.mods = folder.mods.sort((a,b)=>a.local.name.localeCompare(b.local.name));
     }
 
     // data.mods.global.sort((a,b)=>a.local.name.localeCompare(b.local.name));
@@ -1486,11 +1640,11 @@ async function alertBox(w:BrowserWindow,message:string,title="Error"){
 
 // 
 
-import { parseCFGFile, searchStringCompare, util_lstat, util_mkdir, util_readBinary, util_readdir, util_readdirWithTypes, util_readJSON, util_readText, util_readTOML, util_rename, util_rm, util_warn, util_writeBinary, util_writeJSON, util_writeText, wait } from "./util";
-import { Arg_CheckModUpdates, Arg_GetInstances, Arg_GetInstMods, Arg_GetInstScreenshots, Arg_GetPrismInstances, Arg_IID, Arg_SearchPacks, Arg_SyncMods, CurseForgeUpdate, Data_PrismInstancesMenu, FSTestData, FullModData, InstGroups, LocalModData, MMCPack, ModData, ModIndex, ModInfo, ModrinthModData, ModrinthUpdate, ModsFolder, ModsFolderDef, PackMetaData, RemoteModData, Res_GetInstMods, Res_GetInstScreenshots, Res_GetModIndexFiles, Res_GetPrismInstances, Res_SyncMods } from "./interface";
-import { checkModUpdates, getModUpdates, getPackMeta, remoteServerURL, searchPacks, searchPacksMeta } from "./network";
+import { ETL_Generic, evtTimeline, parseCFGFile, searchStringCompare, util_lstat, util_mkdir, util_readBinary, util_readdir, util_readdirWithTypes, util_readJSON, util_readText, util_readTOML, util_rename, util_rm, util_warn, util_writeBinary, util_writeJSON, util_writeText, wait } from "./util";
+import { Arg_AddModToFolder, Arg_ChangeFolderType, Arg_CheckModUpdates, Arg_CreateFolder, Arg_GetInstances, Arg_GetInstMods, Arg_GetInstScreenshots, Arg_GetPrismInstances, Arg_IID, Arg_SearchPacks, Arg_SyncMods, CurseForgeUpdate, Data_PrismInstancesMenu, FSTestData, FullModData, InputMenu_InitData, InstGroups, LocalModData, MMCPack, ModData, ModIndex, ModInfo, ModrinthModData, ModrinthUpdate, ModsFolder, ModsFolderDef, PackMetaData, RemoteModData, Res_GetInstMods, Res_GetInstScreenshots, Res_GetModIndexFiles, Res_GetPrismInstances, Res_InputMenu, Res_SyncMods } from "./interface";
+import { getModUpdates, getPackMeta, searchPacks, searchPacksMeta, updateSocketURL } from "./network";
 import { ListPrismInstReason, openCCMenu, openCCMenuCB, SearchPacksMenu, ViewInstanceMenu } from "./menu_api";
-import { addInstance, cleanModName, dataPath, getModFolderPath, getModpackInst, getModpackPath, LocalModInst, ModPackInst, RemoteModInst, slugMap, sysInst } from "./db";
+import { addInstance, cleanModName, cleanModNameDisabled, dataPath, getModFolderPath, getModpackInst, getModpackPath, LocalModInst, ModPackInst, RemoteModInst, slugMap, sysInst } from "./db";
 import { InstanceData } from "./db_types";
 import { errors, Result } from "./errors";
 import { readConfigFile, StringMappingType } from "typescript";
@@ -1499,7 +1653,7 @@ import { exec } from "child_process";
 import { Dirent } from "fs";
 import { CineonToneMapping } from "three";
 import axios from "axios";
-import { openModDropdown, toggleModEnabled } from "./dropdowns";
+import { toggleModEnabled, allDropdowns } from "./dropdowns";
 
 async function fsTest(customPath?:string): Promise<FSTestData|undefined>{
     let instancePath:string;

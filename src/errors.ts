@@ -51,6 +51,7 @@ export class Result<T>{
 export const errors = {
     noSys: Result.err("System data isn't loaded"),
     responseErr: Result.err("Unknown network response error"),
+    serverNotConnected: Result.err("Couldn't connect to the server.\n\nEither it's down, or you don't have an active internet connection."),
     
     unknown: Result.err("Unknown error"),
     invalid_args: Result.err("Invalid arguments"),
@@ -61,6 +62,11 @@ export const errors = {
     instDataConvert: Result.err("Failed to make instance data from pack meta"),
     addInstance: Result.err("Failed to add instnace"),
     addInstFolder: Result.err("Failed to create folder for instance"),
+
+    folderAlreadyExists: Result.err("A folder with that name already exists"),
+    folderDNE: Result.err("A folder with that name doesn't exist"),
+    modAlreadyInFolder: Result.err("That mod is already in this folder"),
+    invalidFolderName: Result.err("Invalid folder name"),
 
     // prism
     instgroupsRead: Result.err("Failed to read instance group data"),

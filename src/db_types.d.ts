@@ -31,6 +31,7 @@ interface DBSys{
     iid:number;
     ver:string;
     port:string;
+    serverURL:string;
 
     prismRoot?:string;
 };

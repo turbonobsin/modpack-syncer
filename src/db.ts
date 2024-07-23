@@ -2,12 +2,14 @@ import { app } from "electron";
 import { util_lstat, util_mkdir, util_readdir, util_readJSON, util_readText, util_readTOML, util_warn, util_writeJSON } from "./util";
 import path from "path";
 import { DBSys, DBUser, InstanceData as ModPackInstData } from "./db_types";
-import { FolderType, LocalModData, ModIndex, ModrinthModData, ModsFolder, ModsFolderDef, PackMetaData, RemoteModData, SlugMapData } from "./interface";
+import { Arg_AddModToFolder, Arg_ChangeFolderType, Arg_CreateFolder, Arg_EditFolder, FolderType, LocalModData, ModIndex, ModrinthModData, ModsFolder, ModsFolderDef, PackMetaData, RemoteModData, SlugMapData } from "./interface";
 import { errors, Result } from "./errors";
 import express from "express";
 import toml from "toml";
+import { changeServerURL } from "./app";
+import { updateSocketURL } from "./network";
 
-let appPath = app.getAppPath();
+export let appPath = app.getAppPath();
 export const dataPath = path.join(appPath,"data");
 const folderPath = path.join(dataPath,"folders");
 
@@ -86,6 +88,9 @@ export async function initDB(){
     slugMap = await slugMap.load();
     
     // 
+    if(!sysInst.meta?.serverURL) changeServerURL();
+    else updateSocketURL();
+
     let username = "Unnamed";
     await util_mkdir(dataPath);
     
@@ -247,7 +252,8 @@ export class SysInst extends Inst<DBSys>{
             iid:0,
             uid:0,
             ver:"0.0.1",
-            port:"57152"
+            port:"57152",
+            serverURL:""
         };
     }
     async postLoad() {
@@ -322,6 +328,10 @@ export class ModPackInst extends Inst<ModPackInstData>{
             this.meta.update = 0;
             await this.save();
         }
+
+        for(const folder of this.meta.folders){
+            if(!folder.tags) folder.tags = [];
+        }
     }
 
     getPrismInstPath(): string|undefined{
@@ -345,36 +355,73 @@ export class ModPackInst extends Inst<ModPackInstData>{
     }
 
     // 
-    createFolder(name:string,type:FolderType){
-        if(!this.meta) return false;
+    createFolder(arg:Arg_CreateFolder):Result<ModsFolderDef>{
+        if(!this.meta) return errors.failedToReadPack;
+        if(!arg.name || arg.name.length == 0) return errors.invalidFolderName;
 
-        if(this.meta.folders.some(v=>v.name == name)) return false;
+        if(this.meta.folders.some(v=>v.name == arg.name)) return errors.folderAlreadyExists;
 
         let folder:ModsFolderDef = {
-            name,type,mods:[]
+            name:arg.name,type:arg.type,mods:[],tags:arg.tags
         };
         this.meta.folders.push(folder);
 
-        return true;
+        return new Result(folder);
     }
-    changeFolderType(name:string,newType:FolderType){
-        if(!this.meta) return false;
+    editFolder(arg:Arg_EditFolder){
+        if(!this.meta) return errors.failedToReadPack;
+        if(!arg.name || arg.name.length == 0) return errors.invalidFolderName;
 
-        let folder = this.meta.folders.find(v=>v.name == name);
-        if(!folder) return false;
+        let folder = this.meta.folders.find(v=>v.name == arg.folderName);
+        if(!folder) return errors.folderDNE;
 
-        folder.type = newType;
+        folder.name = arg.name;
+        folder.type = arg.type;
+        folder.tags = arg.tags;
+
+        return new Result(folder);
     }
-    addModToFolder(name:string,modPath:string){
-        if(!this.meta) return;
+    removeFolder(folderName:string){
+        if(!this.meta) return errors.failedToReadPack;
+        if(!folderName) return errors.invalidFolderName;
 
-        let folder = this.meta.folders.find(v=>v.name == name);
-        if(!folder) return false;
+        let folderInd = this.meta.folders.findIndex(v=>v.name == folderName);
+        if(folderInd == -1) return errors.folderDNE;
 
-        if(folder.mods.includes(modPath)) return false;
-        folder.mods.push(modPath);
+        this.meta.folders.splice(folderInd,1);
         
-        return true;
+        return new Result({});
+    }
+    changeFolderType(arg:Arg_ChangeFolderType):Result<ModsFolderDef>{
+        if(!this.meta) return errors.failedToReadPack;
+
+        let folder = this.meta.folders.find(v=>v.name == arg.name);
+        if(!folder) return errors.folderDNE;
+
+        folder.type = arg.newType;
+
+        return new Result(folder);
+    }
+    addModToFolder(arg:Arg_AddModToFolder):Result<ModsFolderDef|undefined>{
+        if(!this.meta) return errors.failedToReadPack;
+
+        let existingFolder = this.meta.folders.find(v=>v.mods.includes(arg.modCleaned));
+        if(existingFolder){
+            let ind = existingFolder.mods.indexOf(arg.modCleaned);
+            if(ind != -1) existingFolder.mods.splice(ind,1);
+        }
+
+        if(arg.type == "root"){   
+            return new Result(undefined);
+        }
+
+        let folder = this.meta.folders.find(v=>v.name == arg.name);
+        if(!folder) return errors.folderDNE;
+
+        if(folder.mods.includes(arg.modCleaned)) return errors.modAlreadyInFolder;
+        folder.mods.push(arg.modCleaned);
+        
+        return new Result(folder);
     }
 }
 

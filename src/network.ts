@@ -1,16 +1,25 @@
 import { io } from "socket.io-client";
 import { Arg_CheckModUpdates, Arg_GetModUpdates, Arg_SearchPacks, PackMetaData, Res_GetModUpdates, Res_SearchPacks, Res_SearchPacksMeta } from "./interface";
 import { util_warn } from "./util";
-import { Result } from "./errors";
+import { errors, Result } from "./errors";
+import { sysInst } from "./db";
+import { Socket } from "socket.io";
 // const socket = io({
 //     host:"http://localhost:3000"
 // });
 
-export let remoteServerURL = "http://localhost:3001";
+// export let remoteServerURL = "http://localhost:3001";
 
-const socket = io(remoteServerURL);
+let socket = io("");
 
-socket.emit("msg","hello!");
+export function updateSocketURL(){
+    let url = sysInst.meta?.serverURL;
+    if(!url) return;
+
+    socket = io(url);
+}
+
+// socket.emit("msg","hello!");
 
 console.log("---loaded network.ts");
 
@@ -36,6 +45,10 @@ function validate():Err<undefined>|undefined{
 }
 
 function semit<T,V>(ev:string,arg:T){
+    if(!socket.connected){
+        return errors.serverNotConnected;
+    }
+    
     return new Promise<Result<V>>(resolve=>{
         socket.emit(ev,arg,(res:V)=>{
             resolve(new Result(res));
@@ -62,7 +75,7 @@ export function searchPacksMeta(arg:Arg_SearchPacks){
 }
 
 // sync
-export function checkModUpdates(arg:Arg_CheckModUpdates){
+export function checkModUpdates_old(arg:Arg_CheckModUpdates){
     return semit<Arg_CheckModUpdates,boolean>("checkModUpdates",arg);
 }
 export function getModUpdates(arg:Arg_GetModUpdates){

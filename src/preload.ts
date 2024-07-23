@@ -49,6 +49,7 @@ contextBridge.exposeInMainWorld("gAPI",{
     getPackMeta: async (...args) => await invoke("getPackMeta",...args),
     alert: async (...args) => await invoke("alert",...args),
     openMenu: async (...args) => await invoke("openMenu",...args),
+    triggerEvt:regf("triggerEvt"),
 
     searchPacks:regf("searchPacks"),
     searchPacksMeta:regf("searchPacksMeta"),
@@ -71,10 +72,19 @@ contextBridge.exposeInMainWorld("gAPI",{
     showEditInstance:regf("showEditInstance"),
 
     getImage:regf("getImage"),
+    changeServerURL:regf("changeServerURL"),
+
+    // folders
+    folder:{
+        create:regf("folder-create"),
+        changeType:regf("folder-changeType"),
+        addMod:regf("folder-addMod")
+    },
 
     dropdown:{
         mod:regf("dropdown-mod")
     },
+    openDropdown:regf("openDropdown"),
 
     // sync
     sync:{

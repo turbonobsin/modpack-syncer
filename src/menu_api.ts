@@ -113,6 +113,14 @@ export class UpdateProgressMenu extends CCMenu{
         return w;
     }
 }
+export class InputMenu extends CCMenu{
+    constructor(){
+        super("input_menu",500,500);
+    }
+    getId(): string {
+        return "input_menu";
+    }
+}
 
 class CCMenuRegistry{
     constructor(){
@@ -164,3 +172,4 @@ ccMenuRegistry.register(new ViewInstanceMenu());
 ccMenuRegistry.register(new PrismInstancesMenu());
 ccMenuRegistry.register(new EditInstanceMenu());
 ccMenuRegistry.register(new UpdateProgressMenu());
+ccMenuRegistry.register(new InputMenu());

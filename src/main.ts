@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain } from "electron";
+import { app, BrowserWindow, ipcMain, Menu } from "electron";
 import path from "path";
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
@@ -60,6 +60,29 @@ app.on("activate", () => {
 // code. You can also put them in separate files and import them here.
 
 import "./app";
-import { preInit } from "./app";
+import { changeServerURL, preInit } from "./app";
 import { initDB } from "./db";
 import "./network";
+
+const appMenu = Menu.buildFromTemplate([
+	{
+		label:"File",
+		submenu:[
+			{
+				role:"close"
+			}
+		]
+	},
+	{
+		label:"Data",
+		submenu:[
+			{
+				label:"Set Server URL",
+				click:()=>{
+					changeServerURL();
+				}
+			}
+		]
+	}
+]);
+Menu.setApplicationMenu(appMenu);

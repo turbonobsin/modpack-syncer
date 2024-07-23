@@ -125,6 +125,8 @@ export class SelectionAPI2<T>{
 
     items:SAPI2_Item<T>[];
     selected:Set<SAPI2_Item<T>>;
+
+    _firstSelInd = -1;
 }
 export class SAPI2_Item<T>{
     constructor(api:SelectionAPI2<T>,bundle:SAPI2_Bundle<T>){
@@ -142,6 +144,25 @@ export class SAPI2_Item<T>{
     }
 
     toggle(e?:MouseEvent){
+        if(e?.shiftKey){
+            // let firstInd = this.api.items.findIndex(v=>v.selected);
+            let firstInd = this.api._firstSelInd;
+            if(firstInd == -1) firstInd = 0;
+            let toInd = this.api.items.indexOf(this);
+
+            this.api.deselectAll();
+
+            let min = Math.min(firstInd,toInd);
+            let max = Math.max(firstInd,toInd);
+            for(let i = min; i <= max; i++){
+                this.api.items[i]?.select();
+            }
+
+            this.api._firstSelInd = firstInd;
+
+            return;
+        }
+        
         let multi_select = false;
         if(e) if(e.shiftKey || e.ctrlKey) multi_select = true;
         if(!multi_select) this.api.deselectAll();
@@ -151,6 +172,10 @@ export class SAPI2_Item<T>{
     }
     select(e?:MouseEvent){
         if(this.selected) return;
+
+        if(this.api.selected.size == 0){
+            this.api._firstSelInd = this.api.items.indexOf(this);
+        }
         
         this.selected = true;
         this.api.selected.add(this);

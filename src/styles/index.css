@@ -214,3 +214,9 @@ body {
 .hide{
 	display:none;
 }
+.material-symbols-outlined{
+	max-width:1em;
+}
+.icon{
+	max-width:1em;
+}
