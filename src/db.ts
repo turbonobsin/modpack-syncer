@@ -1,13 +1,16 @@
-import { app } from "electron";
-import { util_lstat, util_mkdir, util_readdir, util_readdirWithTypes, util_readJSON, util_readText, util_readTOML, util_warn, util_writeJSON } from "./util";
+import { app, dialog } from "electron";
+import { pathTo7zip, searchStringCompare, util_lstat, util_mkdir, util_readBinary, util_readdir, util_readdirWithTypes, util_readJSON, util_readText, util_readTOML, util_warn, util_writeJSON, wait } from "./util";
 import path from "path";
 import { DBSys, DBUser, InstanceData as ModPackInstData } from "./db_types";
-import { Arg_AddModToFolder, Arg_ChangeFolderType, Arg_CreateFolder, Arg_EditFolder, FolderType, LocalModData, ModIndex, ModrinthModData, ModsFolder, ModsFolderDef, PackMetaData, RemoteModData, Res_GetInstResourcePacks, RP_Data, SlugMapData } from "./interface";
+import { Arg_AddModToFolder, Arg_ChangeFolderType, Arg_CreateFolder, Arg_EditFolder, Arg_UploadRP, Arg_UploadRPFile, FolderType, LocalModData, ModIndex, ModrinthModData, ModsFolder, ModsFolderDef, PackMetaData, PrismAccount, PrismAccountsData, RemoteModData, Res_GetInstResourcePacks, RP_Data, SearchFilter, SlugMapData, UpdateProgress_InitData } from "./interface";
 import { errors, Result } from "./errors";
 import express from "express";
 import toml from "toml";
 import { changeServerURL } from "./app";
-import { updateSocketURL } from "./network";
+import { semit, updateSocketURL } from "./network";
+import { openCCMenu } from "./menu_api";
+import Seven from "node-7z";
+import axios from "axios";
 
 export let appPath = app.getAppPath();
 export const dataPath = path.join(appPath,"data");
@@ -352,10 +355,26 @@ export class ModPackInst extends Inst<ModPackInstData>{
 
         if(!this.meta) return;
 
+        let needsSave = false;
+
         if(this.meta.update == undefined){
             this.meta.update = 0;
-            await this.save();
+            needsSave = true;
         }
+        if(!this.meta.resourcepacks){
+            this.meta.resourcepacks = [];
+            needsSave = true;
+        }
+        // if(this.meta.auth == undefined){
+        //     this.meta.auth = {
+        //         users:[]
+        //     };
+        // }
+        // if(this.meta.auth.users == undefined){
+        //     this.meta.auth.users = [];
+        // }
+
+        if(needsSave) await this.save();
 
         for(const folder of this.meta.folders){
             if(!folder.tags) folder.tags = [];
@@ -452,9 +471,195 @@ export class ModPackInst extends Inst<ModPackInstData>{
         return new Result(folder);
     }
 
-    async getResourcePacks(){
-        return (await getInstResourcePacks(this)).unwrap();
+    async getResourcePacks(filter:SearchFilter){
+        return (await getInstResourcePacks(this,filter)).unwrap();
     }
+    async uploadRP(arg:Arg_UploadRP): Promise<boolean | undefined>{
+        if(!this.meta) return;
+        let prismPath = this.getPrismInstPath();
+        if(!prismPath) return errors.failedToGetPrismInstPath.unwrap();
+        
+        let acc = await getMainAccount();
+        if(!acc) return;
+
+        let mpID = this.meta?.meta.id;
+        if(!mpID) return;
+
+        arg.uid = acc.profile.id;
+        arg.uname = acc.profile.name;
+
+        let res1 = await semit<Arg_UploadRP,boolean>("uploadRP",{
+            iid:arg.iid,
+            uid:acc.profile.id,
+            uname:acc.profile.name,
+            mpID,
+            name:arg.name
+        });
+        if(!res1) return;
+        let res = res1.unwrap() as boolean;
+        if(!res) return;
+
+        // all good
+
+        let meta = this.meta.resourcepacks.find(v=>v.rpID == arg.name);
+        if(!meta) return errors.couldNotFindRPMeta.unwrap();
+
+        let lastUploaded = meta.lastUploaded;
+        
+        let w = await openCCMenu<UpdateProgress_InitData>("update_progress_menu",{iid:this.meta.iid});
+        if(!w) return errors.failedNewWindow.unwrap();
+        w.webContents.send("updateProgress","main",0,100,"Initializing...");
+
+        // 
+        
+        if(true){
+            let rootPath = path.join(prismPath!,".minecraft","resourcepacks",arg.name);
+            let root = new FFolder("root");
+
+            let totalFiles = 0;
+            let totalFolders = 0;
+            let start = performance.now();
+
+            let files:{
+                path:string,
+                buf:Uint8Array,
+                name:string,
+                bt:number,
+                mt:number
+            }[] = [];
+
+            const read = async (f:FFolder,loc:string,loc2:string)=>{
+                let ar = await util_readdirWithTypes(loc);
+                for(const item of ar){
+                    if(item.isFile()){
+                        let fileLoc = path.join(loc,item.name);
+                        let stat = await util_lstat(fileLoc);
+                        if(!stat) continue;
+
+                        if(item.name == "bronze_layer_1_s - Copy - Copy.png") console.log("STAT:",item.name,stat,lastUploaded,"-----",stat.birthtimeMs,new Date(stat.ctime).getTime());
+                        let time = Math.max(stat.mtimeMs,stat.birthtimeMs);
+                        // if(stat.mtimeMs <= lastUploaded && stat.ctimeMs <= lastUploaded) continue; // SKIP if it hasn't been modified
+                        if(time <= lastUploaded) continue;
+                        
+                        totalFiles++;
+                        let buf = await util_readBinary(fileLoc);
+                        let file = new FFile(item.name,buf);
+                        f.items.push(file);
+                        files.push({
+                            path:loc2+"/"+item.name,buf,name:item.name,
+                            bt:stat.birthtimeMs,
+                            mt:stat.mtimeMs
+                        });
+                    }
+                    else{
+                        totalFolders++;
+                        let folder = new FFolder(item.name);
+                        f.items.push(folder);
+                        await read(folder,path.join(loc,item.name),loc2+"/"+item.name);
+                    }
+                }
+            };
+            await read(root,rootPath,"");
+
+            meta.lastUploaded = new Date().getTime();
+            // meta.lastDownloaded = new Date().getTime();
+            meta.lastModified = new Date().getTime();
+            console.log("LAST UPLOADED",lastUploaded);
+            await this.save();
+
+            let total = totalFiles+totalFolders;
+            console.log("TOTAL: "+total);
+            console.log(">> time [1]: ",performance.now()-start);
+            start = performance.now();
+
+            w.webContents.send("updateProgress","main",0,files.length,"Initializing upload...");
+
+            // 
+            let completed = 0;
+            for(const f of files){
+                w.webContents.send("updateProgress","main",completed,files.length,f.name);
+                let res1 = await semit<Arg_UploadRPFile,boolean>("upload_rp_file",{
+                    path:f.path,
+                    buf:f.buf,
+                    mpID:arg.mpID,
+                    rpName:arg.name,
+
+                    uid:arg.uid,
+                    uname:arg.uname,
+                    
+                    bt:f.bt,
+                    mt:f.mt
+                });
+                if(!res1) return errors.failedUploadRP.unwrap();
+                let res = res1.unwrap() as boolean;
+                if(!res){
+                    util_warn("Err: [2]: ");
+                    console.log(res,res1);
+                    return errors.failedUploadRP.unwrap();
+                }
+
+                completed++;
+            }
+
+            console.log(`>> time [2 - ${files.length}]: `,performance.now()-start);
+
+            w.webContents.send("updateProgress","main",completed,files.length,"Finished.");
+
+            await wait(500);
+            w.close();
+        }
+        else{
+            let start = performance.now();
+
+            let tmpName = arg.name+"__tmp";
+            let rpPath = path.join(prismPath!,".minecraft","resourcepacks");
+            let srcPath = path.join(rpPath,arg.name);
+            let zipPath = path.join(rpPath,tmpName);
+            console.log("7Z path: ",zipPath);
+            
+            let stream = Seven.add(zipPath,path.join(srcPath,"*"),{
+                $bin:pathTo7zip,
+                $progress:true,
+                recursive:true
+            });
+
+            stream.on("progress",progress=>{
+                w!.webContents.send("updateProgress","main",progress.percent,100,"File: "+progress.fileCount);
+                // w.webContents.send("updateProgress","main",progress.percent,100,progress.file+"\n\n"+progress.fileCount+" total files.");
+            });
+            stream.on("end",()=>{
+                w!.webContents.send("updateProgress","main",100,100,"Finished.");
+                console.log("TIME: ",performance.now()-start);
+            });
+            stream.on("error",err=>{
+                util_warn("Error while zipping: "+err);
+                return errors.zipping.unwrap();
+            });
+        }
+
+        return true;
+    }
+}
+
+class FItem{
+    constructor(name:string){
+        this.name = name;
+    }
+    name:string;
+}
+class FFolder extends FItem{
+    constructor(name:string){
+        super(name);
+        this.items = [];
+    }
+    items:FItem[];
+}
+class FFile extends FItem{
+    constructor(name:string,buf:Uint8Array){
+        super(name);
+        this.buf = buf;
+    }
+    buf:Uint8Array;
 }
 
 export class LocalModInst extends Inst<LocalModData>{
@@ -565,7 +770,8 @@ function makeInstanceData(meta:PackMetaData){
         iid,
         update:0,
         meta,
-        folders:[]
+        folders:[],
+        resourcepacks:[]
     };
     return data;
 }
@@ -589,7 +795,9 @@ export async function addInstance(meta:PackMetaData):Promise<Result<ModPackInst>
 }
 
 // MODPACK INST METHODS
-async function getInstResourcePacks(inst:ModPackInst): Promise<Result<Res_GetInstResourcePacks>>{
+async function getInstResourcePacks(inst:ModPackInst,filter:SearchFilter): Promise<Result<Res_GetInstResourcePacks>>{
+    if(!inst.meta) return errors.couldNotFindPack;
+    
     let resData:Res_GetInstResourcePacks = {
         packs:[],
     };
@@ -600,6 +808,8 @@ async function getInstResourcePacks(inst:ModPackInst): Promise<Result<Res_GetIns
     const loc = path.join(prismPath,".minecraft","resourcepacks");
     let packList = await util_readdirWithTypes(loc,false);
     for(const fi_pack of packList){ // fileItem_pack
+        if(filter.query) if(!searchStringCompare(fi_pack.name,filter.query)) continue;
+        
         if(fi_pack.isFile()){
             resData.packs.push({
                 name:fi_pack.name
@@ -621,8 +831,40 @@ async function getInstResourcePacks(inst:ModPackInst): Promise<Result<Res_GetIns
         
         resData.packs.push(d);
     }
+
+    // create metas if not defined
+    if(!inst.meta.resourcepacks) inst.meta.resourcepacks = [];
+    for(const pack of resData.packs){
+        if(inst.meta.resourcepacks.some(v=>v.rpID == pack.name)) continue;
+        inst.meta.resourcepacks.push({
+            rpID:pack.name,
+            lastModified:0,
+            lastUploaded:0,
+            lastDownloaded:0
+        });
+        await inst.save();
+    }
     
+    // 
     return new Result(resData);
+}
+
+/**
+ * 
+ * @note unwraps errors itself
+ */
+export async function getMainAccount(): Promise<PrismAccount | undefined>{
+    if(!sysInst.meta) return errors.noSys.unwrap();
+    let prismRoot = sysInst.meta.prismRoot;
+    if(!prismRoot) return errors.noPrismRoot.unwrap();
+
+    let accountsFile = await util_readJSON<PrismAccountsData>(path.join(prismRoot,"accounts.json"));
+    if(!accountsFile) return errors.noAccountsFile.unwrap();
+
+    let mainAccount = accountsFile.accounts.find(v=>v.active);
+    if(!mainAccount) return errors.noMainAccount.unwrap();
+
+    return mainAccount;
 }
 
 // 

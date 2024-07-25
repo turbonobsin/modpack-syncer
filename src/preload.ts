@@ -83,6 +83,12 @@ contextBridge.exposeInMainWorld("gAPI",{
         addMod:regf("folder-addMod")
     },
 
+    // resource packs
+    uploadRP:regf("uploadRP"),
+    unpackRP:regf("unpackRP"),
+    removeRP:regf("removeRP"),
+    downloadRP:regf("downloadRP"),
+
     dropdown:{
         mod:regf("dropdown-mod")
     },

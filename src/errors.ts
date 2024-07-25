@@ -68,8 +68,19 @@ export const errors = {
     modAlreadyInFolder: Result.err("That mod is already in this folder"),
     invalidFolderName: Result.err("Invalid folder name"),
 
+    failedUploadRP: Result.err("A file failed to upload, aborting."),
+    couldNotFindRPMeta: Result.err("Could not find meta data for this resource pack."),
+
     // prism
     instgroupsRead: Result.err("Failed to read instance group data"),
     noPrismRoot: Result.err("No path for Prism Launcher has been set"),
     failedToGetPrismInstPath: Result.err("Failed to get Prism Instance's path"),
+
+    // accounts
+    noAccountsFile: Result.err("Could not find Prism Accounts file"),
+    noMainAccount: Result.err("Could not find main Prism Account"),
+
+    // 
+    failedNewWindow: Result.err("Failed to open window"),
+    zipping: Result.err("Failed to pack/compress files"),
 };

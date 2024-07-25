@@ -56,4 +56,17 @@ interface InstanceData{
     dataPackFolder?:FId;
 
     folders:ModsFolderDef[];
+
+    resourcepacks:RP_Meta[];
+
+    // auth:{
+    //     users:any[]
+    // }
+}
+
+interface RP_Meta{
+    rpID:string;
+    lastModified:number;
+    lastUploaded:number;
+    lastDownloaded:number;
 }

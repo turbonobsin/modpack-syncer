@@ -11,6 +11,16 @@ const main = root.addPart(new MP_Grid({
     template_rows:"auto 1fr"
 }));
 
+// async function execute(data:any){
+//     let cmd = initData.d.cmd;
+//     let args = initData.d.args;
+//     if(!cmd || !args) return;
+
+//     let f = (window.gAPI as any)[cmd];
+//     if(!f) return;
+//     await f(...args,data);
+// }
+
 const progress = new MP_Progress({});
 
 window.gAPI.onUpdateProgress((id:string,i:number,total:number,item:string,extra:any)=>{

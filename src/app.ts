@@ -12,7 +12,6 @@ const _cf = new Curseforge("$2a$10$/vPH6A3TRcGR9ahXyWmjo.p1lcpWAYQERThrNAT6Jrl/p
 const cf_mc = _cf.get_game("minecraft");
 
 // const pathTo7zip = sevenBin.path7za;
-const pathTo7zip = path.join(app.getAppPath(),"node_modules","7zip-bin","win","x64","7za.exe");
 
 export async function preInit(){
     console.log("pre init");
@@ -162,7 +161,7 @@ export async function preInit(){
         let inst = await getModpackInst(arg.iid);
         if(!inst) return errors.couldNotFindPack.unwrap();
         
-        let res = inst.getResourcePacks();
+        let res = inst.getResourcePacks(arg.filter);
         if(!res) return;
 
         return res;
@@ -235,6 +234,150 @@ export async function preInit(){
         let res = inst.addModToFolder(arg);
 
         return res;
+    });
+
+    // resource packs
+    ipcMain.handle("uploadRP",async (ev,arg:Arg_UploadRP)=>{
+        let inst = await getModpackInst(arg.iid);
+        if(!inst || !inst.meta) return false;
+
+        arg.mpID = inst.meta.meta.id;
+
+        let res = await inst.uploadRP(arg);
+        return !!res;
+    });
+    ipcMain.handle("unpackRP",async (ev,arg:Arg_UnpackRP)=>{
+        let mp = await getModpackInst(arg.iid);
+        if(!mp || !mp.meta) return false;
+
+        let prismPath = mp.getPrismInstPath();
+        if(!prismPath) return errors.failedToGetPrismInstPath.unwrap();
+        
+        let loc = path.join(prismPath,".minecraft","resourcepacks");
+
+        let ar = arg.rpID.split(".");
+        ar.pop();
+        let stream = Seven.extractFull(path.join(loc,arg.rpID),path.join(loc,ar.join(".")),{
+            $bin:pathTo7zip,
+            $progress:true,
+            recursive:true,
+        });
+
+        let w = await openCCMenu<UpdateProgress_InitData>("update_progress_menu",{iid:arg.iid});
+        if(!w) return errors.failedNewWindow.unwrap();
+
+        w.webContents.send("updateProgress","main",0,100,"Initializing...");
+
+        stream.on("progress",prog=>{
+            w.webContents.send("updateProgress","main",prog.percent,100,"Extracting...");
+        });
+        stream.on("end",()=>{
+            console.log(":: Finished unpacking");
+            w.close();
+            ev.sender.reload();
+        });
+        stream.on("error",err=>{
+            util_warn("ERR extracting:");
+            console.log(err);
+        });
+
+        return true;
+    });
+    ipcMain.handle("removeRP",(ev,arg:Arg_RemoveRP)=>{
+        
+    });
+    ipcMain.handle("downloadRP",async (ev,arg:Arg_DownloadRP)=>{
+        let inst = await getModpackInst(arg.iid);
+        if(!inst || !inst.meta) return errors.couldNotFindPack.unwrap();
+
+        if(!inst.meta.linkName) return errors.failedToGetPackLink.unwrap();
+        
+        let meta = inst.meta.resourcepacks.find(v=>v.rpID == arg.rpID);
+        if(!meta) return errors.couldNotFindRPMeta.unwrap();
+        // 
+
+        arg.lastDownloaded = Math.max(meta.lastDownloaded,meta.lastUploaded);
+        // arg.lastDownloaded = meta.lastDownloaded;
+        arg.mpID = inst.meta.linkName;
+        
+        // 
+        let prismRoot = inst.getPrismInstPath();
+        if(!prismRoot) return errors.failedToGetPrismInstPath.unwrap();
+        
+        let loc = path.join(prismRoot,".minecraft","resourcepacks",arg.rpID);
+        console.log("ARG:",arg);
+
+        let w = await openCCMenu<UpdateProgress_InitData>("update_progress_menu",{iid:arg.iid});
+        if(!w) return errors.failedNewWindow.unwrap();
+        w.webContents.send("updateProgress","main",0,100,"Initializing...");
+        
+        // let stat = await util_lstat(loc);
+        let resPacked = await semit<Arg_DownloadRP,Res_DownloadRP>("downloadRP",arg) as Result<Res_DownloadRP>;
+        if(!resPacked){
+            util_warn("---- error couldn't unpack");
+            return errors.unknown;
+        }
+
+        let res = resPacked.unwrap();
+        if(!res) return errors.responseErr; // is this right?
+
+        util_warn("ADD FILES:");
+        console.log(res.add);
+        util_warn("REMOVE FILES:");
+        console.log(res.remove);
+
+        meta.lastDownloaded = new Date().getTime();
+        // meta.lastUploaded = new Date().getTime();
+        meta.lastModified = new Date().getTime();
+        await inst.save();
+        // 
+        let total = res.add.length+res.remove.length;
+        w.webContents.send("updateProgress","main",0,total,"");
+        
+        // 
+
+        let failed:ModifiedFile[] = [];
+        let completed = 0;
+        let success = 0;
+
+        for(const file of res.add){
+            w.webContents.send("updateProgress","main",completed,total,file.n);
+            completed++;
+            
+            let l = file.l.substring(1);
+            let bufPACK = (await semit<Arg_DownloadRPFile,ModifiedFileData>("download_rp_file",{
+                mpID:arg.mpID,
+                rpName:arg.rpID,
+                path:l
+            })) as Result<ModifiedFileData>;
+            if(!bufPACK){
+                failed.push(file);
+                continue;
+            }
+            
+            let f = bufPACK.unwrap();
+            if(!f){
+                failed.push(file);
+                continue;
+            }
+
+            let subPath = path.join(loc,l);
+            await util_mkdir(path.dirname(subPath),true);
+            await util_writeBinary(subPath,Buffer.from(f.buf));
+            
+            console.log("ARG FILE:",f);
+            await util_utimes(subPath,{ btime:f.bt ?? undefined, mtime:f.mt ?? undefined });
+
+            success++;
+        }
+
+        w.webContents.send("updateProgress","main",total,total,"Finished.");
+        console.log("FINISHED! -- total: ",completed);
+        console.log("Success:",success);
+        console.log("Failed:",failed);
+
+        await wait(500);
+        w.close();
     });
 }
 
@@ -1650,9 +1793,9 @@ async function alertBox(w:BrowserWindow,message:string,title="Error"){
 
 // 
 
-import { ETL_Generic, evtTimeline, parseCFGFile, searchStringCompare, util_lstat, util_mkdir, util_readBinary, util_readdir, util_readdirWithTypes, util_readJSON, util_readText, util_readTOML, util_rename, util_rm, util_warn, util_writeBinary, util_writeJSON, util_writeText, wait } from "./util";
-import { Arg_AddModToFolder, Arg_ChangeFolderType, Arg_CheckModUpdates, Arg_CreateFolder, Arg_GetInstances, Arg_GetInstMods, Arg_GetInstResourcePacks, Arg_GetInstScreenshots, Arg_GetPrismInstances, Arg_IID, Arg_SearchPacks, Arg_SyncMods, CurseForgeUpdate, Data_PrismInstancesMenu, FSTestData, FullModData, InputMenu_InitData, InstGroups, LocalModData, MMCPack, ModData, ModIndex, ModInfo, ModrinthModData, ModrinthUpdate, ModsFolder, ModsFolderDef, PackMetaData, RemoteModData, Res_GetInstMods, Res_GetInstResourcePacks, Res_GetInstScreenshots, Res_GetModIndexFiles, Res_GetPrismInstances, Res_InputMenu, Res_SyncMods } from "./interface";
-import { getModUpdates, getPackMeta, searchPacks, searchPacksMeta, updateSocketURL } from "./network";
+import { ETL_Generic, evtTimeline, parseCFGFile, pathTo7zip, searchStringCompare, util_lstat, util_mkdir, util_readBinary, util_readdir, util_readdirWithTypes, util_readJSON, util_readText, util_readTOML, util_rename, util_rm, util_utimes, util_warn, util_writeBinary, util_writeJSON, util_writeText, wait } from "./util";
+import { Arg_AddModToFolder, Arg_ChangeFolderType, Arg_CheckModUpdates, Arg_CreateFolder, Arg_DownloadRP, Arg_DownloadRPFile, Arg_GetInstances, Arg_GetInstMods, Arg_GetInstResourcePacks, Arg_GetInstScreenshots, Arg_GetPrismInstances, Arg_IID, Arg_RemoveRP, Arg_SearchPacks, Arg_SyncMods, Arg_UnpackRP, Arg_UploadRP, CurseForgeUpdate, Data_PrismInstancesMenu, FSTestData, FullModData, InputMenu_InitData, InstGroups, LocalModData, MMCPack, ModData, ModifiedFile, ModifiedFileData, ModIndex, ModInfo, ModrinthModData, ModrinthUpdate, ModsFolder, ModsFolderDef, PackMetaData, RemoteModData, Res_DownloadRP, Res_GetInstMods, Res_GetInstResourcePacks, Res_GetInstScreenshots, Res_GetModIndexFiles, Res_GetPrismInstances, Res_InputMenu, Res_SyncMods, UpdateProgress_InitData } from "./interface";
+import { getModUpdates, getPackMeta, searchPacks, searchPacksMeta, semit, updateSocketURL } from "./network";
 import { ListPrismInstReason, openCCMenu, openCCMenuCB, SearchPacksMenu, ViewInstanceMenu } from "./menu_api";
 import { addInstance, cleanModName, cleanModNameDisabled, dataPath, getModFolderPath, getModpackInst, getModpackPath, LocalModInst, ModPackInst, RemoteModInst, slugMap, sysInst } from "./db";
 import { InstanceData } from "./db_types";

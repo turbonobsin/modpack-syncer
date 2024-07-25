@@ -44,7 +44,7 @@ function validate():Err<undefined>|undefined{
     return;
 }
 
-function semit<T,V>(ev:string,arg:T){
+export function semit<T,V>(ev:string,arg:T){
     if(!socket.connected){
         return errors.serverNotConnected;
     }

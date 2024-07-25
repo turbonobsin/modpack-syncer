@@ -46,6 +46,7 @@
 		"node-7z": "^3.0.0",
 		"node-curseforge": "^1.3.3",
 		"socket.io-client": "^4.7.5",
-		"toml": "^3.0.0"
+		"toml": "^3.0.0",
+		"utimes": "^5.2.1"
 	}
 }

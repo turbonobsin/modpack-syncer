@@ -9,7 +9,7 @@ type FSTestData = {
     instancePath:string;
     modList:string[];
 }
-type PackMetaData = {
+interface PackMetaData{
     id:string;
     name:string;
     desc:string;
@@ -17,6 +17,8 @@ type PackMetaData = {
     version:string;
 
     update:number;
+
+    resourcepacks:RP_Meta[];
 };
 type InitMenuData<T> = {
     data:T
@@ -98,12 +100,16 @@ export interface Res_GetInstScreenshots{
     path:string;
 }
 
+interface CmdInitData{
+    cmd?:string;
+    args?:any[];
+}
 interface EditInst_InitData{
     iid:string;
 }
 interface UpdateProgress_InitData{
     iid:string;
-    update:Res_GetModUpdates;
+    // update:Res_GetModUpdates;
 }
 
 // type InputMenuOptionType = "text" | "combobox" | "multiselect";
@@ -249,20 +255,24 @@ interface RP_Data{
     data?:{ // data will be defined only if the Resource Pack has been unpacked into a folder (because I can't efficiently read the data otherwise)
         icon?:string;
         meta?:RP_MCMeta;
+        sync?:RP_Sync;
     }
 }
-interface FItem{
+interface RP_Sync{
+    rpID:string;
+}
+interface TItem{
     name:string;
 }
-interface FFolder extends FItem{
-    items:FItem[];
+interface TFolder extends TItem{
+    items:TItem[];
 }
-interface FFile extends FItem{
+interface TFile extends TItem{
     buf:Uint8Array;
 }
 interface ResourcePack{
     data:RP_Data;
-    root:FFolder;
+    root:TFolder;
 }
 interface Arg_GetResourcePack{
     name:string;
@@ -272,6 +282,7 @@ interface Res_GetResourcePack{
 }
 interface Arg_GetInstResourcePacks{
     iid:string;
+    filter:SearchFilter;
 }
 interface Res_GetInstResourcePacks{
     packs:RP_Data[];
@@ -497,6 +508,91 @@ interface Arg_AddModToFolder extends Arg_IID{
     type:FolderType;
 }
 
+interface SearchFilter{
+    query?:string;
+}
+
+interface PrismAccount{
+    active:boolean;
+    entitlement:{
+        canPlayMinecraft:boolean;
+        ownsMinecraft:boolean;
+    };
+    profile:{
+        capes:{
+            alias:string;
+            id:string;
+            url:string;
+        }[];
+        id:string;
+        name:string;
+        skin:{
+            data:string;
+            id:string;
+            url:string;
+            variant:string; // CLASSIC
+        };
+    };
+}
+interface PrismAccountsData{
+    accounts:PrismAccount[];
+}
+
+interface Arg_UploadRP{
+    iid:string;
+    uid:string;
+    uname:string;
+    mpID:string;
+    name:string; // this is now rpID which is just the name of the folder/file that is the pack
+}
+interface Arg_UploadRPFile{
+    path:string;
+    buf:Uint8Array;
+    mpID:string;
+    rpName:string;
+
+    uid?:string;
+    uname?:string;
+    
+    mt:number;
+    bt:number;
+}
+interface Arg_UnpackRP{
+    iid:string;
+    rpID:string;
+}
+interface Arg_RemoveRP{
+    iid:string;
+    rpID:string;
+}
+interface Arg_DownloadRPFile{
+    path:string;
+    mpID:string;
+    rpName:string;
+}
+interface Arg_DownloadRP{
+    iid:string;
+    mpID:string;
+    rpID:string;
+    lastDownloaded:number;
+}
+interface ModifiedFile{
+    n:string; // just the name of the file
+    l:string; // relative path/location
+    // lm:number; // last modified (or time created if that's newer)
+    mt:number; // modify time
+    bt:number; // birth time (time created)
+}
+interface ModifiedFileData{
+    buf:Uint8Array;
+    mt:number;
+    bt:number;
+}
+interface Res_DownloadRP{
+    add:ModifiedFile[];
+    remove:ModifiedFile[];
+}
+
 // 
 
 export interface IGlobalAPI{
@@ -538,6 +634,12 @@ export interface IGlobalAPI{
         changeType:(arg:Arg_ChangeFolderType)=>Promise<boolean>;
         addMod:(arg:Arg_AddModToFolder)=>Promise<boolean>;
     }
+
+    // resource packs
+    uploadRP:(arg:Arg_UploadRP)=>Promise<boolean>;
+    unpackRP:(arg:Arg_UnpackRP)=>Promise<boolean>;
+    removeRP:(arg:Arg_RemoveRP)=>Promise<boolean>;
+    downloadRP:(arg:Arg_DownloadRP)=>Promise<boolean>;
 
     // sync
     sync:{

@@ -1,6 +1,6 @@
 import "../render_lib";
 import "../styles/edit_instance_menu.css";
-import { addClassToOps, makeDivPart, MP_ActivityBarItem, MP_Button, MP_Combobox, MP_Div, MP_Flexbox, MP_Flexbox_Ops, MP_Generic, MP_Grid, MP_Header, MP_HR, MP_Img, MP_P, MP_TabbedMenu, MP_TableList, MP_Text, MP_TR, PartTextStyle } from "../menu_parts";
+import { addClassToOps, makeDivPart, MP_ActivityBarItem, MP_Button, MP_Combobox, MP_Div, MP_Flexbox, MP_Flexbox_Ops, MP_Generic, MP_Grid, MP_Header, MP_HR, MP_Img, MP_P, MP_Section, MP_TabbedMenu, MP_TableList, MP_Text, MP_TR, PartTextStyle } from "../menu_parts";
 import { MP_SearchStructure, qElm } from "../render_lib";
 import { EditInst_InitData, FullModData, ModData, ModsFolder, Res_GetInstMods, RP_Data } from "../interface";
 import { deselectItem, InitData, SelectedItem, selectItem, wait } from "../render_util";
@@ -247,6 +247,7 @@ class CMP_ResourcePackSimple extends MP_Flexbox{
         super(ops);
     }
     declare ops:CMP_RP_Ops;
+    content = new MP_Div({className:"mod-row-content"});
 
     load(): void {
         super.load();
@@ -256,6 +257,8 @@ class CMP_ResourcePackSimple extends MP_Flexbox{
         
         let icon = new MP_Img({
             src:getImageURL(data?.icon),
+            minWidth:"25px",
+            minHeight:"25px",
             width:"25px",
             height:"25px",
             className:"_loaded",
@@ -264,13 +267,122 @@ class CMP_ResourcePackSimple extends MP_Flexbox{
             }
         }).addTo(this);
 
-        let cont = new MP_Div({className:"mod-row-content"}).addTo(this);
+        let cont = this.content.addTo(this);
 
         let name = new MP_Text({
             text:d.name,
             marginRight:"auto"
         }).addTo(cont);
     }
+
+    static showData(data:RP_Data,aside:MP_Div){
+        let d = data;
+        const {head,body,footer} = setupAside(aside);
+        
+        head.addParts(
+            new MP_Header({text:d.name}),
+            new MP_HR()
+        );
+
+        if(!data.data){ // it's currently "packed" as a zip
+            body.addParts(
+                new MP_P({
+                    text:"The current Resource Pack is still packed a .zip file.",
+                    className:"l-details"
+                }),
+                new MP_P({
+                    text:"You must unpack it in order to edit or view it's info.",
+                    className:"l-details"
+                }),
+                new MP_Button({
+                    label:"Unpack",
+                    marginTop:"20px",
+                    onClick:(e,elm)=>{
+                        window.gAPI.unpackRP({iid:initData.d.iid,rpID:data.name});
+                    }
+                }).autoJustify("center","center"),
+            );
+        }
+        else{
+            head.e!.style.height = "unset";
+            head.parts[0].addPart(
+                new MP_P({
+                    text:"Pack format: "+data.data.meta?.pack.pack_format ?? "(none found)",
+                    className:"l-details"
+                })
+            );
+            head.addParts(
+                new MP_Flexbox({
+                    justifyContent:"space-between",
+                    alignItems:"center",
+                    marginBottom:"20px"
+                }).addParts(
+                    new MP_Button({
+                        label:"Edit",
+                        onClick:(e,elm)=>{
+    
+                        }
+                    }),
+                    new MP_Button({
+                        skipAdd:d.data?.sync != null,
+                        label:"Upload",
+                        icon:"upload",
+                        className:"accent",
+                        onClick:(e,elm)=>{
+                            window.gAPI.uploadRP({
+                                iid:initData.d.iid,
+                                mpID:"bob",
+                                name:d.name,
+                                uid:"",
+                                uname:""
+                            });
+                        }
+                    }),
+                    new MP_Button({
+                        skipAdd:d.data?.sync != null,
+                        label:"Download",
+                        icon:"download",
+                        className:"",
+                        onClick:(e,elm)=>{
+                            window.gAPI.downloadRP({
+                                iid:initData.d.iid,
+                                rpID:d.name,
+                                lastDownloaded:-1,
+                                mpID:""
+                            });
+                        }
+                    }),//
+                    new MP_Button({
+                        // skipAdd:d.data?.sync == null,
+                        skipAdd:true,
+                        label:"Sync",
+                        icon:"sync_alt",
+                        className:"accent",
+                        onClick:(e,elm)=>{
+    
+                        }
+                    })
+                )
+            );
+            body.addParts(
+                
+                new MP_Img({
+                    src:getImageURL(data.data.icon),
+                    width:"50%"
+                }).autoJustify("start","center"),
+                new MP_P({
+                    text:data.data.meta?.pack.description ?? "No description."
+                })
+            );
+        }
+    }
+}
+function setupAside(aside:MP_Div){
+    let head = new MP_Div({className:"info-head"}); // or could be a section instead of div
+    let body = new MP_Div({className:"info-body"});
+    let footer = new MP_Div({className:"info-footer"});
+    aside.addParts(head,body,footer);
+    return {head,body,footer};
 }
 
 async function loadSection(index:number,menu:MP_TabbedMenu){
@@ -378,22 +490,23 @@ async function loadSection(index:number,menu:MP_TabbedMenu){
             
         } break;
         case 1:{
-            let search = new MP_SearchStructure({
+            let search = new MP_SearchStructure<RP_Data>({
                 listId:"_",
                 submitOnOpen:true,
                 onSelect:(data,item)=>{
-
+                    CMP_ResourcePackSimple.showData(data,menu.aside);
                 },
                 onNoSelected:()=>{
                     menu.aside.clearParts();
                 },
                 onSubmit:async (t,e,q)=>{
-                    let res = await window.gAPI.getInstRPs({iid:initData.d.iid});
+                    let res = await window.gAPI.getInstRPs({iid:initData.d.iid,filter:{query:q}});
                     console.log("RP:",res);
                     if(!res) return;
 
                     for(const pack of res.packs){
-                        search.list.addPart(new CMP_ResourcePackSimple({data:pack}));
+                        let p = new CMP_ResourcePackSimple({data:pack}).addTo(search.list);
+                        search.registerSelItem(pack,p.content.e);
                     }
                 }
             });

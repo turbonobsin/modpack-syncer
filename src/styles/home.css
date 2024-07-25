@@ -196,6 +196,7 @@ button.accent{
 }
 
 aside{
+    overflow-y:auto;
     width:300px;
     height:100vh;
     background-color:var(--menu-bg);
