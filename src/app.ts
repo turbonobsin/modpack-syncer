@@ -131,13 +131,13 @@ export async function preInit(){
         if(!pack.meta) return;
         if(!pack.meta.linkName) return;
 
-        let cfgPath = path.join(sysInst.meta.prismRoot,"instances",pack.meta.linkName,"instance.cfg");
-        let instCfg = parseCFGFile(await util_readText(cfgPath));
-        if(!instCfg) return;
-        instCfg.setValue("JavaPath","C:/Program Files (x86)/Minecraft Launcher/runtime/java-runtime-delta/windows-x64/java-runtime-delta/bin/javaw.exe");
-        instCfg.setValue("JavaVersion","21.0.3");
-        instCfg.setValue("OverrideJavaLocation","true");
-        await util_writeText(cfgPath,instCfg.toText());
+        // let cfgPath = path.join(sysInst.meta.prismRoot,"instances",pack.meta.linkName,"instance.cfg");
+        // let instCfg = parseCFGFile(await util_readText(cfgPath));
+        // if(!instCfg) return;
+        // instCfg.setValue("JavaPath","C:/Program Files (x86)/Minecraft Launcher/runtime/java-runtime-delta/windows-x64/java-runtime-delta/bin/javaw.exe");
+        // instCfg.setValue("JavaVersion","21.0.3");
+        // instCfg.setValue("OverrideJavaLocation","true");
+        // await util_writeText(cfgPath,instCfg.toText());
 
         let cmd = `${path.join(sysInst.meta.prismRoot,"prismlauncher")} --launch "${pack.meta.linkName}"`;
         util_warn("EXEC:",cmd);
