@@ -394,7 +394,18 @@ export async function downloadRP(arg:Arg_DownloadRP){
     if(!inst.meta.linkName) return errors.failedToGetPackLink.unwrap();
     
     let meta = inst.meta.resourcepacks.find(v=>v.rpID == arg.rpID);
-    if(!meta) return errors.couldNotFindRPMeta.unwrap();
+    if(!meta){
+        meta = {
+            rpID:arg.rpID,
+            lastModified:0,
+            lastUploaded:0,
+            lastDownloaded:0,
+            update:-1
+        };
+        inst.meta.resourcepacks.push(meta);
+        await inst.save();
+        // return errors.couldNotFindRPMeta.unwrap();
+    }
     // 
 
     // let cachePath = path.join(inst.getRPCachePath()!,arg.rpID+".json");
