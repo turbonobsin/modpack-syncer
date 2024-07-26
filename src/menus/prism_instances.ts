@@ -140,10 +140,11 @@ async function initPage(){
                     gg.parts[1].addPart(part);
                 }
 
-                part.e?.addEventListener("click",e=>{
-                    if(!part.e) return;
-                    selectItem(search.selected,inst,part.e);
-                });
+                // part.e?.addEventListener("click",e=>{
+                //     if(!part.e) return;
+                //     selectItem(search.selected,inst,part.e);
+                // });
+                search.registerSelItem(inst,part.e);
             }
         }
     })

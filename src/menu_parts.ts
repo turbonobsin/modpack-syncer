@@ -990,6 +990,12 @@ export class MP_Img extends MenuPart{
     }
 }
 
+export class MP_Aside extends MenuPart{
+    create(): void {
+        this.e = document.createElement("aside");
+    }
+}
+
 // ideas
 /**
 

@@ -2,7 +2,6 @@ import { app } from "electron";
 import fs from "fs";
 import path from "path";
 import toml from "toml";
-import { utimes } from "utimes";
 
 export const pathTo7zip = path.join(app.getAppPath(),"node_modules","7zip-bin","win","x64","7za.exe");
 
@@ -183,27 +182,45 @@ export function util_rm(path:fs.PathLike){
     });
 }
 export function util_utimes(path:string,ops:{
-    mtime?:number,
-    btime?:number
+    mtime:number,
+    atime:number,
+    btime:number
 }){
-    return;
+    if(ops.atime == undefined) ops.atime = 0;
+
+    if(ops.mtime) ops.mtime = Math.floor(ops.mtime);
+    if(ops.atime) ops.atime = Math.floor(ops.atime);
+    // if(ops.btime) ops.btime = Math.floor(ops.btime);
+
+    return new Promise<boolean>(resolve=>{
+        fs.utimes(path,ops.atime/1000,ops.mtime/1000,err=>{
+            if(err){
+                util_warn("Error occured while changing timestamps:");
+                console.log(err);
+                resolve(false);
+            }
+            else resolve(true);
+        });
+    });
+
+    
 
     // if(ops.mtime) ops.mtime = Math.floor(ops.mtime);
     // if(ops.btime) ops.btime = Math.floor(ops.btime);
     
-    return new Promise<boolean>(resolve=>{
-        // utimes(path,{
-        //     btime:ops.btime,
-        //     mtime:ops.mtime
-        // },err=>{
-        //     if(err){
-        //         util_warn("Error occured while changing timestamps:");
-        //         console.log(err);
-        //         resolve(false);
-        //     }
-        //     else resolve(true);
-        // });
-    });
+    // return new Promise<boolean>(resolve=>{
+    //     // utimes(path,{
+    //     //     btime:ops.btime,
+    //     //     mtime:ops.mtime
+    //     // },err=>{
+    //     //     if(err){
+    //     //         util_warn("Error occured while changing timestamps:");
+    //     //         console.log(err);
+    //     //         resolve(false);
+    //     //     }
+    //     //     else resolve(true);
+    //     // });
+    // });
 }
 
 // 

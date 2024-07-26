@@ -544,6 +544,7 @@ interface Arg_UploadRP{
     uname:string;
     mpID:string;
     name:string; // this is now rpID which is just the name of the folder/file that is the pack
+    force?:boolean;
 }
 interface Arg_UploadRPFile{
     path:string;
@@ -554,6 +555,7 @@ interface Arg_UploadRPFile{
     uid?:string;
     uname?:string;
     
+    at:number;
     mt:number;
     bt:number;
 }
@@ -569,12 +571,17 @@ interface Arg_DownloadRPFile{
     path:string;
     mpID:string;
     rpName:string;
+
+    // upload:number;
+    // download:number;
+    // modified:number;
 }
 interface Arg_DownloadRP{
     iid:string;
     mpID:string;
     rpID:string;
     lastDownloaded:number;
+    force?:boolean;
 }
 interface ModifiedFile{
     n:string; // just the name of the file
@@ -582,15 +589,40 @@ interface ModifiedFile{
     // lm:number; // last modified (or time created if that's newer)
     mt:number; // modify time
     bt:number; // birth time (time created)
+    at:number;
 }
 interface ModifiedFileData{
     buf:Uint8Array;
     mt:number;
+    at:number;
     bt:number;
 }
 interface Res_DownloadRP{
     add:ModifiedFile[];
     remove:ModifiedFile[];
+}
+interface RPCache{
+    upload:number;
+    download:number;
+    modified:number;
+}
+interface ArgC_GetRPs{ // arg client    
+    iid:string;
+}
+interface Arg_GetRPs{
+    mpID:string;
+    existing:string[];
+}
+interface Res_GetRPs{
+    list:{
+        rpID:string;
+        desc:string;
+        pack_format:number;
+    }[];
+}
+interface AddRP_InitData{
+    iid:string;
+    // data:Res_GetRPs;
 }
 
 // 
@@ -600,7 +632,7 @@ export interface IGlobalAPI{
     fsTest:(path?:string)=>Promise<FSTestData>;
     getPackMeta:(id?:string)=>Promise<Err<PackMetaData>>;
     alert:(msg?:string)=>Promise<void>;
-    openMenu:(type:string)=>void;
+    openMenu:(type:string,data?:any)=>void;
     triggerEvt:(id:string,data:any)=>void;
     
     searchPacks:(arg:Arg_SearchPacks)=>Promise<Res_SearchPacks>;
@@ -640,6 +672,8 @@ export interface IGlobalAPI{
     unpackRP:(arg:Arg_UnpackRP)=>Promise<boolean>;
     removeRP:(arg:Arg_RemoveRP)=>Promise<boolean>;
     downloadRP:(arg:Arg_DownloadRP)=>Promise<boolean>;
+    getRPs:(arg:ArgC_GetRPs)=>Promise<Res_GetRPs>;
+    getRPImg:(iid:string,rpID:string)=>Promise<string>;
 
     // sync
     sync:{

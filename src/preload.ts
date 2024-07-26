@@ -88,6 +88,8 @@ contextBridge.exposeInMainWorld("gAPI",{
     unpackRP:regf("unpackRP"),
     removeRP:regf("removeRP"),
     downloadRP:regf("downloadRP"),
+    getRPs:regf("getRPs"),
+    getRPImg:regf("getRPImg"),
 
     dropdown:{
         mod:regf("dropdown-mod")

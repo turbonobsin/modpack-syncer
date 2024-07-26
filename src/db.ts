@@ -1,12 +1,12 @@
 import { app, dialog } from "electron";
 import { pathTo7zip, searchStringCompare, util_lstat, util_mkdir, util_readBinary, util_readdir, util_readdirWithTypes, util_readJSON, util_readText, util_readTOML, util_warn, util_writeJSON, wait } from "./util";
 import path from "path";
-import { DBSys, DBUser, InstanceData as ModPackInstData } from "./db_types";
-import { Arg_AddModToFolder, Arg_ChangeFolderType, Arg_CreateFolder, Arg_EditFolder, Arg_UploadRP, Arg_UploadRPFile, FolderType, LocalModData, ModIndex, ModrinthModData, ModsFolder, ModsFolderDef, PackMetaData, PrismAccount, PrismAccountsData, RemoteModData, Res_GetInstResourcePacks, RP_Data, SearchFilter, SlugMapData, UpdateProgress_InitData } from "./interface";
+import { DBSys, DBUser, InstanceData as ModPackInstData, TmpFile } from "./db_types";
+import { Arg_AddModToFolder, Arg_ChangeFolderType, Arg_CreateFolder, Arg_EditFolder, Arg_UploadRP, Arg_UploadRPFile, FolderType, LocalModData, ModIndex, ModrinthModData, ModsFolder, ModsFolderDef, PackMetaData, PrismAccount, PrismAccountsData, RemoteModData, Res_GetInstResourcePacks, RP_Data, RPCache, SearchFilter, SlugMapData, UpdateProgress_InitData } from "./interface";
 import { errors, Result } from "./errors";
 import express from "express";
 import toml from "toml";
-import { changeServerURL } from "./app";
+import { changeServerURL, refreshMainWindow } from "./app";
 import { semit, updateSocketURL } from "./network";
 import { openCCMenu } from "./menu_api";
 import Seven from "node-7z";
@@ -379,6 +379,17 @@ export class ModPackInst extends Inst<ModPackInstData>{
         for(const folder of this.meta.folders){
             if(!folder.tags) folder.tags = [];
         }
+
+        // resource packs
+        let res = await util_mkdir(path.join(dataPath,"instances",this.meta.iid,"rp"));
+        if(res){
+            
+        }
+    }
+    getRPCachePath(){
+        if(!this.meta) return;
+        
+        return path.join(dataPath,"instances",this.meta.iid,"rp");
     }
 
     getPrismInstPath(): string|undefined{
@@ -488,23 +499,32 @@ export class ModPackInst extends Inst<ModPackInstData>{
         arg.uid = acc.profile.id;
         arg.uname = acc.profile.name;
 
-        let res1 = await semit<Arg_UploadRP,boolean>("uploadRP",{
+        let res = (await semit<Arg_UploadRP,number>("uploadRP",{
             iid:arg.iid,
             uid:acc.profile.id,
             uname:acc.profile.name,
             mpID,
             name:arg.name
-        });
-        if(!res1) return;
-        let res = res1.unwrap() as boolean;
-        if(!res) return;
+        })).unwrap();
+        if(!res){
+            util_warn("Failed to upload");
+            return;
+        }
+
+        if(res == 2){
+            arg.force = true;
+        }
 
         // all good
 
         let meta = this.meta.resourcepacks.find(v=>v.rpID == arg.name);
         if(!meta) return errors.couldNotFindRPMeta.unwrap();
 
-        let lastUploaded = meta.lastUploaded;
+        // let cachePath = path.join(this.getRPCachePath()!,arg.name+".json");
+        // let cache = await util_readJSON<Record<string,RPCache>>(cachePath);
+        // if(!cache) return errors.couldNotFindRPCache.unwrap();
+
+        // let lastUploaded = meta.lastUploaded;
         
         let w = await openCCMenu<UpdateProgress_InitData>("update_progress_menu",{iid:this.meta.iid});
         if(!w) return errors.failedNewWindow.unwrap();
@@ -520,26 +540,39 @@ export class ModPackInst extends Inst<ModPackInstData>{
             let totalFolders = 0;
             let start = performance.now();
 
-            let files:{
-                path:string,
-                buf:Uint8Array,
-                name:string,
-                bt:number,
-                mt:number
-            }[] = [];
+            let files:TmpFile[] = [];
 
             const read = async (f:FFolder,loc:string,loc2:string)=>{
                 let ar = await util_readdirWithTypes(loc);
                 for(const item of ar){
                     if(item.isFile()){
+                        if(item.name.includes(".__conflict")) continue; // don't want to upload conflict files, they should be local only
+
+                        // let trimmed = loc2.substring(1)+"/"+item.name;
+                        // let cacheMeta = cache[trimmed];
+                        // if(!cacheMeta){
+                        //     cacheMeta = {
+                        //         download:0,
+                        //         modified:0,
+                        //         upload:0
+                        //     };
+                        //     // console.log("(update) LOC:",trimmed);
+                        //     cache[trimmed] = cacheMeta;
+                        // }
+                        
                         let fileLoc = path.join(loc,item.name);
                         let stat = await util_lstat(fileLoc);
                         if(!stat) continue;
 
-                        if(item.name == "bronze_layer_1_s - Copy - Copy.png") console.log("STAT:",item.name,stat,lastUploaded,"-----",stat.birthtimeMs,new Date(stat.ctime).getTime());
+                        // if(item.name == "bronze_layer_1_s - Copy - Copy.png") console.log("STAT:",item.name,stat,cacheMeta);
                         let time = Math.max(stat.mtimeMs,stat.birthtimeMs);
                         // if(stat.mtimeMs <= lastUploaded && stat.ctimeMs <= lastUploaded) continue; // SKIP if it hasn't been modified
-                        if(time <= lastUploaded) continue;
+                        // if(time <= cacheMeta.upload) continue;
+                        // if(time <= Math.min(meta.lastUploaded,meta.lastDownloaded)) continue;
+                        // if(time <= meta.lastModified) continue;
+                        // if(time <= Math.max(cacheMeta.download,cacheMeta.upload)) continue;
+                        // if(time <= cacheMeta.upload) continue;
+                        if(!arg.force) if(time <= meta.lastUploaded) continue;
                         
                         totalFiles++;
                         let buf = await util_readBinary(fileLoc);
@@ -547,9 +580,14 @@ export class ModPackInst extends Inst<ModPackInstData>{
                         f.items.push(file);
                         files.push({
                             path:loc2+"/"+item.name,buf,name:item.name,
+                            at:stat.atimeMs,
                             bt:stat.birthtimeMs,
                             mt:stat.mtimeMs
                         });
+
+                        // 
+                        // cacheMeta.upload = new Date().getTime();
+                        // cacheMeta.modified = cacheMeta.upload;
                     }
                     else{
                         totalFolders++;
@@ -561,11 +599,7 @@ export class ModPackInst extends Inst<ModPackInstData>{
             };
             await read(root,rootPath,"");
 
-            meta.lastUploaded = new Date().getTime();
-            // meta.lastDownloaded = new Date().getTime();
-            meta.lastModified = new Date().getTime();
-            console.log("LAST UPLOADED",lastUploaded);
-            await this.save();
+            // await util_writeJSON(cachePath,cache);
 
             let total = totalFiles+totalFolders;
             console.log("TOTAL: "+total);
@@ -576,6 +610,9 @@ export class ModPackInst extends Inst<ModPackInstData>{
 
             // 
             let completed = 0;
+            let successfulFiles:TmpFile[] = [];
+            let failedFiles:TmpFile[] = [];
+
             for(const f of files){
                 w.webContents.send("updateProgress","main",completed,files.length,f.name);
                 let res1 = await semit<Arg_UploadRPFile,boolean>("upload_rp_file",{
@@ -587,26 +624,54 @@ export class ModPackInst extends Inst<ModPackInstData>{
                     uid:arg.uid,
                     uname:arg.uname,
                     
+                    at:f.at,
                     bt:f.bt,
                     mt:f.mt
                 });
-                if(!res1) return errors.failedUploadRP.unwrap();
+                if(!res1){
+                    // return errors.failedUploadRP.unwrap();
+                    failedFiles.push(f);
+                    continue;
+                }
                 let res = res1.unwrap() as boolean;
                 if(!res){
                     util_warn("Err: [2]: ");
                     console.log(res,res1);
-                    return errors.failedUploadRP.unwrap();
+                    failedFiles.push(f);
+                    // return errors.failedUploadRP.unwrap();
+                    continue;
                 }
 
                 completed++;
+                successfulFiles.push(f);
             }
+
+            meta.lastUploaded = new Date().getTime();
+            // meta.lastDownloaded = new Date().getTime();
+            meta.lastModified = meta.lastUploaded;
+            // console.log("LAST UPLOADED",lastUploaded);
+            await this.save();
 
             console.log(`>> time [2 - ${files.length}]: `,performance.now()-start);
 
-            w.webContents.send("updateProgress","main",completed,files.length,"Finished.");
+            // w.webContents.send("updateProgress","main",completed,files.length,"Finished.");
 
+            // show results
+            w.webContents.send("updateProgress","main",completed,files.length,"Finished.",{
+                sections:[
+                    {
+                        header:`Failed: (${failedFiles.length})`,
+                        text:failedFiles.map(v=>v.path)
+                    },
+                    {
+                        header:`Uploaded: (${successfulFiles.length})`,
+                        text:successfulFiles.map(v=>v.path)
+                    }
+                ]
+            });
+            
             await wait(500);
-            w.close();
+            // w.close();
         }
         else{
             let start = performance.now();
@@ -791,6 +856,8 @@ export async function addInstance(meta:PackMetaData):Promise<Result<ModPackInst>
     }
     console.log("ADDED INSTANCE:",inst);
 
+    refreshMainWindow();
+
     return new Result(inst);
 }
 
@@ -834,7 +901,21 @@ async function getInstResourcePacks(inst:ModPackInst,filter:SearchFilter): Promi
 
     // create metas if not defined
     if(!inst.meta.resourcepacks) inst.meta.resourcepacks = [];
+    util_warn("----- RPs: "+resData.packs.length);
     for(const pack of resData.packs){
+        let rpPath = inst.getRPCachePath()!;
+        if(!await util_lstat(path.join(rpPath,pack.name+".json"))){
+            // let data = {
+            //     download:0,
+            //     upload:0,
+            //     modified:0,
+            // } as RPCache;
+            let data = {};
+            await util_writeJSON(path.join(rpPath,pack.name+".json"),data);
+        }
+        
+        // 
+        
         if(inst.meta.resourcepacks.some(v=>v.rpID == pack.name)) continue;
         inst.meta.resourcepacks.push({
             rpID:pack.name,

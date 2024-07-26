@@ -70,6 +70,7 @@ export const errors = {
 
     failedUploadRP: Result.err("A file failed to upload, aborting."),
     couldNotFindRPMeta: Result.err("Could not find meta data for this resource pack."),
+    couldNotFindRPCache: Result.err("Could not find resource pack cache file"),
 
     // prism
     instgroupsRead: Result.err("Failed to read instance group data"),

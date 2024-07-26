@@ -70,3 +70,12 @@ interface RP_Meta{
     lastUploaded:number;
     lastDownloaded:number;
 }
+interface TmpFile{
+    path:string,
+    buf:Uint8Array,
+    name:string,
+    
+    at:number,
+    bt:number,
+    mt:number
+}

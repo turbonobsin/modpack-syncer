@@ -35,6 +35,11 @@ body{
     justify-content:space-between;
     align-items:center;
 }
+.main-options{
+    display:flex;
+    gap:10px;
+    align-items:center;
+}
 form.query{
     margin:10px 0px;
     float:right;
@@ -210,9 +215,9 @@ aside{
     /* background-color: var(--menu-bg); */
     /* border-bottom: solid 1px var(--menu-border); */
 }
-.instance-grid-items:not(:has(*)){
+/* .instance-grid-items:not(:has(*)){
     background-color:darkred;
-}
+} */
 .instance-grid-items{
     display:grid;
     grid-template-columns:repeat(auto-fill,200px);

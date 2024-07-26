@@ -121,7 +121,16 @@ export class InputMenu extends CCMenu{
         return "input_menu";
     }
 }
+export class AddRPMenu extends CCMenu{
+    constructor(){
+        super("add_rp_menu",1000,800);
+    }
+    getId(): string {
+        return "add_rp_menu";
+    }
+}
 
+// 
 class CCMenuRegistry{
     constructor(){
         this.reg = new Map();
@@ -173,3 +182,4 @@ ccMenuRegistry.register(new PrismInstancesMenu());
 ccMenuRegistry.register(new EditInstanceMenu());
 ccMenuRegistry.register(new UpdateProgressMenu());
 ccMenuRegistry.register(new InputMenu());
+ccMenuRegistry.register(new AddRPMenu());

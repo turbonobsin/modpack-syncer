@@ -44,12 +44,12 @@ function validate():Err<undefined>|undefined{
     return;
 }
 
-export function semit<T,V>(ev:string,arg:T){
+export async function semit<T,V>(ev:string,arg:T): Promise<Result<V>>{
     if(!socket.connected){
         return errors.serverNotConnected;
     }
     
-    return new Promise<Result<V>>(resolve=>{
+    return await new Promise<Result<V>>(resolve=>{
         socket.emit(ev,arg,(res:V)=>{
             resolve(new Result(res));
         });

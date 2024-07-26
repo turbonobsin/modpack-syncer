@@ -1,7 +1,7 @@
-import { MP_Button, MP_Div, MP_Header, MP_P, MP_Text } from "./menu_parts";
+import { MenuPart, MP_Button, MP_Div, MP_Header, MP_P, MP_Text } from "./menu_parts";
 import { InitMenuData, PackMetaData } from "./interface";
 
-export function loadDefaultAside(aside:MP_Div,ops:{
+export function loadDefaultAside(aside:MenuPart,ops:{
     title:string,
     desc?:string
 }){
@@ -303,3 +303,21 @@ export class InitData<T>{
 window.gAPI.onMsg(msg=>{
     console.log("MSG: ",msg);
 });
+
+export function searchStringCompare(s1?:string,s2?:string){
+    if(!s1 || !s2) return true;
+    s1 = s1.toLowerCase().replaceAll(" ","");
+    s2 = s2.toLowerCase().replaceAll(" ","");
+    
+    return s1.includes(s2) || s2.includes(s1);
+}
+
+export function getImageURL(path?:string){
+    if(!path) return "";
+    if(!path.startsWith("http")){
+        let url1 = new URL("http://localhost:57152/image");
+        url1.searchParams.set("path",path);
+        path = url1.href;
+    }
+    return path;
+}

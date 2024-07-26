@@ -1,10 +1,10 @@
-import { BrowserWindow, dialog, Menu, MenuItemConstructorOptions, nativeImage } from "electron";
-import { appPath, cleanModName, cleanModNameDisabled, getModpackInst, getStandardInstData } from "./db";
+import { BrowserWindow, dialog, ipcMain, Menu, MenuItemConstructorOptions, nativeImage } from "electron";
+import { appPath, cleanModName, cleanModNameDisabled, getMainAccount, getModpackInst, getStandardInstData, initDB } from "./db";
 import { Result } from "./errors";
 import { ETL_Generic, evtTimeline, util_rename, util_warn } from "./util";
 import path from "path";
 import { electron } from "process";
-import { checkForModUpdates } from "./app";
+import { checkForModUpdates, downloadRP } from "./app";
 import { openCCMenu } from "./menu_api";
 import { IMO_Combobox, IMO_Input, IMO_MultiSelect, InputMenu_InitData, ModsFolderDef, Res_InputMenu } from "./interface";
 
@@ -235,7 +235,7 @@ async function openEditModsAdditional(_w:BrowserWindow,iid:string){
 export const allDropdowns = {
     modItem:openModDropdown,
     editModsAdditional:openEditModsAdditional,
-    modFolder:async (_w:BrowserWindow,iid:string,folderName:string)=>{        
+    modFolder:async (_w:BrowserWindow,iid:string,folderName:string)=>{
         let inst = await getModpackInst(iid);
         if(!inst || !inst.meta) return;
 
@@ -340,6 +340,35 @@ export const allDropdowns = {
                             _w.reload();
                         }
                     }
+                }
+            }
+        ]);
+
+        menu.popup({window:_w});
+    },
+    rpOptions:async (_w:BrowserWindow,iid:string,rpID:string)=>{
+        let inst = await getModpackInst(iid);
+        if(!inst || !inst.meta) return;
+
+        let user = await getMainAccount();
+        if(!user) return;
+
+        let menu = Menu.buildFromTemplate([
+            {
+                label:"Force Upload All",
+                click:()=>{
+                    inst.uploadRP({
+                        iid,name:rpID,mpID:inst.meta!.linkName!,uid:user.profile.id,uname:user.profile.name,force:true
+                    });
+                }
+            },
+            {
+                label:"Force Download All",
+                click:()=>{
+                    downloadRP({
+                        iid,mpID:inst.meta!.linkName!,
+                        rpID,lastDownloaded:-1,force:true
+                    });
                 }
             }
         ]);

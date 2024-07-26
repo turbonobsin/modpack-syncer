@@ -3,7 +3,7 @@ import "../styles/edit_instance_menu.css";
 import { addClassToOps, makeDivPart, MP_ActivityBarItem, MP_Button, MP_Combobox, MP_Div, MP_Flexbox, MP_Flexbox_Ops, MP_Generic, MP_Grid, MP_Header, MP_HR, MP_Img, MP_P, MP_Section, MP_TabbedMenu, MP_TableList, MP_Text, MP_TR, PartTextStyle } from "../menu_parts";
 import { MP_SearchStructure, qElm } from "../render_lib";
 import { EditInst_InitData, FullModData, ModData, ModsFolder, Res_GetInstMods, RP_Data } from "../interface";
-import { deselectItem, InitData, SelectedItem, selectItem, wait } from "../render_util";
+import { deselectItem, getImageURL, InitData, SelectedItem, selectItem, wait } from "../render_util";
 import { io } from "socket.io-client";
 import { allDropdowns } from "src/dropdowns";
 
@@ -318,16 +318,17 @@ class CMP_ResourcePackSimple extends MP_Flexbox{
                     marginBottom:"20px"
                 }).addParts(
                     new MP_Button({
-                        label:"Edit",
+                        // label:"Edit",
+                        label:"",
+                        icon:"more_vert",
                         onClick:(e,elm)=>{
-    
+                            window.gAPI.openDropdown("rpOptions",initData.d.iid,d.name);
                         }
                     }),
                     new MP_Button({
-                        skipAdd:d.data?.sync != null,
+                        // skipAdd:d.data?.sync != null,
                         label:"Upload",
                         icon:"upload",
-                        className:"accent",
                         onClick:(e,elm)=>{
                             window.gAPI.uploadRP({
                                 iid:initData.d.iid,
@@ -339,29 +340,28 @@ class CMP_ResourcePackSimple extends MP_Flexbox{
                         }
                     }),
                     new MP_Button({
-                        skipAdd:d.data?.sync != null,
+                        // skipAdd:d.data?.sync != null,
                         label:"Download",
                         icon:"download",
-                        className:"",
+                        className:"accent",
                         onClick:(e,elm)=>{
                             window.gAPI.downloadRP({
                                 iid:initData.d.iid,
                                 rpID:d.name,
-                                lastDownloaded:-1,
-                                mpID:""
+                                mpID:"",
+                                lastDownloaded:-1
                             });
                         }
                     }),//
-                    new MP_Button({
-                        // skipAdd:d.data?.sync == null,
-                        skipAdd:true,
-                        label:"Sync",
-                        icon:"sync_alt",
-                        className:"accent",
-                        onClick:(e,elm)=>{
+                    // new MP_Button({
+                    //     // skipAdd:d.data?.sync == null,
+                    //     skipAdd:true,
+                    //     label:"Sync",
+                    //     icon:"sync_alt",
+                    //     onClick:(e,elm)=>{
     
-                        }
-                    })
+                    //     }
+                    // })
                 )
             );
             body.addParts(
@@ -518,17 +518,29 @@ async function loadSection(index:number,menu:MP_TabbedMenu){
                         label:"(Local Folder)",
                         value:"_local"
                     },
-                    {
-                        label:"High Rez Packs",
-                        value:"high_rez_packs"
-                    },
-                    {
-                        label:"Medieval Packs",
-                        value:"medieval_packs"
-                    }
+                    // {
+                    //     label:"High Rez Packs",
+                    //     value:"high_rez_packs"
+                    // },
+                    // {
+                    //     label:"Medieval Packs",
+                    //     value:"medieval_packs"
+                    // }
                 ]
             });
-            search.mainOptions.addPart(combo);
+            search.mainOptions.addParts(
+                combo,
+                new MP_Button({
+                    label:"",
+                    icon:"add",
+                    onClick:(e,elm)=>{
+                        window.gAPI.openMenu("add_rp_menu",{iid:initData.d.iid});
+                        // window.gAPI.getRPs({
+                        //     iid:initData.d.iid
+                        // });
+                    }
+                })
+            );
         } break;
         case 2:{
             let res = await window.gAPI.getInstScreenshots({iid:initData.d.iid});
@@ -725,16 +737,6 @@ async function checkVis(){
     checkingVis = false;
 }
 let loadingImageCache:number[] = [];
-
-function getImageURL(path?:string){
-    if(!path) return "";
-    if(!path.startsWith("http")){
-        let url1 = new URL("http://localhost:57152/image");
-        url1.searchParams.set("path",path);
-        path = url1.href;
-    }
-    return path;
-}
 
 let _scrollY = 0;
 async function _loadImage(e:HTMLImageElement,i:number){
