@@ -1869,6 +1869,7 @@ async function getPrismInstances(w=mainWindow,arg:Arg_GetPrismInstances):Promise
     let instancePath = path.join(sysInst.meta.prismRoot,"instances");
     let groupData = await util_readJSON<InstGroups>(path.join(instancePath,"instgroups.json"));
     if(!groupData){
+        util_warn("PATH TO READ: ",path.join(instancePath,"instgroups.json"));
         return errors.instgroupsRead;
     }
 
