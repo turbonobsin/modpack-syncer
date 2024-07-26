@@ -40,7 +40,7 @@ interface DBSys{
 
 type javaId = string;
 
-interface InstanceData{
+export interface InstanceData{
     iid:string;
     update:number;
     meta:PackMetaData;
@@ -64,13 +64,14 @@ interface InstanceData{
     // }
 }
 
-interface RP_Meta{
+export interface RP_Meta{
     rpID:string;
     lastModified:number;
     lastUploaded:number;
     lastDownloaded:number;
+    update:number;
 }
-interface TmpFile{
+export interface TmpFile{
     path:string,
     buf:Uint8Array,
     name:string,

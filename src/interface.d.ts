@@ -1,7 +1,7 @@
 // Server Types
 
 import { ModPackInst } from "./db";
-import { InstanceData } from "./db_types";
+import { InstanceData, RP_Meta } from "./db_types";
 import type { Mod as Mod2 } from "node-curseforge";
 import { allDropdowns } from "./dropdowns";
 
@@ -463,7 +463,7 @@ interface Arg_SyncMods extends Arg_IID{
 
 }
 interface Res_SyncMods{
-
+    upToDate:boolean;
 }
 interface Arg_CheckModUpdates{
     id:string;
@@ -546,6 +546,10 @@ interface Arg_UploadRP{
     name:string; // this is now rpID which is just the name of the folder/file that is the pack
     force?:boolean;
 }
+interface Res_UploadRP{
+    res:number;
+    update:number;
+}
 interface Arg_UploadRPFile{
     path:string;
     buf:Uint8Array;
@@ -600,13 +604,14 @@ interface ModifiedFileData{
 interface Res_DownloadRP{
     add:ModifiedFile[];
     remove:ModifiedFile[];
+    update:number;
 }
 interface RPCache{
     upload:number;
     download:number;
     modified:number;
 }
-interface ArgC_GetRPs{ // arg client    
+interface ArgC_GetRPs{ // arg client
     iid:string;
 }
 interface Arg_GetRPs{
@@ -614,15 +619,30 @@ interface Arg_GetRPs{
     existing:string[];
 }
 interface Res_GetRPs{
-    list:{
-        rpID:string;
-        desc:string;
-        pack_format:number;
-    }[];
+    // list:{
+    //     rpID:string;
+    //     desc:string;
+    //     pack_format:number;
+    // }[];
+    list:RP_Data[];
 }
 interface AddRP_InitData{
     iid:string;
     // data:Res_GetRPs;
+}
+
+interface Arg_GetRPVersions{
+    mpID:string;
+    current:{
+        rpID:string;
+        update:number;
+    }[];
+}
+interface Res_GetRPVersions{
+    versions:{
+        rpID:string;
+        update:number;
+    }[];
 }
 
 // 
@@ -642,6 +662,8 @@ export interface IGlobalAPI{
     getInstances:(arg:Arg_GetInstances)=>Promise<InstanceData[]|undefined>;
     showLinkInstance:(iid:string,instName:string)=>Promise<string|undefined>;
     linkInstance:(iid:string,pInstName:string)=>Promise<void>;
+    checkForInstUpdates:(iid:string)=>Promise<boolean>;
+    updateInst:(iid:string)=>Promise<boolean>;
 
     getInstScreenshots:(arg:Arg_GetInstScreenshots)=>Promise<Res_GetInstScreenshots>;
     getInstMods:(arg:Arg_GetInstMods)=>Promise<Res_GetInstMods>;

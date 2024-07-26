@@ -854,6 +854,7 @@ export class MP_Progress extends MP_Div{
         if(!this.details.e) return;
         
         let percent = amt == 0 ? 0 : (amt/total*100);
+        if(amt == 0 && total == 0) percent = 100;
         
         this.bar.e.style.setProperty("--progress-text",`"${Math.floor(percent)}% | ${amt}/${total}"`);
         this.bar.e.style.width = `${percent}%`;

@@ -300,6 +300,7 @@ export class CMP_FullInst extends MP_Article {
                         label:"Launch",
                         className:"b-inst-launch",
                         disabled:!this.canLaunch(),
+                        icon:"rocket_launch",
                         onClick:async e=>{
                             window.gAPI.launchInstance(inst.iid);
                             // let res = await window.gAPI.addInstance(meta);
@@ -307,7 +308,16 @@ export class CMP_FullInst extends MP_Article {
                         }
                     }),
                     new MP_Button({
+                        label:"Sync",
+                        icon:"sync_alt",
+                        className:"accent",
+                        onClick:(e,elm)=>{
+                            window.gAPI.checkForInstUpdates(inst.iid);
+                        }
+                    }),
+                    new MP_Button({
                         label:"Edit",
+                        icon:"settings",
                         onClick:e=>{
                             window.gAPI.showEditInstance(inst.iid);
                         }

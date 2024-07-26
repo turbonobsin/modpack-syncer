@@ -2,7 +2,7 @@ import { app, dialog } from "electron";
 import { pathTo7zip, searchStringCompare, util_lstat, util_mkdir, util_readBinary, util_readdir, util_readdirWithTypes, util_readJSON, util_readText, util_readTOML, util_warn, util_writeJSON, wait } from "./util";
 import path from "path";
 import { DBSys, DBUser, InstanceData as ModPackInstData, TmpFile } from "./db_types";
-import { Arg_AddModToFolder, Arg_ChangeFolderType, Arg_CreateFolder, Arg_EditFolder, Arg_UploadRP, Arg_UploadRPFile, FolderType, LocalModData, ModIndex, ModrinthModData, ModsFolder, ModsFolderDef, PackMetaData, PrismAccount, PrismAccountsData, RemoteModData, Res_GetInstResourcePacks, RP_Data, RPCache, SearchFilter, SlugMapData, UpdateProgress_InitData } from "./interface";
+import { Arg_AddModToFolder, Arg_ChangeFolderType, Arg_CreateFolder, Arg_EditFolder, Arg_UploadRP, Arg_UploadRPFile, FolderType, LocalModData, ModIndex, ModrinthModData, ModsFolder, ModsFolderDef, PackMetaData, PrismAccount, PrismAccountsData, RemoteModData, Res_GetInstResourcePacks, Res_UploadRP, RP_Data, RPCache, SearchFilter, SlugMapData, UpdateProgress_InitData } from "./interface";
 import { errors, Result } from "./errors";
 import express from "express";
 import toml from "toml";
@@ -499,7 +499,7 @@ export class ModPackInst extends Inst<ModPackInstData>{
         arg.uid = acc.profile.id;
         arg.uname = acc.profile.name;
 
-        let res = (await semit<Arg_UploadRP,number>("uploadRP",{
+        let res = (await semit<Arg_UploadRP,Res_UploadRP>("uploadRP",{
             iid:arg.iid,
             uid:acc.profile.id,
             uname:acc.profile.name,
@@ -511,7 +511,7 @@ export class ModPackInst extends Inst<ModPackInstData>{
             return;
         }
 
-        if(res == 2){
+        if(res.res == 2){
             arg.force = true;
         }
 
@@ -519,6 +519,9 @@ export class ModPackInst extends Inst<ModPackInstData>{
 
         let meta = this.meta.resourcepacks.find(v=>v.rpID == arg.name);
         if(!meta) return errors.couldNotFindRPMeta.unwrap();
+
+        meta.update = res.update;
+        // await this.save();
 
         // let cachePath = path.join(this.getRPCachePath()!,arg.name+".json");
         // let cache = await util_readJSON<Record<string,RPCache>>(cachePath);
@@ -921,7 +924,8 @@ async function getInstResourcePacks(inst:ModPackInst,filter:SearchFilter): Promi
             rpID:pack.name,
             lastModified:0,
             lastUploaded:0,
-            lastDownloaded:0
+            lastDownloaded:0,
+            update:-1
         });
         await inst.save();
     }

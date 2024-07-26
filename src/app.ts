@@ -328,160 +328,233 @@ export async function preInit(){
 
         return url.href;
     });
+
+    // more inst stuff
+    ipcMain.handle("checkForInstUpdates",async (ev,iid:string)=>{
+        console.log("CHECK FOR INST UPDATES:",iid);
+
+        let window = getWindow(ev);
+        if(!window) return;
+
+        let inst = await getModpackInst(iid);
+        if(!inst || !inst.meta) return errors.couldNotFindPack.unwrap();
+
+        console.log(11);
+
+        if(!inst.meta.linkName) return errors.failedToGetPackLink.unwrap();
+
+        console.log(22);
+        
+        let res = (await semit<Arg_GetRPVersions,Res_GetRPVersions>("getRPVersions",{
+            mpID:inst.meta.linkName,
+            current:inst.meta.resourcepacks.map(v=>{
+                return {
+                    rpID:v.rpID,
+                    update:v.update
+                };
+            })
+        })).unwrap();
+        if(!res) return;
+
+        console.log("VERSIONS:",res.versions);
+
+        let res1 = (await syncMods(window,iid,true)).unwrap();
+        let modsUpToDate = res1?.upToDate;
+
+        let proms:Promise<any>[] = [];
+        for(const v of res.versions){
+            proms.push(downloadRP({
+                iid,lastDownloaded:-1,
+                mpID:inst.meta.linkName,
+                rpID:v.rpID
+            }));
+        }
+        await Promise.all(proms);
+
+        if(modsUpToDate && res.versions.length == 0){
+            await dialog.showMessageBox({
+                message:"Up to date"
+            });
+        }
+        else{
+            await dialog.showMessageBox({
+                message:"Finished"
+            });
+        }
+    });
+    ipcMain.handle("updateInst",async (ev,iid:string)=>{
+
+    });
 }
 
 export async function downloadRP(arg:Arg_DownloadRP){
     let inst = await getModpackInst(arg.iid);
-        if(!inst || !inst.meta) return errors.couldNotFindPack.unwrap();
+    if(!inst || !inst.meta) return errors.couldNotFindPack.unwrap();
 
-        if(!inst.meta.linkName) return errors.failedToGetPackLink.unwrap();
+    if(!inst.meta.linkName) return errors.failedToGetPackLink.unwrap();
+    
+    let meta = inst.meta.resourcepacks.find(v=>v.rpID == arg.rpID);
+    if(!meta) return errors.couldNotFindRPMeta.unwrap();
+    // 
+
+    // let cachePath = path.join(inst.getRPCachePath()!,arg.rpID+".json");
+    // let cache = await util_readJSON<Record<string,RPCache>>(cachePath);
+    // if(!cache) return errors.couldNotFindRPCache.unwrap(); // do I need to change this now?
+
+    // arg.lastDownloaded = Math.min(meta.lastDownloaded,meta.lastUploaded);
+    // arg.lastDownloaded = Math.max(meta.lastDownloaded,meta.lastUploaded);
+    arg.lastDownloaded = meta.lastDownloaded;
+    arg.mpID = inst.meta.linkName;
+
+    // arg.data = cache;
+    
+    // 
+    let prismRoot = inst.getPrismInstPath();
+    if(!prismRoot) return errors.failedToGetPrismInstPath.unwrap();
+    
+    let loc = path.join(prismRoot,".minecraft","resourcepacks",arg.rpID);
+    console.log("ARG:",arg);
+
+    let w = await openCCMenu<UpdateProgress_InitData>("update_progress_menu",{iid:arg.iid});
+    if(!w) return errors.failedNewWindow.unwrap();
+    w.webContents.send("updateProgress","main",0,100,"Initializing...");
+
+    // ensure folder is created if downloading for the first time
+    if(!await util_lstat(loc)){
+        // force download
+        arg.force = true;
+    }
+    
+    // let stat = await util_lstat(loc);
+    let resPacked = await semit<Arg_DownloadRP,Res_DownloadRP>("downloadRP",arg) as Result<Res_DownloadRP>;
+    if(!resPacked){
+        util_warn("---- error couldn't unpack");
+        w.close();
+        return errors.unknown;
+    }
+
+    let res = resPacked.unwrap();
+    if(!res){
+        w.close();
+        return;
+    }
+
+    util_warn("ADD FILES:");
+    console.log(res.add);
+    util_warn("REMOVE FILES:");
+    console.log(res.remove);
+
+    // 
+    let total = res.add.length+res.remove.length;
+    w.webContents.send("updateProgress","main",0,total,"");
+
+    // ensure folder is created if downloading for the first time
+    if(!await util_lstat(loc)){
+        await util_mkdir(loc);
+    }
+
+    // 
+    let successfulFiles:ModifiedFile[] = [];
+    let failed:ModifiedFile[] = [];
+    let completed = 0;
+    let success = 0;
+
+    let nowTime = new Date().getTime();
+
+    for(const file of res.add){
+        w.webContents.send("updateProgress","main",completed,total,file.n);
+        completed++;
+
+        let l = file.l.substring(1);
+        let subPath = path.join(loc,l);
+
+        // let cacheMeta = cache[l];
+        // if(!cacheMeta){
+        //     cacheMeta = {
+        //         // download:meta.lastDownloaded,
+        //         // modified:meta.lastDownloaded,
+        //         // upload:meta.lastDownloaded
+        //         download:nowTime,
+        //         modified:nowTime,
+        //         upload:0
+        //     };
+        //     cache[l] = cacheMeta;
+        // }
+        // else{
+        //     cacheMeta.download = nowTime;
+        //     cacheMeta.modified = nowTime;
+        //     // cacheMeta.upload = nowTime;
+        // }
+
+        let stat = await util_lstat(subPath);
+        if(stat) if(stat.mtimeMs > Math.max(file.mt,file.bt)){ // do I need && with comparision with cacheMeta instead of stat? like cacheMeta... < Math.max(...) ?
+            let altName = subPath+".__conflict";
+            let num = 0;
+            while(await util_lstat(altName+(num == 0 ? "" : num))){
+                num++;
+            }
+            await util_rename(subPath,altName+(num == 0 ? "" : num));
+
+            // check contents
+            // let text1 = await util_readText(subPath);
+        }
         
-        let meta = inst.meta.resourcepacks.find(v=>v.rpID == arg.rpID);
-        if(!meta) return errors.couldNotFindRPMeta.unwrap();
-        // 
-
-        // let cachePath = path.join(inst.getRPCachePath()!,arg.rpID+".json");
-        // let cache = await util_readJSON<Record<string,RPCache>>(cachePath);
-        // if(!cache) return errors.couldNotFindRPCache.unwrap(); // do I need to change this now?
-
-        // arg.lastDownloaded = Math.min(meta.lastDownloaded,meta.lastUploaded);
-        // arg.lastDownloaded = Math.max(meta.lastDownloaded,meta.lastUploaded);
-        arg.lastDownloaded = meta.lastDownloaded;
-        arg.mpID = inst.meta.linkName;
-
-        // arg.data = cache;
+        let bufPACK = (await semit<Arg_DownloadRPFile,ModifiedFileData>("download_rp_file",{
+            mpID:arg.mpID,
+            rpName:arg.rpID,
+            path:l,
+        })) as Result<ModifiedFileData>;
+        if(!bufPACK){
+            failed.push(file);
+            continue;
+        }
         
-        // 
-        let prismRoot = inst.getPrismInstPath();
-        if(!prismRoot) return errors.failedToGetPrismInstPath.unwrap();
-        
-        let loc = path.join(prismRoot,".minecraft","resourcepacks",arg.rpID);
-        console.log("ARG:",arg);
-
-        let w = await openCCMenu<UpdateProgress_InitData>("update_progress_menu",{iid:arg.iid});
-        if(!w) return errors.failedNewWindow.unwrap();
-        w.webContents.send("updateProgress","main",0,100,"Initializing...");
-        
-        // let stat = await util_lstat(loc);
-        let resPacked = await semit<Arg_DownloadRP,Res_DownloadRP>("downloadRP",arg) as Result<Res_DownloadRP>;
-        if(!resPacked){
-            util_warn("---- error couldn't unpack");
-            w.close();
-            return errors.unknown;
+        let f = bufPACK.unwrap();
+        if(!f){
+            failed.push(file);
+            continue;
         }
 
-        let res = resPacked.unwrap();
-        if(!res){
-            w.close();
-            return;
-        }
-
-        util_warn("ADD FILES:");
-        console.log(res.add);
-        util_warn("REMOVE FILES:");
-        console.log(res.remove);
-
-        // 
-        let total = res.add.length+res.remove.length;
-        w.webContents.send("updateProgress","main",0,total,"");
+        await util_mkdir(path.dirname(subPath),true);
+        await util_writeBinary(subPath,Buffer.from(f.buf));
+        if(stat) await util_utimes(subPath,{ atime:stat.atimeMs, btime:stat.birthtimeMs, mtime:stat.mtimeMs });
         
-        // 
+        success++;
+        successfulFiles.push(file);
+    }
 
-        let successfulFiles:ModifiedFile[] = [];
-        let failed:ModifiedFile[] = [];
-        let completed = 0;
-        let success = 0;
+    // 
+    // await util_writeJSON(cachePath,cache);
 
-        let nowTime = new Date().getTime();
+    meta.lastDownloaded = new Date().getTime();
+    // meta.lastUploaded = new Date().getTime();
+    meta.lastModified = meta.lastDownloaded;
 
-        for(const file of res.add){
-            w.webContents.send("updateProgress","main",completed,total,file.n);
-            completed++;
+    meta.update = res.update;
 
-            let l = file.l.substring(1);
-            let subPath = path.join(loc,l);
+    await inst.save();
 
-            // let cacheMeta = cache[l];
-            // if(!cacheMeta){
-            //     cacheMeta = {
-            //         // download:meta.lastDownloaded,
-            //         // modified:meta.lastDownloaded,
-            //         // upload:meta.lastDownloaded
-            //         download:nowTime,
-            //         modified:nowTime,
-            //         upload:0
-            //     };
-            //     cache[l] = cacheMeta;
-            // }
-            // else{
-            //     cacheMeta.download = nowTime;
-            //     cacheMeta.modified = nowTime;
-            //     // cacheMeta.upload = nowTime;
-            // }
+    // w.webContents.send("updateProgress","main",total,total,"Finished.");
+    // console.log("FINISHED! -- total: ",completed);
+    // console.log("Success:",success);
+    // console.log("Failed:",failed);
 
-            let stat = await util_lstat(subPath);
-            if(stat) if(stat.mtimeMs > Math.max(file.mt,file.bt)){ // do I need && with comparision with cacheMeta instead of stat? like cacheMeta... < Math.max(...) ?
-                let altName = subPath+".__conflict";
-                let num = 0;
-                while(await util_lstat(altName+(num == 0 ? "" : num))){
-                    num++;
-                }
-                await util_rename(subPath,altName+(num == 0 ? "" : num));
+    // show results
+    w.webContents.send("updateProgress","main",total,total,"Finished.",{
+        sections:[
+            {
+                header:`Failed: (${failed.length})`,
+                text:failed.map(v=>v.l)
+            },
+            {
+                header:`Downloaded: (${successfulFiles.length})`,
+                text:successfulFiles.map(v=>v.l)
             }
-            
-            let bufPACK = (await semit<Arg_DownloadRPFile,ModifiedFileData>("download_rp_file",{
-                mpID:arg.mpID,
-                rpName:arg.rpID,
-                path:l,
-            })) as Result<ModifiedFileData>;
-            if(!bufPACK){
-                failed.push(file);
-                continue;
-            }
-            
-            let f = bufPACK.unwrap();
-            if(!f){
-                failed.push(file);
-                continue;
-            }
-
-            await util_mkdir(path.dirname(subPath),true);
-            await util_writeBinary(subPath,Buffer.from(f.buf));
-            if(stat) await util_utimes(subPath,{ atime:stat.atimeMs, btime:stat.birthtimeMs, mtime:stat.mtimeMs });
-            
-            success++;
-            successfulFiles.push(file);
-        }
-
-        // 
-        // await util_writeJSON(cachePath,cache);
-
-        meta.lastDownloaded = new Date().getTime();
-        // meta.lastUploaded = new Date().getTime();
-        meta.lastModified = meta.lastDownloaded;
-        await inst.save();
-
-        // w.webContents.send("updateProgress","main",total,total,"Finished.");
-        // console.log("FINISHED! -- total: ",completed);
-        // console.log("Success:",success);
-        // console.log("Failed:",failed);
-
-        // show results
-        w.webContents.send("updateProgress","main",total,total,"Finished.",{
-            sections:[
-                {
-                    header:`Failed: (${failed.length})`,
-                    text:failed.map(v=>v.l)
-                },
-                {
-                    header:`Downloaded: (${successfulFiles.length})`,
-                    text:successfulFiles.map(v=>v.l)
-                }
-            ]
-        });
-        
-        await wait(500);
-        // w.close();
+        ]
+    });
+    
+    await wait(500);
+    // w.close();
 }
 
 export async function changeServerURL(url?:string){
@@ -632,7 +705,7 @@ async function getModUpdatesData(iid:string){
         res,indexPath,modsPath,ignoreMods,inst,upToDate
     });
 }
-async function syncMods(w:BrowserWindow,iid:string): Promise<Result<Res_SyncMods|undefined>>{
+async function syncMods(w:BrowserWindow,iid:string,noMsg=false): Promise<Result<Res_SyncMods|undefined>>{
     if(!sysInst.meta) return errors.noSys;
     
     let _res = await getModUpdatesData(iid);
@@ -642,10 +715,10 @@ async function syncMods(w:BrowserWindow,iid:string): Promise<Result<Res_SyncMods
     let {res,indexPath,modsPath,ignoreMods,inst,upToDate} = _d;
 
     if(upToDate){
-        await dialog.showMessageBox({
+        if(!noMsg) await dialog.showMessageBox({
             message:"Up to date"
         });
-        return _res;
+        return new Result({upToDate:true});
     }
 
     let deletedPath = path.join(modsPath,".deleted");
@@ -1963,7 +2036,7 @@ async function alertBox(w:BrowserWindow,message:string,title="Error"){
 // 
 
 import { ETL_Generic, evtTimeline, parseCFGFile, pathTo7zip, searchStringCompare, util_lstat, util_mkdir, util_readBinary, util_readdir, util_readdirWithTypes, util_readJSON, util_readText, util_readTOML, util_rename, util_rm, util_utimes, util_warn, util_writeBinary, util_writeJSON, util_writeText, wait } from "./util";
-import { AddRP_InitData, Arg_AddModToFolder, Arg_ChangeFolderType, Arg_CheckModUpdates, Arg_CreateFolder, Arg_DownloadRP, Arg_DownloadRPFile, Arg_GetInstances, Arg_GetInstMods, Arg_GetInstResourcePacks, Arg_GetInstScreenshots, Arg_GetPrismInstances, Arg_GetRPs, Arg_IID, Arg_RemoveRP, Arg_SearchPacks, Arg_SyncMods, Arg_UnpackRP, Arg_UploadRP, ArgC_GetRPs, CurseForgeUpdate, Data_PrismInstancesMenu, FSTestData, FullModData, InputMenu_InitData, InstGroups, LocalModData, MMCPack, ModData, ModifiedFile, ModifiedFileData, ModIndex, ModInfo, ModrinthModData, ModrinthUpdate, ModsFolder, ModsFolderDef, PackMetaData, RemoteModData, Res_DownloadRP, Res_GetInstMods, Res_GetInstResourcePacks, Res_GetInstScreenshots, Res_GetModIndexFiles, Res_GetPrismInstances, Res_GetRPs, Res_InputMenu, Res_SyncMods, RPCache, UpdateProgress_InitData } from "./interface";
+import { AddRP_InitData, Arg_AddModToFolder, Arg_ChangeFolderType, Arg_CheckModUpdates, Arg_CreateFolder, Arg_DownloadRP, Arg_DownloadRPFile, Arg_GetInstances, Arg_GetInstMods, Arg_GetInstResourcePacks, Arg_GetInstScreenshots, Arg_GetPrismInstances, Arg_GetRPs, Arg_GetRPVersions, Arg_IID, Arg_RemoveRP, Arg_SearchPacks, Arg_SyncMods, Arg_UnpackRP, Arg_UploadRP, ArgC_GetRPs, CurseForgeUpdate, Data_PrismInstancesMenu, FSTestData, FullModData, InputMenu_InitData, InstGroups, LocalModData, MMCPack, ModData, ModifiedFile, ModifiedFileData, ModIndex, ModInfo, ModrinthModData, ModrinthUpdate, ModsFolder, ModsFolderDef, PackMetaData, RemoteModData, Res_DownloadRP, Res_GetInstMods, Res_GetInstResourcePacks, Res_GetInstScreenshots, Res_GetModIndexFiles, Res_GetPrismInstances, Res_GetRPs, Res_GetRPVersions, Res_InputMenu, Res_SyncMods, RPCache, UpdateProgress_InitData } from "./interface";
 import { getModUpdates, getPackMeta, searchPacks, searchPacksMeta, semit, updateSocketURL } from "./network";
 import { ListPrismInstReason, openCCMenu, openCCMenuCB, SearchPacksMenu, ViewInstanceMenu } from "./menu_api";
 import { addInstance, cleanModName, cleanModNameDisabled, dataPath, getModFolderPath, getModpackInst, getModpackPath, LocalModInst, ModPackInst, RemoteModInst, slugMap, sysInst } from "./db";
