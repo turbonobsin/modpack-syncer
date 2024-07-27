@@ -52,6 +52,7 @@ export const errors = {
     noSys: Result.err("System data isn't loaded"),
     responseErr: Result.err("Unknown network response error"),
     serverNotConnected: Result.err("Couldn't connect to the server.\n\nEither it's down, or you don't have an active internet connection."),
+    noSlug: Result.err("Slug map isn't loaded"),
     
     unknown: Result.err("Unknown error"),
     invalid_args: Result.err("Invalid arguments"),

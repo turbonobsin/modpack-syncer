@@ -907,14 +907,24 @@ async function cacheMods(iid:string): Promise<Result<any>>{
 }
 
 async function cacheModsLocal(iid:string): Promise<Result<LocalModData[]>>{
+    if(!slugMap.meta) return errors.noSlug;
+    
+    let time2 = performance.now();
+    
     let inst = await getModpackInst(iid);
     if(!inst) return errors.couldNotFindPack;
+
+    util_note2("time [1]:",performance.now()-time2);
+    time2 = performance.now();
 
     let prismPath = inst.getPrismInstPath();
     if(!prismPath) return errors.failedToGetPrismInstPath;
 
     let modsPath = path.join(prismPath,".minecraft","mods");
     if(!modsPath) return Result.err("Could not find mods path");
+
+    util_note2("time [2]:",performance.now()-time2);
+    time2 = performance.now();
 
     let indexPath = path.join(modsPath,".index");
     console.log(":: start cache mods (local)");
@@ -927,8 +937,15 @@ async function cacheModsLocal(iid:string): Promise<Result<LocalModData[]>>{
         indexScan:new Set<string>()
     };
 
+    util_note2("time [3]:",performance.now()-time2);
+    time2 = performance.now();
+
     // scan
     let localMods = await util_readdirWithTypes(modsPath,false);
+    let proms:{
+        prom:Promise<LocalModInst>;
+        name:string;
+    }[] = [];
     for(const mod of localMods){
         if(!mod.isFile()) continue;
         // if(!mod.name.endsWith(".jar") && !mod.name.endsWith(".jar.disabled")) continue;
@@ -936,14 +953,26 @@ async function cacheModsLocal(iid:string): Promise<Result<LocalModData[]>>{
         let filename = cleanModName(mod.name);
         // if(filename.endsWith(".disabled")) filename = filename.replace(".disabled","");
 
-        let slug = slugMap.getVal(filename);
+        // let slug = slugMap.getVal(filename);
+        let slug = slugMap.getSlug(filename);
+        // let slug = "";
         if(!slug){
             req.indexScan.add(filename);
             // continue;
         }
 
-        localModCache.set(mod.name,await new LocalModInst(modsPath,iid,filename).load());
+        proms.push({
+            prom:new LocalModInst(modsPath,iid,filename).load(),
+            name:mod.name
+        });
     }
+    await Promise.all(proms);
+    for(const d of proms){
+        localModCache.set(d.name,await d.prom);
+    }    
+
+    util_note2("time [4]:",performance.now()-time2);
+    time2 = performance.now();
 
     // temp force all mods to update slugs/.index data
     if(false) for(const [filename,local] of localModCache){
@@ -951,11 +980,11 @@ async function cacheModsLocal(iid:string): Promise<Result<LocalModData[]>>{
     }
 
     // extract
-    if(true) for(const mod of localMods){
+    if(true) for(const mod of localMods){ // !!! -> this could be an important thing to have enabled
         if(!mod.isFile()) continue;
         // if(!mod.name.endsWith(".jar") && !mod.name.endsWith(".jar.disabled")) continue;
         
-        let filename = cleanModName(mod.name);
+        // let filename = cleanModName(mod.name);
 
         let info = await getMod(modsPath,mod.name);
         let ok = Object.keys(info);
@@ -969,49 +998,64 @@ async function cacheModsLocal(iid:string): Promise<Result<LocalModData[]>>{
         }
     }
 
+    util_note2("time [5]:",performance.now()-time2);
+    time2 = performance.now();
+
     // link slugs
-    if(req.indexScan){
+    if(req.indexScan.size != 0){
+        util_note("->> doing index scan: ",req.indexScan.size);
+        let time2 = performance.now();
         let indexFiles = await util_readdir(indexPath);
+        let proms2:Promise<void>[] = [];
         for(const index of indexFiles){
-            let indexData = await util_readTOML<ModIndex>(path.join(indexPath,index));
-            if(!indexData){
-                util_warn("couldn't read pw.toml file for: "+index);
-                continue;
-            }
+            proms2.push(new Promise<void>(async resolve=>{
+                let indexData = await util_readTOML<ModIndex>(path.join(indexPath,index));
+                if(!indexData){
+                    util_warn("couldn't read pw.toml file for: "+index);
+                    resolve();
+                    return;
+                }
 
-            let slug = index.replace(".pw.toml","");
+                let slug = index.replace(".pw.toml","");
 
-            let filename = cleanModName(indexData.filename);
-            // if(filename.endsWith(".disabled")) filename = filename.replace(".disabled","");
-            
-            slugMap.setVal(slug,filename);
-
-            let local = localModCache.get(indexData.filename);
-            if(!local) local = localModCache.get(indexData.filename+".disabled");
-            if(local && local.meta){
-                let m = local.meta;
-                m.pw = indexData;
-                m.name = indexData.name;
-                m.slug = slug;
-                // await local.save();
-            }
-            else if(local){
-                console.log("Err [1]: failed to find local for saving index: ",index,indexData.filename,local != null);
-                // local.meta = 
-            }
-            else{
-                console.log("Err [2]: failed to find local for saving index: ",index,indexData.filename,local != null);
+                let filename = cleanModName(indexData.filename);
+                // if(filename.endsWith(".disabled")) filename = filename.replace(".disabled","");
                 
-            }
+                slugMap.setVal(slug,filename);
+
+                let local = localModCache.get(indexData.filename);
+                if(!local) local = localModCache.get(indexData.filename+".disabled");
+                if(local && local.meta){
+                    let m = local.meta;
+                    m.pw = indexData;
+                    m.name = indexData.name;
+                    m.slug = slug;
+                    // await local.save();
+                }
+                else if(local){
+                    console.log("Err [1]: failed to find local for saving index: ",index,indexData.filename,local != null);
+                    // local.meta = 
+                }
+                else{
+                    console.log("Err [2]: failed to find local for saving index: ",index,indexData.filename,local != null);
+                }
+                resolve();
+            }));
         }
+        await Promise.all(proms2);
 
         await slugMap.save();
+
+        util_note2("time [6]:",performance.now()-time2);
     }
+    time2 = performance.now();
 
     // save
     for(const [filename,local] of localModCache){
         await local.save();
     }
+
+    util_note2("time [7]:",performance.now()-time2);
 
     console.log(":: FINISH cache mods (local)",localModCache.size);
     
@@ -1329,6 +1373,8 @@ async function getModIndexFiles(arg:Arg_IID): Promise<Result<Res_GetModIndexFile
     return new Result(data);
 }
 async function getInstMods(arg:Arg_GetInstMods): Promise<Result<Res_GetInstMods>>{
+    let time2 = performance.now();
+    
     if(!sysInst.meta) return errors.noSys;
     if(!sysInst.meta.prismRoot) return errors.noPrismRoot;
 
@@ -1339,8 +1385,15 @@ async function getInstMods(arg:Arg_GetInstMods): Promise<Result<Res_GetInstMods>
     if(!prismPath) return errors.failedToGetPrismInstPath;
     // 
 
+    util_warn("TIME [1] - "+(performance.now()-time2));
+    time2 = performance.now();
+
     let localList = (await cacheModsLocal(arg.iid)).unwrap();
+    util_warn("TIME [2] - "+(performance.now()-time2));
+    time2 = performance.now();
     let remoteList = (await cacheModsRemote(arg.iid)).unwrap();
+    util_warn("TIME [3] - "+(performance.now()-time2));
+    time2 = performance.now();
     
     // 
     let data:Res_GetInstMods = {
@@ -1374,6 +1427,8 @@ async function getInstMods(arg:Arg_GetInstMods): Promise<Result<Res_GetInstMods>
     
     let _map:Map<string,FullModData[]> = new Map();
 
+    util_warn("TIME [4] - "+(performance.now()-time2));
+    time2 = performance.now();
     
     if(localList){
         for(const meta of localList){
@@ -1386,6 +1441,9 @@ async function getInstMods(arg:Arg_GetInstMods): Promise<Result<Res_GetInstMods>
             // });
         }
     }
+
+    util_warn("TIME [5] - "+(performance.now()-time2));
+    time2 = performance.now();
 
     if(remoteList){
         for(const meta of remoteList){
@@ -1404,6 +1462,9 @@ async function getInstMods(arg:Arg_GetInstMods): Promise<Result<Res_GetInstMods>
     }
     else util_warn("Remote cache list was undefined");
 
+    util_warn("TIME [6] - "+(performance.now()-time2));
+    time2 = performance.now();
+
     for(const [slug,metas] of _map){
         for(const meta of metas){
             let folderName = _cache.get(cleanModName(meta.local.file));
@@ -1421,6 +1482,9 @@ async function getInstMods(arg:Arg_GetInstMods): Promise<Result<Res_GetInstMods>
         }
     }
 
+    util_warn("TIME [7] - "+(performance.now()-time2));
+    time2 = performance.now();
+
     // let folder2:ModsFolder = {
     //     name:"Extra Folder",
     //     type:"custom",
@@ -1437,6 +1501,9 @@ async function getInstMods(arg:Arg_GetInstMods): Promise<Result<Res_GetInstMods>
     for(const folder of data.folders){
         folder.mods = folder.mods.sort((a,b)=>a.local.name.localeCompare(b.local.name));
     }
+
+    util_warn("TIME [8] - "+(performance.now()-time2));
+    time2 = performance.now();
 
     // data.mods.global.sort((a,b)=>a.local.name.localeCompare(b.local.name));
 
@@ -2096,7 +2163,7 @@ async function alertBox(w:BrowserWindow,message:string,title="Error"){
 
 // 
 
-import { ETL_Generic, evtTimeline, parseCFGFile, pathTo7zip, searchStringCompare, util_lstat, util_mkdir, util_readBinary, util_readdir, util_readdirWithTypes, util_readJSON, util_readText, util_readTOML, util_rename, util_rm, util_utimes, util_warn, util_writeBinary, util_writeJSON, util_writeText, wait } from "./util";
+import { ETL_Generic, evtTimeline, parseCFGFile, pathTo7zip, searchStringCompare, util_lstat, util_mkdir, util_note, util_note2, util_readBinary, util_readdir, util_readdirWithTypes, util_readJSON, util_readText, util_readTOML, util_rename, util_rm, util_utimes, util_warn, util_writeBinary, util_writeJSON, util_writeText, wait } from "./util";
 import { AddRP_InitData, Arg_AddModToFolder, Arg_ChangeFolderType, Arg_CheckModUpdates, Arg_CreateFolder, Arg_DownloadRP, Arg_DownloadRPFile, Arg_GetInstances, Arg_GetInstMods, Arg_GetInstResourcePacks, Arg_GetInstScreenshots, Arg_GetPrismInstances, Arg_GetRPs, Arg_GetRPVersions, Arg_IID, Arg_RemoveRP, Arg_SearchPacks, Arg_SyncMods, Arg_UnpackRP, Arg_UploadRP, ArgC_GetRPs, CurseForgeUpdate, Data_PrismInstancesMenu, FSTestData, FullModData, InputMenu_InitData, InstGroups, LocalModData, MMCPack, ModData, ModifiedFile, ModifiedFileData, ModIndex, ModInfo, ModrinthModData, ModrinthUpdate, ModsFolder, ModsFolderDef, PackMetaData, RemoteModData, Res_DownloadRP, Res_GetInstMods, Res_GetInstResourcePacks, Res_GetInstScreenshots, Res_GetModIndexFiles, Res_GetPrismInstances, Res_GetRPs, Res_GetRPVersions, Res_InputMenu, Res_SyncMods, RPCache, UpdateProgress_InitData } from "./interface";
 import { getModUpdates, getPackMeta, searchPacks, searchPacksMeta, semit, updateSocketURL } from "./network";
 import { ListPrismInstReason, openCCMenu, openCCMenuCB, SearchPacksMenu, ViewInstanceMenu } from "./menu_api";

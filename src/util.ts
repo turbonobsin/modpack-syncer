@@ -229,6 +229,14 @@ export function util_warn(...text:string[]){
     // console.log('\x1b[33m%s\x1b[0m', 'Your yellow text here'); // yellow        
     for(const item of text) console.log("\x1b[33m%s\x1b[0m","Warn: "+item);
 }
+export function util_note(...text:any[]){
+    // console.log("\x1b[36m%s\x1b[0m",text.join(" "));
+    console.log("\x1b[32m%s\x1b[0m",text.join(" "));
+}
+export function util_note2(...text:any[]){
+    // console.log("\x1b[36m%s\x1b[0m",text.join(" "));
+    console.log("\x1b[35m%s\x1b[0m",text.join(" "));
+}
 
 export function searchStringCompare(s1?:string,s2?:string){
     if(!s1 || !s2) return true;

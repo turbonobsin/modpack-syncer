@@ -144,7 +144,8 @@ export function cleanModNameDisabled(name:string){
 
 const instCache = {
     user:new Map<string,UserInst>(),
-    modpack:new Map<string,ModPackInst>()
+    modpack:new Map<string,ModPackInst>(),
+    localMods:new Map<string,LocalModInst>(),
 };
 
 abstract class Inst<T>{
@@ -198,6 +199,8 @@ abstract class Inst<T>{
             let v = cache.get(this.filePath);
             if(v) return v as this; // MAY NEED SOME EXTRA WORK LIKE WHEN IT BECOMES STALE
         }
+
+        // console.log("----- read: ",this.filePath);
         
         let stats = await util_lstat(this.filePath);
         if(!stats){
@@ -769,6 +772,9 @@ export class LocalModInst extends Inst<LocalModData>{
     async getDefault(): Promise<LocalModData | undefined> {
         return;
     }
+    getCacheMap(): Map<string, Inst<LocalModData>> | undefined {
+        return instCache.localMods;
+    }
 }
 
 export class RemoteModInst extends Inst<RemoteModData>{    
@@ -806,10 +812,26 @@ export class SlugMap extends Inst<SlugMapData>{
         };
     }
 
+    async postLoad(): Promise<void> {
+        if(!this.meta) return;
+        let ok = Object.keys(this.meta.map);
+        for(const k of ok){
+            this.meta.map[k] = [...new Set(this.meta.map[k])];
+        }
+        await this.save();
+    }
+
     getVal(k:string){
         if(!this.meta) return;
 
         return this.meta.map[k];
+    }
+    getSlug(file:string){
+        if(!this.meta) return;
+        let ok = Object.keys(this.meta.map);
+        for(const k of ok){
+            if(this.meta.map[k]?.includes(file)) return k;
+        }
     }
     setVal(k:string,v:string){
         if(!this.meta) return;
@@ -824,7 +846,9 @@ export class SlugMap extends Inst<SlugMapData>{
         // this.meta.map[v] = k;
 
         let ar = this.meta.map[k];
-        if(ar) ar.push(v);
+        if(ar){
+            if(!ar.includes(v)) ar.push(v);
+        }
         else{
             this.meta.map[k] = [v];
         }
@@ -923,7 +947,6 @@ async function getInstResourcePacks(inst:ModPackInst,filter:SearchFilter): Promi
 
     // create metas if not defined
     if(!inst.meta.resourcepacks) inst.meta.resourcepacks = [];
-    util_warn("----- RPs: "+resData.packs.length);
     for(const pack of resData.packs){
         let rpPath = inst.getRPCachePath()!;
         if(!await util_lstat(path.join(rpPath,pack.name+".json"))){
