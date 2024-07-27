@@ -485,6 +485,8 @@ export async function downloadRP(arg:Arg_DownloadRP){
                 return;
             }
 
+            w.webContents.send("updateProgress","main",completed,total,file.n); // should this be here or before?
+
             let l = file.l.substring(1);
             let subPath = path.join(loc,l);
 
@@ -527,12 +529,14 @@ export async function downloadRP(arg:Arg_DownloadRP){
 
             if(!bufPACK){
                 failed.push(file);
+                resolve();
                 return;
             }
             
             let f = bufPACK.unwrap();
             if(!f){
                 failed.push(file);
+                resolve();
                 return;
             }
 
@@ -544,8 +548,8 @@ export async function downloadRP(arg:Arg_DownloadRP){
             successfulFiles.push(file);
 
             // 
-            w.webContents.send("updateProgress","main",completed,total,file.n); // should this be here or before?
             completed++;
+            w.webContents.send("updateProgress","main",completed,total,file.n); // should this be here or before?
 
             resolve();
         });

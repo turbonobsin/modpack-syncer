@@ -616,42 +616,55 @@ export class ModPackInst extends Inst<ModPackInstData>{
             let successfulFiles:TmpFile[] = [];
             let failedFiles:TmpFile[] = [];
 
+            if(w.isDestroyed()) return;
+
+            let proms:Promise<void>[] = [];
             for(const f of files){
-                if(w.isDestroyed()){
-                    failedFiles.push(f);
-                    continue;
-                }
-                w.webContents.send("updateProgress","main",completed,files.length,f.name);
-                let res1 = await semit<Arg_UploadRPFile,boolean>("upload_rp_file",{
-                    path:f.path,
-                    buf:f.buf,
-                    mpID:arg.mpID,
-                    rpName:arg.name,
+                proms.push(new Promise<void>(async resolve=>{
+                    if(w.isDestroyed()){
+                        failedFiles.push(f);
+                        resolve();
+                        return;
+                    }
+                    w.webContents.send("updateProgress","main",completed,files.length,f.name);
+    
+                    let res1 = await semit<Arg_UploadRPFile,boolean>("upload_rp_file",{
+                        path:f.path,
+                        buf:f.buf,
+                        mpID:arg.mpID,
+                        rpName:arg.name,
+    
+                        uid:arg.uid,
+                        uname:arg.uname,
+                        
+                        at:f.at,
+                        bt:f.bt,
+                        mt:f.mt
+                    });
+                    if(!res1){
+                        // return errors.failedUploadRP.unwrap();
+                        failedFiles.push(f);
+                        resolve();
+                        return;
+                    }
+                    let res = res1.unwrap() as boolean;
+                    if(!res){
+                        util_warn("Err: [2]: ");
+                        console.log(res,res1);
+                        failedFiles.push(f);
+                        // return errors.failedUploadRP.unwrap();
+                        resolve();
+                        return;
+                    }
+    
+                    completed++;
+                    w.webContents.send("updateProgress","main",completed,files.length,f.name);
+                    successfulFiles.push(f);
 
-                    uid:arg.uid,
-                    uname:arg.uname,
-                    
-                    at:f.at,
-                    bt:f.bt,
-                    mt:f.mt
-                });
-                if(!res1){
-                    // return errors.failedUploadRP.unwrap();
-                    failedFiles.push(f);
-                    continue;
-                }
-                let res = res1.unwrap() as boolean;
-                if(!res){
-                    util_warn("Err: [2]: ");
-                    console.log(res,res1);
-                    failedFiles.push(f);
-                    // return errors.failedUploadRP.unwrap();
-                    continue;
-                }
-
-                completed++;
-                successfulFiles.push(f);
+                    resolve();
+                }));
             }
+            await Promise.all(proms);
 
             meta.lastUploaded = new Date().getTime();
             // meta.lastDownloaded = new Date().getTime();
@@ -678,7 +691,9 @@ export class ModPackInst extends Inst<ModPackInstData>{
             });
             
             await wait(500);
-            // w.close();
+
+            // console.log("UPLOAD FINISHED");
+            // if(failedFiles.length == 0) w.close();
         }
         else{
             let start = performance.now();
