@@ -617,6 +617,10 @@ export class ModPackInst extends Inst<ModPackInstData>{
             let failedFiles:TmpFile[] = [];
 
             for(const f of files){
+                if(w.isDestroyed()){
+                    failedFiles.push(f);
+                    continue;
+                }
                 w.webContents.send("updateProgress","main",completed,files.length,f.name);
                 let res1 = await semit<Arg_UploadRPFile,boolean>("upload_rp_file",{
                     path:f.path,

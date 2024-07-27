@@ -107,13 +107,6 @@ export class UpdateProgressMenu extends CCMenu{
     }
     async init<T>(data?: T | undefined): Promise<BrowserWindow> {
         let w = await super.init(data);
-
-        // w.webContents.openDevTools();
-
-        w.on("close",e=>{
-            e.preventDefault();
-        });
-
         return w;
     }
 }

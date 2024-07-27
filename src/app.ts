@@ -477,6 +477,12 @@ export async function downloadRP(arg:Arg_DownloadRP){
     let proms:Promise<void>[] = [];
     for(const file of res.add){
         let prom = new Promise<void>(async resolve=>{
+            if(w.isDestroyed()){
+                failed.push(file);
+                resolve();
+                return;
+            }
+            
             w.webContents.send("updateProgress","main",completed,total,file.n);
             completed++;
 
@@ -539,6 +545,7 @@ export async function downloadRP(arg:Arg_DownloadRP){
 
             resolve();
         });
+        proms.push(prom);
     }
     await Promise.all(proms);
 
