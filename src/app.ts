@@ -2025,7 +2025,6 @@ async function ensurePrismLinked(w?:BrowserWindow|null){
         let filePath = res.filePaths[0];
         if(!filePath) return false;
 
-        filePath = path.join(filePath,"..");
         sysInst.meta.prismRoot = filePath;
         await sysInst.save();
 
