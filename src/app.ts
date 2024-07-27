@@ -828,7 +828,7 @@ async function syncMods(w:BrowserWindow,iid:string,noMsg=false): Promise<Result<
             if(item.action == ItemAction.add){ // add
                 console.log("add: ",item.path);
 
-                let url = new URL((sysInst.meta.serverURL+"/"+item.ep).replaceAll("\\","/"));
+                let url = new URL((sysInst.meta.serverURL+"/"+item.ep).replaceAll("\\","/").replaceAll("//","/"));
                 url.searchParams.set("id",inst.meta.linkName);
                 url.searchParams.set("name",item.name);
                 let href = url.href;
