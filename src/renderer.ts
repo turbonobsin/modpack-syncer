@@ -245,7 +245,7 @@ export class CMP_FullInst extends MP_Article {
     
         let head = root.addPart(new MP_Div({className:"info-head"}));
         let body = root.addPart(new MP_Div({className:"info-body"}));
-        // let footer = root.addPart(new MP_Div({className:"info-footer"}));
+        let footer = root.addPart(new MP_Div({className:"info-footer"}));
     
         head.addParts(
             new MP_Header({
@@ -311,6 +311,7 @@ export class CMP_FullInst extends MP_Article {
                         label:"Sync",
                         icon:"sync_alt",
                         className:"accent",
+                        disabled:!this.canLaunch(),
                         onClick:(e,elm)=>{
                             window.gAPI.checkForInstUpdates(inst.iid);
                         }
@@ -318,11 +319,35 @@ export class CMP_FullInst extends MP_Article {
                     new MP_Button({
                         label:"Edit",
                         icon:"settings",
+                        disabled:!this.canLaunch(),
                         onClick:e=>{
                             window.gAPI.showEditInstance(inst.iid);
                         }
                     }),
                 )
+            )
+        );
+
+        footer.addParts(
+            new MP_Flexbox({
+                alignItems:"center",
+                gap:"10px"
+            }).addParts(
+                new MP_Button({
+                    label:"Remove",
+                    icon:"delete",
+                    onClick:(e,elm)=>{
+                        window.gAPI.removeInst(inst.iid);
+                    }
+                }),
+                new MP_Button({
+                    label:"Unlink",
+                    icon:"link_off",
+                    disabled:inst.linkName == undefined,
+                    onClick:(e,elm)=>{
+                        window.gAPI.unlinkInst(inst.iid);
+                    }
+                })
             )
         );
         // footer.addParts(
@@ -382,6 +407,7 @@ export class CMP_FullInst extends MP_Article {
         );
 
         this.e.addEventListener("dblclick",e=>{
+            if(!this.canLaunch()) return;
             window.gAPI.showEditInstance(this.ops.data.iid);
         });
 

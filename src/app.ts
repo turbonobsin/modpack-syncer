@@ -384,8 +384,42 @@ export async function preInit(){
             });
         }
     });
-    ipcMain.handle("updateInst",async (ev,iid:string)=>{
+    // ipcMain.handle("updateInst",async (ev,iid:string)=>{
 
+    // });
+    ipcMain.handle("removeInst",async (ev,iid:string)=>{
+        let inst = await getModpackInst(iid);
+        if(!inst) return;
+
+        let w = getWindow(ev);
+        if(!w) return;
+
+        let confirmRes = await dialog.showMessageBox(w,{
+            message:`This instance will be moved to the "instances_deleted" folder.\n\nNote: THIS DOES NOT AFFECT THE PRISM INSTANCE FILES.`,
+            buttons:["Cancel","Remove"]
+        });
+        if(confirmRes.response != 1) return;
+
+        let loc = path.dirname(inst.filePath);
+        let res = await util_cp(loc,path.join(loc,"..","..","instances_deleted",iid),true);
+        if(res){
+            res = await util_rm(loc,true);
+        }
+
+        refreshMainWindow();
+
+        return new Result(res);
+    });
+    ipcMain.handle("unlinkInst",async (ev,iid:string)=>{
+        let inst = await getModpackInst(iid);
+        if(!inst || !inst.meta) return;
+
+        inst.meta.linkName = undefined;
+        await inst.save();
+
+        refreshMainWindow();
+
+        return new Result(true);
     });
 }
 
@@ -1943,7 +1977,7 @@ async function getInstScreenshots(arg:Arg_GetInstScreenshots): Promise<Result<Re
 export function refreshMainWindow(){
     // mainWindow.webContents.send("refresh");
     mainWindow.webContents.reload();
-    console.log("REFRESHING...",mainWindow);
+    // console.log("REFRESHING...",mainWindow);
 }
 
 async function linkInstance(iid:string,pInstName:string):Promise<Result<undefined>>{
@@ -2175,7 +2209,7 @@ async function alertBox(w:BrowserWindow,message:string,title="Error"){
 
 // 
 
-import { ETL_Generic, evtTimeline, parseCFGFile, pathTo7zip, searchStringCompare, util_lstat, util_mkdir, util_note, util_note2, util_readBinary, util_readdir, util_readdirWithTypes, util_readJSON, util_readText, util_readTOML, util_rename, util_rm, util_utimes, util_warn, util_writeBinary, util_writeJSON, util_writeText, wait } from "./util";
+import { ETL_Generic, evtTimeline, parseCFGFile, pathTo7zip, searchStringCompare, util_cp, util_lstat, util_mkdir, util_note, util_note2, util_readBinary, util_readdir, util_readdirWithTypes, util_readJSON, util_readText, util_readTOML, util_rename, util_rm, util_utimes, util_warn, util_writeBinary, util_writeJSON, util_writeText, wait } from "./util";
 import { AddRP_InitData, Arg_AddModToFolder, Arg_ChangeFolderType, Arg_CheckModUpdates, Arg_CreateFolder, Arg_DownloadRP, Arg_DownloadRPFile, Arg_GetInstances, Arg_GetInstMods, Arg_GetInstResourcePacks, Arg_GetInstScreenshots, Arg_GetPrismInstances, Arg_GetRPs, Arg_GetRPVersions, Arg_IID, Arg_RemoveRP, Arg_SearchPacks, Arg_SyncMods, Arg_UnpackRP, Arg_UploadRP, ArgC_GetRPs, CurseForgeUpdate, Data_PrismInstancesMenu, FSTestData, FullModData, InputMenu_InitData, InstGroups, LocalModData, MMCPack, ModData, ModifiedFile, ModifiedFileData, ModIndex, ModInfo, ModrinthModData, ModrinthUpdate, ModsFolder, ModsFolderDef, PackMetaData, RemoteModData, Res_DownloadRP, Res_GetInstMods, Res_GetInstResourcePacks, Res_GetInstScreenshots, Res_GetModIndexFiles, Res_GetPrismInstances, Res_GetRPs, Res_GetRPVersions, Res_InputMenu, Res_SyncMods, RPCache, UpdateProgress_InitData } from "./interface";
 import { getModUpdates, getPackMeta, searchPacks, searchPacksMeta, semit, updateSocketURL } from "./network";
 import { ListPrismInstReason, openCCMenu, openCCMenuCB, SearchPacksMenu, ViewInstanceMenu } from "./menu_api";

@@ -106,6 +106,8 @@ export async function initDB(){
         await createFolder("instances",dataPath);
     }
 
+    await util_mkdir(path.join(dataPath,"instances_deleted"));
+
     let res = await util_readJSON<DBUser>(userPath);
     if(!res){
         util_warn("Could not load user data");

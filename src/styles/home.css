@@ -143,6 +143,9 @@ button.accent{
     &:active{
         background-color:var(--accent1);
     }
+    &:disabled{
+        filter:grayscale(0.7) brightness(0.8);
+    }
 }
 
 /* buttons */

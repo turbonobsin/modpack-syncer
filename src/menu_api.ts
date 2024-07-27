@@ -8,6 +8,8 @@ import { InitMenuData } from "src/interface";
 import { util_warn } from "./util";
 import { mainWindow } from "./main";
 
+export let windowStack:BrowserWindow[] = [];
+
 abstract class CCMenu{
     constructor(startScript:string,w=800,h=600){
         this.startScript = startScript;
@@ -27,8 +29,16 @@ abstract class CCMenu{
             webPreferences: {
                 preload: path.join(__dirname, "preload.js"),
             },
-            parent:mainWindow,
-            center:true
+            // parent:mainWindow,
+            parent:windowStack[windowStack.length-1] ?? mainWindow,
+            center:true,
+            modal:true
+        });
+        windowStack.push(w);
+
+        w.on("close",e=>{
+            let ind = windowStack.indexOf(w);
+            if(ind != -1) windowStack.splice(ind,1);
         });
 
         // const menu = Menu.buildFromTemplate([

@@ -663,7 +663,9 @@ export interface IGlobalAPI{
     showLinkInstance:(iid:string,instName:string)=>Promise<string|undefined>;
     linkInstance:(iid:string,pInstName:string)=>Promise<void>;
     checkForInstUpdates:(iid:string)=>Promise<boolean>;
-    updateInst:(iid:string)=>Promise<boolean>;
+    updateInst:(iid:string)=>Promise<boolean>; // depricated?
+    removeInst:(iid:string)=>Promise<boolean>;
+    unlinkInst:(iid:string)=>Promise<boolean>;
 
     getInstScreenshots:(arg:Arg_GetInstScreenshots)=>Promise<Res_GetInstScreenshots>;
     getInstMods:(arg:Arg_GetInstMods)=>Promise<Res_GetInstMods>;

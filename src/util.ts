@@ -155,7 +155,7 @@ export function util_mkdir(path:fs.PathLike,recursive=false){
                 // console.log("Err:",err);
                 resolve(false);
             }
-            resolve(true);
+            else resolve(true);
         });
     });
 }
@@ -166,13 +166,24 @@ export function util_rename(path:fs.PathLike,newPath:fs.PathLike){
                 util_warn("ERR: "+err.message);
                 resolve(false);
             }
-            resolve(true);
+            else resolve(true);
         });
     });
 }
-export function util_rm(path:fs.PathLike){
+export function util_cp(path:string|URL,newPath:string|URL,recursive=true){
     return new Promise<boolean>(resolve=>{
-        fs.rm(path,(err=>{
+        fs.cp(path,newPath,{recursive,preserveTimestamps:true},(err)=>{
+            if(err){
+                util_warn("ERR: "+err.message);
+                resolve(false);
+            }
+            else resolve(true);
+        });
+    });
+}
+export function util_rm(path:fs.PathLike,recursive=false){
+    return new Promise<boolean>(resolve=>{
+        fs.rm(path,{recursive},(err=>{
             if(err){
                 util_warn("Failed to delete file: "+path);
                 resolve(false);

@@ -64,6 +64,8 @@ contextBridge.exposeInMainWorld("gAPI",{
     getInstRPs:regf("getInstRPs"),
     checkForInstUpdates:regf("checkForInstUpdates"),
     updateInst:regf("updateInst"),
+    removeInst:regf("removeInst"),
+    unlinkInst:regf("unlinkInst"),
 
     getModIndexFiles:regf("getModIndexFiles"),
     cacheMods:regf("cacheMods"),
