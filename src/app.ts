@@ -2013,10 +2013,13 @@ async function ensurePrismLinked(w?:BrowserWindow|null){
         await alertBox(w,"Prism Launcher path not set.\nPlease select your prism launcher folder.");
         
         let res = await dialog.showOpenDialog(w,{
-            properties:["openDirectory"],
+            properties:[
+                "openDirectory",
+                "showHiddenFiles",
+            ],
             filters:[],
             title:"Please select your prism launcher folder",
-            defaultPath:"%appdata%/roaming/prismlauncher"
+            defaultPath:path.join(process.env.APPDATA!,"prismlauncher"),
         });
         if(!res) return false;
         let filePath = res.filePaths[0];
@@ -2028,6 +2031,7 @@ async function ensurePrismLinked(w?:BrowserWindow|null){
 
         await alertBox(w,"Prism Launcher folder path set to:\n"+filePath,"Success");
     }
+    // process.env.HOME!, process.env.APPDATA!
 
     if(!sysInst.meta.prismExe){
         await alertBox(w,"Prism Launcher executable not set.\nPlease select your prismlauncher executable.");
@@ -2042,7 +2046,7 @@ async function ensurePrismLinked(w?:BrowserWindow|null){
                 }
             ],
             title:"Please select your prismlauncher executable",
-            defaultPath:"%appdata%/local/programs/prismlauncher"
+            defaultPath:path.join(process.env.APPDATA!,"..","local","programs","prismlauncher"),
         });
         if(!res) return false;
         let filePath = res.filePaths[0];
