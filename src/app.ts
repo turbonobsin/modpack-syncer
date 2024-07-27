@@ -2099,53 +2099,65 @@ async function ensurePrismLinked(w?:BrowserWindow|null){
     if(!sysInst) return false;
     if(!sysInst.meta) return false;
     
-    if(!sysInst.meta.prismRoot){
-        await alertBox(w,"Prism Launcher path not set.\nPlease select your prism launcher folder.");
-        
-        let res = await dialog.showOpenDialog(w,{
-            properties:[
-                "openDirectory",
-                "showHiddenFiles",
-            ],
-            filters:[],
-            title:"Please select your prism launcher folder",
-            defaultPath:path.join(process.env.APPDATA!,"prismlauncher"),
-        });
-        if(!res) return false;
-        let filePath = res.filePaths[0];
-        if(!filePath) return false;
+    if(!sysInst.meta.prismRoot){        
+        if(await util_lstat(path.join(process.env.APPDATA!,"prismlauncher","instances"))){
+            sysInst.meta.prismRoot = path.join(process.env.APPDATA!,"prismlauncher");
+            await sysInst.save();
+        }
+        else{
+            await alertBox(w,"Prism Launcher path not set.\nPlease select your prism launcher folder.");
 
-        sysInst.meta.prismRoot = filePath;
-        await sysInst.save();
-
-        await alertBox(w,"Prism Launcher folder path set to:\n"+filePath,"Success");
+            let res = await dialog.showOpenDialog(w,{
+                properties:[
+                    "openDirectory",
+                    "showHiddenFiles",
+                ],
+                filters:[],
+                title:"Please select your prism launcher folder",
+                defaultPath:path.join(process.env.APPDATA!,"prismlauncher"),
+            });
+            if(!res) return false;
+            let filePath = res.filePaths[0];
+            if(!filePath) return false;
+    
+            sysInst.meta.prismRoot = filePath;
+            await sysInst.save();
+    
+            await alertBox(w,"Prism Launcher folder path set to:\n"+filePath,"Success");
+        }
     }
     // process.env.HOME!, process.env.APPDATA!
 
     if(!sysInst.meta.prismExe){
-        await alertBox(w,"Prism Launcher executable not set.\nPlease select your prismlauncher executable.");
-        
-        let res = await dialog.showOpenDialog(w,{
-            properties:["openFile"],
-            filters:[
-                {
-                    // extensions:["exe"],
-                    extensions:[],
-                    name:"prismlauncher"
-                }
-            ],
-            title:"Please select your prismlauncher executable",
-            defaultPath:path.join(process.env.APPDATA!,"..","local","programs","prismlauncher"),
-        });
-        if(!res) return false;
-        let filePath = res.filePaths[0];
-        if(!filePath) return false;
+        if(await util_lstat(path.join(process.env.APPDATA!,"..","local","programs","prismlauncher","prismlauncher.exe"))){
+            sysInst.meta.prismExe = path.join(process.env.APPDATA!,"..","local","programs","prismlauncher");
+            await sysInst.save();
+        }
+        else{
+            await alertBox(w,"Prism Launcher executable not set.\nPlease select your prismlauncher executable.");
+            
+            let res = await dialog.showOpenDialog(w,{
+                properties:["openFile"],
+                filters:[
+                    {
+                        // extensions:["exe"],
+                        extensions:[],
+                        name:"prismlauncher"
+                    }
+                ],
+                title:"Please select your prismlauncher executable",
+                defaultPath:path.join(process.env.APPDATA!,"..","local","programs","prismlauncher"),
+            });
+            if(!res) return false;
+            let filePath = res.filePaths[0];
+            if(!filePath) return false;
 
-        filePath = path.join(filePath,"..");
-        sysInst.meta.prismExe = filePath;
-        await sysInst.save();
+            filePath = path.join(filePath,"..");
+            sysInst.meta.prismExe = filePath;
+            await sysInst.save();
 
-        await alertBox(w,"Prism Launcher executable path set to:\n"+filePath,"Success");
+            await alertBox(w,"Prism Launcher executable path set to:\n"+filePath,"Success");
+        }
     }
     
     return true;

@@ -15,7 +15,7 @@ const createWindow = async () => {
 		height: 1000,
 		webPreferences: {
 			preload: path.join(__dirname, "preload.js"),
-		},
+		}
 	});
 
 	// and load the index.html of the app.
