@@ -126,6 +126,8 @@ export async function preInit(){
         if(!sysInst.meta) return;
         if(!sysInst.meta.prismRoot) return;
 
+        if(!await ensurePrismLinked(getWindow(ev))) return;
+
         let pack = await getModpackInst(iid);
         if(!pack) return;
         if(!pack.meta) return;
@@ -141,7 +143,7 @@ export async function preInit(){
 
         let cmd = `${path.join(sysInst.meta.prismRoot,"prismlauncher")} --launch "${pack.meta.linkName}"`;
         util_warn("EXEC:",cmd);
-        exec(cmd);
+        // exec(cmd);
     });
 
     ipcMain.handle("showEditInstance",async (ev,iid:string)=>{
@@ -2008,7 +2010,27 @@ async function ensurePrismLinked(w?:BrowserWindow|null){
     if(!sysInst.meta) return false;
     
     if(!sysInst.meta.prismRoot){
-        await alertBox(w,"Prism Launcher path not set.\nPlease select your prismlauncher.exe.");
+        await alertBox(w,"Prism Launcher path not set.\nPlease select your prism launcher folder.");
+        
+        let res = await dialog.showOpenDialog(w,{
+            properties:["openDirectory"],
+            filters:[],
+            title:"Please select your prism launcher folder",
+            defaultPath:"%appdata%/roaming/prismlauncher"
+        });
+        if(!res) return false;
+        let filePath = res.filePaths[0];
+        if(!filePath) return false;
+
+        filePath = path.join(filePath,"..");
+        sysInst.meta.prismRoot = filePath;
+        await sysInst.save();
+
+        await alertBox(w,"Prism Launcher folder path set to:\n"+filePath,"Success");
+    }
+
+    if(!sysInst.meta.prismExe){
+        await alertBox(w,"Prism Launcher executable not set.\nPlease select your prismlauncher executable.");
         
         let res = await dialog.showOpenDialog(w,{
             properties:["openFile"],
@@ -2019,17 +2041,18 @@ async function ensurePrismLinked(w?:BrowserWindow|null){
                     name:"prismlauncher"
                 }
             ],
-            title:"Please select your prismlauncher executable"
+            title:"Please select your prismlauncher executable",
+            defaultPath:"%appdata%/local/programs/prismlauncher"
         });
         if(!res) return false;
         let filePath = res.filePaths[0];
         if(!filePath) return false;
 
         filePath = path.join(filePath,"..");
-        sysInst.meta.prismRoot = filePath;
+        sysInst.meta.prismExe = filePath;
         await sysInst.save();
 
-        await alertBox(w,"Prism Launcher file path set to:\n"+filePath,"Success");
+        await alertBox(w,"Prism Launcher executable path set to:\n"+filePath,"Success");
     }
     
     return true;

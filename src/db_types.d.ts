@@ -34,6 +34,7 @@ interface DBSys{
     serverURL:string;
 
     prismRoot?:string;
+    prismExe?:string;
 };
 
 // 
