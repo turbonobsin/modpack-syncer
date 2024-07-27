@@ -323,7 +323,7 @@ export async function preInit(){
 
         if(!inst.meta.linkName) return errors.failedToGetPackLink.unwrap();
 
-        let url = new URL(sysInst.meta.serverURL);
+        let url = new URL(sysInst.meta.serverURL.replaceAll("\\","/"));
         url.pathname = "rp_image";
         url.searchParams.set("mpID",inst.meta.linkName);
         url.searchParams.set("rpID",rpID);
@@ -472,7 +472,9 @@ export async function downloadRP(arg:Arg_DownloadRP){
     let completed = 0;
     let success = 0;
 
-    let nowTime = new Date().getTime();
+    if(w.isDestroyed()) return;
+
+    // let nowTime = new Date().getTime();
 
     let proms:Promise<void>[] = [];
     for(const file of res.add){
@@ -482,9 +484,6 @@ export async function downloadRP(arg:Arg_DownloadRP){
                 resolve();
                 return;
             }
-            
-            w.webContents.send("updateProgress","main",completed,total,file.n);
-            completed++;
 
             let l = file.l.substring(1);
             let subPath = path.join(loc,l);
@@ -525,6 +524,7 @@ export async function downloadRP(arg:Arg_DownloadRP){
                 rpName:arg.rpID,
                 path:l,
             })) as Result<ModifiedFileData>;
+
             if(!bufPACK){
                 failed.push(file);
                 return;
@@ -542,6 +542,10 @@ export async function downloadRP(arg:Arg_DownloadRP){
             
             success++;
             successfulFiles.push(file);
+
+            // 
+            w.webContents.send("updateProgress","main",completed,total,file.n); // should this be here or before?
+            completed++;
 
             resolve();
         });
@@ -820,14 +824,15 @@ async function syncMods(w:BrowserWindow,iid:string,noMsg=false): Promise<Result<
             if(item.action == ItemAction.add){ // add
                 console.log("add: ",item.path);
 
-                let url = new URL(sysInst.meta.serverURL+"/"+item.ep);
+                let url = new URL((sysInst.meta.serverURL+"/"+item.ep).replaceAll("\\","/"));
                 url.searchParams.set("id",inst.meta.linkName);
                 url.searchParams.set("name",item.name);
+                let href = url.href;
                 
-                let response = await fetch(url.href);
+                let response = await fetch(href);
                 if(!response.ok){
                     util_warn("Failed to get file: "+item.name+" ~ "+response.statusText+" ~ "+response.status);
-                    console.log(url.href);
+                    console.log(href);
                     fails.push(item);
                 }
                 else{
