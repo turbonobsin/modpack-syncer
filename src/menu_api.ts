@@ -110,6 +110,10 @@ export class UpdateProgressMenu extends CCMenu{
 
         // w.webContents.openDevTools();
 
+        w.on("close",e=>{
+            e.preventDefault();
+        });
+
         return w;
     }
 }

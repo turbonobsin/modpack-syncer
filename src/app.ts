@@ -474,67 +474,73 @@ export async function downloadRP(arg:Arg_DownloadRP){
 
     let nowTime = new Date().getTime();
 
+    let proms:Promise<void>[] = [];
     for(const file of res.add){
-        w.webContents.send("updateProgress","main",completed,total,file.n);
-        completed++;
+        let prom = new Promise<void>(async resolve=>{
+            w.webContents.send("updateProgress","main",completed,total,file.n);
+            completed++;
 
-        let l = file.l.substring(1);
-        let subPath = path.join(loc,l);
+            let l = file.l.substring(1);
+            let subPath = path.join(loc,l);
 
-        // let cacheMeta = cache[l];
-        // if(!cacheMeta){
-        //     cacheMeta = {
-        //         // download:meta.lastDownloaded,
-        //         // modified:meta.lastDownloaded,
-        //         // upload:meta.lastDownloaded
-        //         download:nowTime,
-        //         modified:nowTime,
-        //         upload:0
-        //     };
-        //     cache[l] = cacheMeta;
-        // }
-        // else{
-        //     cacheMeta.download = nowTime;
-        //     cacheMeta.modified = nowTime;
-        //     // cacheMeta.upload = nowTime;
-        // }
+            // let cacheMeta = cache[l];
+            // if(!cacheMeta){
+            //     cacheMeta = {
+            //         // download:meta.lastDownloaded,
+            //         // modified:meta.lastDownloaded,
+            //         // upload:meta.lastDownloaded
+            //         download:nowTime,
+            //         modified:nowTime,
+            //         upload:0
+            //     };
+            //     cache[l] = cacheMeta;
+            // }
+            // else{
+            //     cacheMeta.download = nowTime;
+            //     cacheMeta.modified = nowTime;
+            //     // cacheMeta.upload = nowTime;
+            // }
 
-        let stat = await util_lstat(subPath);
-        if(stat) if(stat.mtimeMs > Math.max(file.mt,file.bt)){ // do I need && with comparision with cacheMeta instead of stat? like cacheMeta... < Math.max(...) ?
-            let altName = subPath+".__conflict";
-            let num = 0;
-            while(await util_lstat(altName+(num == 0 ? "" : num))){
-                num++;
+            let stat = await util_lstat(subPath);
+            if(stat) if(stat.mtimeMs > Math.max(file.mt,file.bt)){ // do I need && with comparision with cacheMeta instead of stat? like cacheMeta... < Math.max(...) ?
+                let altName = subPath+".__conflict";
+                let num = 0;
+                while(await util_lstat(altName+(num == 0 ? "" : num))){
+                    num++;
+                }
+                await util_rename(subPath,altName+(num == 0 ? "" : num));
+
+                // check contents
+                // let text1 = await util_readText(subPath);
             }
-            await util_rename(subPath,altName+(num == 0 ? "" : num));
+            
+            let bufPACK = (await semit<Arg_DownloadRPFile,ModifiedFileData>("download_rp_file",{
+                mpID:arg.mpID,
+                rpName:arg.rpID,
+                path:l,
+            })) as Result<ModifiedFileData>;
+            if(!bufPACK){
+                failed.push(file);
+                return;
+            }
+            
+            let f = bufPACK.unwrap();
+            if(!f){
+                failed.push(file);
+                return;
+            }
 
-            // check contents
-            // let text1 = await util_readText(subPath);
-        }
-        
-        let bufPACK = (await semit<Arg_DownloadRPFile,ModifiedFileData>("download_rp_file",{
-            mpID:arg.mpID,
-            rpName:arg.rpID,
-            path:l,
-        })) as Result<ModifiedFileData>;
-        if(!bufPACK){
-            failed.push(file);
-            continue;
-        }
-        
-        let f = bufPACK.unwrap();
-        if(!f){
-            failed.push(file);
-            continue;
-        }
+            await util_mkdir(path.dirname(subPath),true);
+            await util_writeBinary(subPath,Buffer.from(f.buf));
+            if(stat) await util_utimes(subPath,{ atime:stat.atimeMs, btime:stat.birthtimeMs, mtime:stat.mtimeMs });
+            
+            success++;
+            successfulFiles.push(file);
 
-        await util_mkdir(path.dirname(subPath),true);
-        await util_writeBinary(subPath,Buffer.from(f.buf));
-        if(stat) await util_utimes(subPath,{ atime:stat.atimeMs, btime:stat.birthtimeMs, mtime:stat.mtimeMs });
-        
-        success++;
-        successfulFiles.push(file);
+            resolve();
+        });
     }
+    await Promise.all(proms);
 
     // 
     // await util_writeJSON(cachePath,cache);
@@ -814,6 +820,7 @@ async function syncMods(w:BrowserWindow,iid:string,noMsg=false): Promise<Result<
                 let response = await fetch(url.href);
                 if(!response.ok){
                     util_warn("Failed to get file: "+item.name+" ~ "+response.statusText+" ~ "+response.status);
+                    console.log(url.href);
                     fails.push(item);
                 }
                 else{
