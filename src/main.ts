@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Menu } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Menu } from "electron";
 import path from "path";
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
@@ -61,7 +61,7 @@ app.on("activate", () => {
 
 import "./app";
 import { changeServerURL, preInit } from "./app";
-import { initDB } from "./db";
+import { initDB, sysInst } from "./db";
 import "./network";
 
 const appMenu = Menu.buildFromTemplate([
@@ -80,6 +80,48 @@ const appMenu = Menu.buildFromTemplate([
 				label:"Set Server URL",
 				click:()=>{
 					changeServerURL();
+				}
+			},
+			{
+				label:"Set Prism Folder",
+				click:async ()=>{
+					if(!sysInst.meta) return;
+					
+					let loc = sysInst.meta.prismRoot ?? "";
+					let newLoc = await dialog.showOpenDialog(mainWindow,{
+						properties:[
+							"openDirectory"
+						],
+						defaultPath:loc
+					});
+					if(newLoc.canceled) return;
+
+					sysInst.meta.prismRoot = newLoc.filePaths[0];
+					await sysInst.save();
+				}
+			},
+			{
+				label:"Set Prism Executable",
+				click:async ()=>{
+					if(!sysInst.meta) return;
+					
+					let loc = sysInst.meta.prismExe ?? "";
+					let newLoc = await dialog.showOpenDialog(mainWindow,{
+						properties:[
+							"openFile"
+						],
+						filters:[
+							{
+								extensions:[],
+								name:"prismlauncher"
+							}
+						],
+						defaultPath:loc
+					});
+					if(newLoc.canceled) return;
+
+					sysInst.meta.prismExe = path.join(newLoc.filePaths[0],"..");
+					await sysInst.save();
 				}
 			}
 		]

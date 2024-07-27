@@ -124,7 +124,7 @@ export async function preInit(){
     ipcMain.handle("launchInstance",async (ev,iid:string)=>{
         // exec("notepad");
         if(!sysInst.meta) return;
-        if(!sysInst.meta.prismRoot) return;
+        if(!sysInst.meta.prismExe) return;
 
         if(!await ensurePrismLinked(getWindow(ev))) return;
 
@@ -141,9 +141,9 @@ export async function preInit(){
         // instCfg.setValue("OverrideJavaLocation","true");
         // await util_writeText(cfgPath,instCfg.toText());
 
-        let cmd = `${path.join(sysInst.meta.prismRoot,"prismlauncher")} --launch "${pack.meta.linkName}"`;
+        let cmd = `${path.join(sysInst.meta.prismExe,"prismlauncher")} --launch "${pack.meta.linkName}"`;
         util_warn("EXEC:",cmd);
-        // exec(cmd);
+        exec(cmd);
     });
 
     ipcMain.handle("showEditInstance",async (ev,iid:string)=>{
