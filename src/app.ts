@@ -297,12 +297,12 @@ export async function preInit(){
 
         let prismRoot = inst.getPrismInstPath();
         if(!prismRoot) return errors.noPrismRoot.unwrap();
-        if(!inst.meta.linkName) return errors.failedToGetPackLink.unwrap();
+        // if(!inst.meta.meta.id) return errors.failedToGetPackLink.unwrap();
 
         let existing = await util_readdir(path.join(prismRoot,".minecraft","resourcepacks"));
 
         let res = (await semit<Arg_GetRPs,Res_GetRPs>("getRPs",{
-            mpID:inst.meta.linkName,
+            mpID:inst.meta.meta.id,
             existing
         })).unwrap();
         if(!res) return;
@@ -321,11 +321,11 @@ export async function preInit(){
         let inst = await getModpackInst(iid);
         if(!inst || !inst.meta) return errors.couldNotFindPack.unwrap();
 
-        if(!inst.meta.linkName) return errors.failedToGetPackLink.unwrap();
+        if(!inst.meta.meta.id) return errors.failedToGetPackLink.unwrap();
 
         let url = new URL(sysInst.meta.serverURL.replaceAll("\\","/"));
         url.pathname = "rp_image";
-        url.searchParams.set("mpID",inst.meta.linkName);
+        url.searchParams.set("mpID",inst.meta.meta.id);
         url.searchParams.set("rpID",rpID);
 
         return url.href;
@@ -343,12 +343,12 @@ export async function preInit(){
 
         console.log(11);
 
-        if(!inst.meta.linkName) return errors.failedToGetPackLink.unwrap();
+        // if(!inst.meta.meta.id) return errors.failedToGetPackLink.unwrap();
 
         console.log(22);
         
         let res = (await semit<Arg_GetRPVersions,Res_GetRPVersions>("getRPVersions",{
-            mpID:inst.meta.linkName,
+            mpID:inst.meta.meta.id,
             current:inst.meta.resourcepacks.map(v=>{
                 return {
                     rpID:v.rpID,
@@ -367,7 +367,7 @@ export async function preInit(){
         for(const v of res.versions){
             proms.push(downloadRP({
                 iid,lastDownloaded:-1,
-                mpID:inst.meta.linkName,
+                mpID:inst.meta.meta.id,
                 rpID:v.rpID
             }));
         }
@@ -427,7 +427,7 @@ export async function downloadRP(arg:Arg_DownloadRP){
     let inst = await getModpackInst(arg.iid);
     if(!inst || !inst.meta) return errors.couldNotFindPack.unwrap();
 
-    if(!inst.meta.linkName) return errors.failedToGetPackLink.unwrap();
+    // if(!inst.meta.linkName) return errors.failedToGetPackLink.unwrap();
     
     let meta = inst.meta.resourcepacks.find(v=>v.rpID == arg.rpID);
     if(!meta){
@@ -451,7 +451,7 @@ export async function downloadRP(arg:Arg_DownloadRP){
     // arg.lastDownloaded = Math.min(meta.lastDownloaded,meta.lastUploaded);
     // arg.lastDownloaded = Math.max(meta.lastDownloaded,meta.lastUploaded);
     arg.lastDownloaded = meta.lastDownloaded;
-    arg.mpID = inst.meta.linkName;
+    arg.mpID = inst.meta.meta.id;
 
     // arg.data = cache;
     
@@ -702,7 +702,7 @@ export async function checkForModUpdates(w:BrowserWindow,iid:string){
 async function getModUpdatesData(iid:string){
     let inst = await getModpackInst(iid);
     if(!inst || !inst.meta) return errors.couldNotFindPack;
-    if(!inst.meta.linkName) return errors.failedToGetPackLink;
+    // if(!inst.meta.linkName) return errors.failedToGetPackLink;
     
     // let needsUpdate = (await checkModUpdates({id:inst.meta.linkName,update:inst.meta.update})).unwrap();
     // if(needsUpdate == undefined) return errors.responseErr;
@@ -745,7 +745,7 @@ async function getModUpdatesData(iid:string){
     }
 
     let resWrapped = (await getModUpdates({
-        id:inst.meta.linkName,
+        id:inst.meta.meta.id,
         currentMods,
         currentIndexes,
         ignoreMods
@@ -863,7 +863,7 @@ async function syncMods(w:BrowserWindow,iid:string,noMsg=false): Promise<Result<
                 console.log("add: ",item.path);
 
                 let url = new URL((sysInst.meta.serverURL+"/"+item.ep).replaceAll("\\","/").replaceAll("//","/"));
-                url.searchParams.set("id",inst.meta.linkName);
+                url.searchParams.set("id",inst.meta.meta.id);
                 url.searchParams.set("name",item.name);
                 let href = url.href;
                 

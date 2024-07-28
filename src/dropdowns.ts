@@ -358,7 +358,7 @@ export const allDropdowns = {
                 label:"Force Upload All",
                 click:()=>{
                     inst.uploadRP({
-                        iid,name:rpID,mpID:inst.meta!.linkName!,uid:user.profile.id,uname:user.profile.name,force:true
+                        iid,name:rpID,mpID:inst.meta!.meta.id,uid:user.profile.id,uname:user.profile.name,force:true
                     });
                 }
             },
@@ -366,7 +366,7 @@ export const allDropdowns = {
                 label:"Force Download All",
                 click:()=>{
                     downloadRP({
-                        iid,mpID:inst.meta!.linkName!,
+                        iid,mpID:inst.meta!.meta.id,
                         rpID,lastDownloaded:-1,force:true
                     });
                 }
