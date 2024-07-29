@@ -791,6 +791,7 @@ async function syncMods(w:BrowserWindow,iid:string,noMsg=false): Promise<Result<
 
     let deletedPath = path.join(modsPath,".deleted");
     await util_mkdir(deletedPath);
+    await util_mkdir(path.join(modsPath,".cache"));
 
     // w.webContents.send("msg","hi there!");
     let newW = await openCCMenu("update_progress_menu",{iid});
