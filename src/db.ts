@@ -1,5 +1,5 @@
 import { app, dialog } from "electron";
-import { pathTo7zip, searchStringCompare, util_lstat, util_mkdir, util_readBinary, util_readdir, util_readdirWithTypes, util_readJSON, util_readText, util_readTOML, util_warn, util_writeJSON, wait } from "./util";
+import { pathTo7zip, searchStringCompare, util_lstat, util_mkdir, util_note, util_note2, util_readBinary, util_readdir, util_readdirWithTypes, util_readJSON, util_readText, util_readTOML, util_warn, util_writeJSON, wait } from "./util";
 import path from "path";
 import { DBSys, DBUser, InstanceData as ModPackInstData, TmpFile } from "./db_types";
 import { Arg_AddModToFolder, Arg_ChangeFolderType, Arg_CreateFolder, Arg_EditFolder, Arg_UploadRP, Arg_UploadRPFile, FolderType, LocalModData, ModIndex, ModrinthModData, ModsFolder, ModsFolderDef, PackMetaData, PrismAccount, PrismAccountsData, RemoteModData, Res_GetInstResourcePacks, Res_UploadRP, RP_Data, RPCache, SearchFilter, SlugMapData, UpdateProgress_InitData } from "./interface";
@@ -144,10 +144,11 @@ export function cleanModNameDisabled(name:string){
 
 // 
 
-const instCache = {
+export const instCache = {
     user:new Map<string,UserInst>(),
     modpack:new Map<string,ModPackInst>(),
     localMods:new Map<string,LocalModInst>(),
+    remoteMods:new Map<string,RemoteModInst>(),
 };
 
 abstract class Inst<T>{
@@ -208,6 +209,7 @@ abstract class Inst<T>{
         if(!stats){
             if(!defMeta && !this.useDefaultIfDNE()){
                 util_warn("couldn't read file [1]");
+                console.log("path: "+this.filePath);
                 return this;
             }
             let def = defMeta ?? await this.getDefault();

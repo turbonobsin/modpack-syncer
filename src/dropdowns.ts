@@ -1,12 +1,12 @@
-import { BrowserWindow, dialog, ipcMain, Menu, MenuItemConstructorOptions, nativeImage } from "electron";
+import { BrowserWindow, dialog, ipcMain, Menu, MenuItemConstructorOptions, nativeImage, shell } from "electron";
 import { appPath, cleanModName, cleanModNameDisabled, getMainAccount, getModpackInst, getStandardInstData, initDB } from "./db";
-import { Result } from "./errors";
-import { ETL_Generic, evtTimeline, util_rename, util_warn } from "./util";
+import { errors, Result } from "./errors";
+import { ETL_Generic, evtTimeline, util_cp, util_lstat, util_mkdir, util_note, util_rename, util_rm, util_warn } from "./util";
 import path from "path";
 import { electron } from "process";
-import { checkForModUpdates, downloadRP } from "./app";
+import { checkForModUpdates, downloadRP, getModIndexFiles } from "./app";
 import { openCCMenu } from "./menu_api";
-import { IMO_Combobox, IMO_Input, IMO_MultiSelect, InputMenu_InitData, ModsFolderDef, Res_InputMenu } from "./interface";
+import { IMO_Combobox, IMO_Input, IMO_MultiSelect, InputMenu_InitData, ModsFolderDef, Res_InputMenu, UpdateProgress_InitData } from "./interface";
 
 // const folderIcon = nativeImage.createFromPath(path.join(appPath,"icons","folder.svg"));
 const folderIcon = path.join(appPath,"icons","folder.png");
@@ -88,6 +88,15 @@ async function openModDropdown(w:BrowserWindow,iid:string,files:string[]){
 
                 return ar;
             })()
+        },
+        {
+            label:"Show in Folder",
+            click:()=>{
+                let prismPath = inst.getPrismInstPath();
+                if(!prismPath) return errors.failedToGetPrismInstPath.unwrap();
+                
+                shell.showItemInFolder(path.join(prismPath,".minecraft","mods",files[files.length-1] ?? ""));
+            }
         }
     ])
     // Menu.setApplicationMenu(menu);
@@ -221,6 +230,67 @@ async function openEditModsAdditional(_w:BrowserWindow,iid:string){
                     }
                 }
             ]
+        },
+        {
+            label:"Show in Folder",
+            click:()=>{
+                let prismPath = inst.getPrismInstPath();
+                if(!prismPath) return errors.failedToGetPrismInstPath.unwrap();
+                
+                shell.showItemInFolder(path.join(prismPath,".minecraft","mods"));
+            }
+        },
+        {
+            label:"Gen Server Mods",
+            click:async ()=>{
+                if(!inst.meta) return;
+
+                let w = await openCCMenu<UpdateProgress_InitData>("update_progress_menu",{iid:inst.meta.iid});
+                if(!w) return errors.failedNewWindow.unwrap();
+                w.webContents.send("updateProgress","main",0,100,"Initializing...");
+                // 
+                
+                let res = (await getModIndexFiles({iid:inst.meta.iid})).unwrap();
+                if(!res) return;
+
+                util_note("RES");
+                // console.log(res.client,res.server);
+                // 
+
+                let prismPath = inst.getRoot();
+                if(!prismPath) return errors.failedToGetPrismInstPath.unwrap();
+
+                // 
+                let serverNeeded = res.server.required.concat(res.server.optional);
+                let instPath = path.join(inst.filePath,"..");
+                let serverPath = path.join(instPath,"servers","main");
+                let serverModsPath = path.join(serverPath,"mods");
+
+                await util_rm(serverModsPath,true); // remove old mods before creating new mods
+                await util_mkdir(serverModsPath,true);
+                
+                let completed:string[] = [];
+                let failed:string[] = [];
+                for(const name of serverNeeded){
+                    let res = await util_cp(path.join(prismPath,"mods",name),path.join(serverModsPath,name));
+                    if(res) completed.push(name);
+                    else failed.push(name);
+                    w.webContents.send("updateProgress","main",completed.length+failed.length,serverNeeded.length,name);
+                }
+
+                w.webContents.send("updateProgress","main",serverNeeded.length,serverNeeded.length,"Finished.",{
+                    sections:[
+                        {
+                            header:`Failed: (${failed.length})`,
+                            text:failed
+                        },
+                        {
+                            header:`Completed: (${completed.length})`,
+                            text:completed
+                        }
+                    ]
+                });
+            }
         }
     ]);
     menu.addListener("menu-will-close",e=>{
@@ -374,7 +444,28 @@ export const allDropdowns = {
         ]);
 
         menu.popup({window:_w});
-    }
+    },
+    rpItem:async (_w:BrowserWindow,iid:string,rpID:string)=>{
+        let inst = await getModpackInst(iid);
+        if(!inst || !inst.meta) return;
+
+        let loc = inst.getPrismInstPath();
+        if(!loc) return errors.failedToGetPrismInstPath.unwrap();
+        loc = path.join(loc,".minecraft","resourcepacks",rpID);
+
+        if(await util_lstat(path.join(loc,"assets"))) loc = path.join(loc,"assets");
+
+        let menu = Menu.buildFromTemplate([
+            {
+                label:"Show in Explorer",
+                click:()=>{
+                    shell.showItemInFolder(loc);
+                }
+            }
+        ]);
+
+        menu.popup({window:_w});
+    },
 };
 
 export async function toggleModEnabled(iid:string,filename:string,force?:boolean): Promise<Result<{newName:string}>>{
@@ -393,13 +484,13 @@ export async function toggleModEnabled(iid:string,filename:string,force?:boolean
 
     if(last_enabled != enabled){
         if(last_enabled){ // disable
-            console.log(">> disable");
+            // console.log(">> disable");
             newName = filename+".disabled";
             let res = await util_rename(path.join(a.modsPath,filename),path.join(a.modsPath,newName));
             if(!res) return Result.err("Failed to disable mod");
         }
         else{ // enable
-            console.log(">> enable");
+            // console.log(">> enable");
             newName = cleanModNameDisabled(filename);
             let res = await util_rename(path.join(a.modsPath,filename),path.join(a.modsPath,newName));
             if(!res) return Result.err("Failed to enable mod");

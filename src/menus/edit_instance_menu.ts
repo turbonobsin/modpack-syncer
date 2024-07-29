@@ -406,14 +406,20 @@ async function loadSection(index:number,menu:MP_TabbedMenu){
                         new MP_Header({
                             textContent:data.local.name
                         }),
-                        new MP_Div({
+                        new MP_Flexbox({
                             className:"info-details",
-                            marginTop:"0px"
+                            marginTop:"10px",
+                            direction:"column",
+                            gap:"3px",
                         }).addParts(
-                            new MP_P({
-                                className:"l-version",
+                            new MP_Div({
+                                className:"l-version accent-text",
                                 text:data.local.version
-                            })
+                            }),
+                            new MP_Div({
+                                className:"l-details",
+                                text:data.local.file
+                            }),
                         ),
                         new MP_HR()
                     );
@@ -506,7 +512,13 @@ async function loadSection(index:number,menu:MP_TabbedMenu){
 
                     for(const pack of res.packs){
                         let p = new CMP_ResourcePackSimple({data:pack}).addTo(search.list);
-                        search.registerSelItem(pack,p.content.e);
+                        let sel = search.registerSelItem(pack,p.content.e);
+                        if(p.e) p.e.addEventListener("mouseup",e=>{
+                            if(!sel) return;
+                            if(e.button != 2) return;
+                            if(!sel.isSelected()) sel.toggle(e);
+                            window.gAPI.openDropdown("rpItem",initData.d.iid,pack.name);
+                        });
                     }
                 }
             });

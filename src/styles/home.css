@@ -147,6 +147,9 @@ button.accent{
         filter:grayscale(0.7) brightness(0.8);
     }
 }
+.accent-text{
+    color:var(--accent1);
+}
 
 /* buttons */
 

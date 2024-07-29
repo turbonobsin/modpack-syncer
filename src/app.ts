@@ -1025,7 +1025,7 @@ async function cacheModsLocal(iid:string): Promise<Result<LocalModData[]>>{
         let local = localModCache.get(mod.name) as any;
         if(!local) continue;
         if(local.meta) for(const k of ok){
-            local.meta[k] = info[k];
+            local.meta[k] = (info as any)[k];
         }
         else{
             local.meta = info;
@@ -1228,7 +1228,7 @@ async function cacheModsRemote(iid:string): Promise<Result<RemoteModData[]>>{
     // return new Result({});
 }
 
-async function getModIndexFiles(arg:Arg_IID): Promise<Result<Res_GetModIndexFiles>>{
+export async function getModIndexFiles(arg:Arg_IID): Promise<Result<Res_GetModIndexFiles>>{
     if(!sysInst.meta) return errors.noSys;
     if(!sysInst.meta.prismRoot) return errors.noPrismRoot;
 
@@ -1265,6 +1265,7 @@ async function getModIndexFiles(arg:Arg_IID): Promise<Result<Res_GetModIndexFile
     let allowedExts = ["pw.toml"];
     for(const mod of modList){
         if(!mod.isFile()) continue;
+        if(mod.name.endsWith(".disabled")) continue; // ignore disabled files
 
         let check = false;
         for(const ext of allowedExts){
@@ -1407,6 +1408,148 @@ async function getModIndexFiles(arg:Arg_IID): Promise<Result<Res_GetModIndexFile
     return new Result(data);
 }
 async function getInstMods(arg:Arg_GetInstMods): Promise<Result<Res_GetInstMods>>{
+    if(!sysInst.meta) return errors.noSys;
+    if(!sysInst.meta.prismRoot) return errors.noPrismRoot;
+    
+    let inst = await getModpackInst(arg.iid);
+    if(!inst || !inst.meta) return errors.couldNotFindPack;
+
+    let prismPath = inst.getRoot();
+    if(!prismPath) return errors.failedToGetPrismInstPath;
+
+    // 
+
+    let data:Res_GetInstMods = {
+        folders:[]
+    };
+    let rootFolder:ModsFolder = {
+        name:"root",
+        type:"root",
+        tags:[],
+        mods:[]
+    };
+    data.folders.push(rootFolder);
+    for(const f of inst.meta.folders){
+        data.folders.push({
+            type:f.type,
+            name:f.name,
+            tags:f.tags,
+            mods:[]
+        });
+    }
+    
+    // 
+
+    let instPath = path.dirname(inst.filePath);
+    // let modsCache = await util_readJSON<Record<string,LocalModData>>(path.join(instPath,"mods.json"));
+    // if(!modsCache) modsCache = {};
+
+    // 
+
+    let modsPath = path.join(prismPath,"mods");
+
+    let files = await util_readdirWithTypes(path.join(prismPath,"mods"));
+    let proms:Promise<void>[] = [];
+    for(const file of files){
+        proms.push(new Promise<void>(async resolve=>{
+            if(!inst || !inst.meta){
+                resolve();
+                return;
+            }
+            
+            if(!file.isFile()){
+                resolve();
+                return;
+            }
+
+            if(arg.query) if(!searchStringCompare(file.name,arg.query)){
+                resolve();
+                return;
+            }
+            let cleanName = cleanModName(file.name);
+
+            let fNameI = inst.meta.folders.findIndex(v=>v.mods.includes(cleanName));
+            let f:ModsFolder | undefined;
+            if(fNameI != -1) f = data.folders[fNameI];
+
+            if(!f) f = rootFolder;
+            if(!f){
+                util_warn("Serious issue happened where mod couldn't find folder")
+                resolve();
+                return;
+            }
+            
+            // let cacheData = modsCache[file.name];
+            let cacheFileName = path.join(modsPath,".cache",cleanName+".json");
+            if(!await util_lstat(cacheFileName)){
+                let newData = await getMod(modsPath,file.name);
+                if(!newData){
+                    console.log("couldn't find mod data: "+file.name);
+                }
+                else{
+                    console.log("...had to write cache data... : "+file.name);
+                    await util_writeJSON(cacheFileName,newData);
+                }
+            }
+            
+            let cacheData = await new LocalModInst(modsPath,arg.iid,cleanName).load();
+            if(cacheData.meta){
+                let remoteCache:RemoteModData | undefined;
+                if(cacheData.meta.slug){
+                    let found = instCache.remoteMods.get(cleanName);
+                    if(found) remoteCache = found.meta;
+                    else{
+                        let rinst = new RemoteModInst(cacheData.meta.slug,path.join(modsPath,".index"));
+                        remoteCache = (await rinst.load())?.meta;
+                        instCache.remoteMods.set(cleanName,rinst);
+                    }
+                }
+                f.mods.push({
+                    local:cacheData.meta,
+                    remote:remoteCache
+                });
+                resolve();
+                return;
+            }
+            else{
+                f.mods.push({
+                    local:{
+                        _formatVersion:"1",
+                        _type:"other",
+                        name:file.name,
+                        file:file.name,
+                        authors:[],
+                        description:"",
+                        icon:"",
+                        id:"",
+                        slug:"",
+                        version:"",
+                        pw:undefined as any,
+                        fabric:undefined,
+                        datapack:undefined,
+                        forge:undefined
+                    }
+                });
+            }
+
+            resolve();
+        }));
+    }
+    await Promise.all(proms);
+
+    // sort
+    for(const f of data.folders){
+        f.mods.sort((a,b)=>{
+            let aName = a.remote?.modrinth?.title ?? a.remote?.curseforge?.name ?? a.local.name ?? a.local.file;
+            let bName = b.remote?.modrinth?.title ?? b.remote?.curseforge?.name ?? b.local.name ?? b.local.file;
+
+            return aName.localeCompare(bName) ?? 0;
+        })
+    }
+
+    return new Result(data);
+}
+async function getInstMods_old(arg:Arg_GetInstMods): Promise<Result<Res_GetInstMods>>{
     let time2 = performance.now();
     
     if(!sysInst.meta) return errors.noSys;
@@ -1716,7 +1859,7 @@ function getSimilarStringCount(s1?:string,s2?:string){
 //     return new Result(data);
 // }
 
-async function getMod(modPath:string,filename:string,update=0){
+async function getMod(modPath:string,filename:string,update=0):Promise<LocalModData>{
     
     // let info = 
     // let cachePath = `"${path.join(dataPath,"cache","mods")}"`;
@@ -1733,7 +1876,7 @@ async function getMod(modPath:string,filename:string,update=0){
     if(true) if((await util_lstat(cachePath))?.isDirectory()){
         if(update != 2){
             let data = await util_readJSON(path.join(cachePath,"info.json"));
-            if(data) return data;
+            if(data) return data as any;
             else{
                 util_warn("Failed to read data even though it was there!",cachePath);
             }
@@ -1799,7 +1942,7 @@ async function getMod(modPath:string,filename:string,update=0){
     let forge_info:any;
     let datapack_info:any;
     let info1:any;
-    let info:any = {};
+    let info:LocalModData = {} as any;
 
     info.file = filename;
 
@@ -1903,7 +2046,8 @@ async function getMod(modPath:string,filename:string,update=0){
             else info.icon = "pack.png";
             // else info.icon = path.join(cachePath,"assets",info.id,"pack.png");
 
-            iconPaths = info.icon;
+            // iconPaths = info.icon;
+            iconPaths.push(info.icon);
         }
     }
     else{ // other or just couldn't find data like with the Essential Mod & Kotlin for Forge
@@ -1912,7 +2056,7 @@ async function getMod(modPath:string,filename:string,update=0){
 
     // if(info1){
         info._formatVersion = "1";
-        info._type = type;
+        info._type = type as any;
 
         info.fabric = fabric_info;
         info.forge = forge_info;
@@ -2213,7 +2357,7 @@ import { ETL_Generic, evtTimeline, parseCFGFile, pathTo7zip, searchStringCompare
 import { AddRP_InitData, Arg_AddModToFolder, Arg_ChangeFolderType, Arg_CheckModUpdates, Arg_CreateFolder, Arg_DownloadRP, Arg_DownloadRPFile, Arg_GetInstances, Arg_GetInstMods, Arg_GetInstResourcePacks, Arg_GetInstScreenshots, Arg_GetPrismInstances, Arg_GetRPs, Arg_GetRPVersions, Arg_IID, Arg_RemoveRP, Arg_SearchPacks, Arg_SyncMods, Arg_UnpackRP, Arg_UploadRP, ArgC_GetRPs, CurseForgeUpdate, Data_PrismInstancesMenu, FSTestData, FullModData, InputMenu_InitData, InstGroups, LocalModData, MMCPack, ModData, ModifiedFile, ModifiedFileData, ModIndex, ModInfo, ModrinthModData, ModrinthUpdate, ModsFolder, ModsFolderDef, PackMetaData, RemoteModData, Res_DownloadRP, Res_GetInstMods, Res_GetInstResourcePacks, Res_GetInstScreenshots, Res_GetModIndexFiles, Res_GetPrismInstances, Res_GetRPs, Res_GetRPVersions, Res_InputMenu, Res_SyncMods, RPCache, UpdateProgress_InitData } from "./interface";
 import { getModUpdates, getPackMeta, searchPacks, searchPacksMeta, semit, updateSocketURL } from "./network";
 import { ListPrismInstReason, openCCMenu, openCCMenuCB, SearchPacksMenu, ViewInstanceMenu } from "./menu_api";
-import { addInstance, cleanModName, cleanModNameDisabled, dataPath, getModFolderPath, getModpackInst, getModpackPath, LocalModInst, ModPackInst, RemoteModInst, slugMap, sysInst } from "./db";
+import { addInstance, cleanModName, cleanModNameDisabled, dataPath, getModFolderPath, getModpackInst, getModpackPath, instCache, LocalModInst, ModPackInst, RemoteModInst, slugMap, sysInst } from "./db";
 import { InstanceData } from "./db_types";
 import { errors, Result } from "./errors";
 import { readConfigFile, StringMappingType } from "typescript";
