@@ -279,7 +279,7 @@ export async function preInit(){
             stream.on("end",()=>{
                 console.log(":: Finished unpacking");
                 w.close();
-                ev.sender.reload();
+                // ev.sender.reload();
                 resolve();
             });
             stream.on("error",err=>{
@@ -506,9 +506,9 @@ export async function downloadRP(arg:Arg_DownloadRP){
     }
 
     util_warn("ADD FILES:");
-    console.log(res.add);
+    // console.log(res.add);
     util_warn("REMOVE FILES:");
-    console.log(res.remove);
+    // console.log(res.remove);
 
     // 
     let total = res.add.length+res.remove.length;
@@ -628,7 +628,8 @@ export async function downloadRP(arg:Arg_DownloadRP){
 
     // auto add it to options.txt (currently selected packs)
     if(!alreadyHad){
-        let optionsText = await util_readText(path.join(prismRoot,"options.txt"));
+        util_note("Didn't have the RP, adding...");
+        let optionsText = await util_readText(path.join(prismRoot,".minecraft","options.txt"));
         if(optionsText){
             let lines = optionsText.split("\n");
             let rpLineI = lines.findIndex(v=>v.startsWith("resourcePacks:"));
@@ -641,11 +642,12 @@ export async function downloadRP(arg:Arg_DownloadRP){
                     list.push(toAdd);
                     
                     lines[rpLineI] = split[0]+":"+JSON.stringify(list);
-                    await util_writeText(path.join(prismRoot,"options.txt"),lines.join("\n"));
+                    await util_writeText(path.join(prismRoot,".minecraft","options.txt"),lines.join("\n"));
                 }
             }
         }
     }
+    else util_note("Already had the RP, skipping!");
 
     // show results
     w.webContents.send("updateProgress","main",total,total,"Finished.",{

@@ -297,8 +297,9 @@ class CMP_ResourcePackSimple extends MP_Flexbox{
                 new MP_Button({
                     label:"Unpack",
                     marginTop:"20px",
-                    onClick:(e,elm)=>{
-                        window.gAPI.unpackRP({iid:initData.d.iid,rpID:data.name});
+                    onClick:async (e,elm)=>{
+                        let res = await window.gAPI.unpackRP({iid:initData.d.iid,rpID:data.name});
+                        if(res) currentSearch?.submit();
                     }
                 }).autoJustify("center","center"),
             );
@@ -464,6 +465,7 @@ async function loadSection(index:number,menu:MP_TabbedMenu){
                     }
                 }
             });
+            currentSearch = search;
 
             search.mainOptions = search.mainOptions.replaceWith(new MP_Flexbox({gap:"7.5px"}));
             search.mainOptions.addParts(
@@ -523,6 +525,7 @@ async function loadSection(index:number,menu:MP_TabbedMenu){
                 }
             });
             menu.main_body.addPart(search);
+            currentSearch = search;
 
             let combo = new MP_Combobox({
                 options:[
@@ -564,6 +567,8 @@ async function loadSection(index:number,menu:MP_TabbedMenu){
             );
         } break;
         case 2:{
+            currentSearch = undefined;
+
             let res = await window.gAPI.getInstScreenshots({iid:initData.d.iid});
             if(!res) return;
             console.log("RES:",res);
@@ -643,6 +648,8 @@ async function loadSection(index:number,menu:MP_TabbedMenu){
         } break;
     }
 }
+
+let currentSearch:MP_SearchStructure<any>|undefined;
 
 const fullscreenCont = qElm(".fullscreen-cont") as HTMLElement | undefined;
 const imgCont = qElm(".img-cont") as HTMLElement | undefined;
