@@ -626,6 +626,7 @@ interface Res_GetRPs{
     // }[];
     list:RP_Data[];
 }
+
 interface AddRP_InitData{
     iid:string;
     // data:Res_GetRPs;
@@ -684,6 +685,8 @@ export interface IGlobalAPI{
     getImage:(path:string)=>Promise<Uint8Array>;
     changeServerURL:()=>Promise<boolean>;
 
+    getTheme():Promise<string|undefined>;
+
     // folders
     folder:{
         create:(arg:Arg_CreateFolder)=>Promise<boolean>;
@@ -698,6 +701,7 @@ export interface IGlobalAPI{
     downloadRP:(arg:Arg_DownloadRP)=>Promise<boolean>;
     getRPs:(arg:ArgC_GetRPs)=>Promise<Res_GetRPs>;
     getRPImg:(iid:string,rpID:string)=>Promise<string>;
+    genAllThePBR:(iid:string)=>Promise<boolean>;
 
     // sync
     sync:{
@@ -715,6 +719,9 @@ export interface IGlobalAPI{
     onInitReturnCB:(cb:(data:any)=>void)=>void;
     refresh:(cb:(data:any)=>void)=>void;
     onMsg:(cb:(msg:string)=>void)=>void;
+
+    onEditImg:(cb:(img:string,type:string)=>any)=>void;
+    onSetClientTheme:(cb:(theme:string|undefined)=>void)=>void;
     
     onUpdateProgress:(cb:(id:string,i:number,total:number,item:string,extra:any)=>void)=>void;
 }

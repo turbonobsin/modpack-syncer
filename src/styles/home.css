@@ -5,7 +5,8 @@
     'wght' 200,
     'GRAD' 0,
     'opsz' 24;
-    color:var(--t2);
+    /* color:var(--t2); */
+    color:currentColor;
 }
 .icon-cont{
     font-family:"Material Symbols Outlined";
@@ -148,7 +149,7 @@ button.accent{
     }
 }
 .accent-text{
-    color:var(--accent1);
+    color:var(--accent1-t2,var(--accent1));
 }
 
 /* buttons */

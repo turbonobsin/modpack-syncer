@@ -24,6 +24,10 @@ const createWindow = async () => {
 	} else {
 		mainWindow.loadFile(path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`));
 	}
+	mainWindow.webContents.send("setClientTheme",sysInst.meta?.theme);
+	mainWindow.webContents.send("initMenu",<InitMenuData<any>>{
+		data:undefined
+	});
 
 	// Open the DevTools.
 	// mainWindow.webContents.openDevTools();
@@ -61,8 +65,9 @@ app.on("activate", () => {
 
 import "./app";
 import { changeServerURL, preInit } from "./app";
-import { initDB, sysInst } from "./db";
+import { initDB, sysInst, themes } from "./db";
 import "./network";
+import { InitMenuData } from "./interface";
 
 const appMenu = Menu.buildFromTemplate([
 	{
@@ -131,6 +136,21 @@ const appMenu = Menu.buildFromTemplate([
 		submenu:[
 			{
 				role:"toggleDevTools"
+			},
+			{
+				label:"Change Theme",
+				submenu:(()=>{
+					let ok = Object.keys(themes);
+					return ok.map(k=>{
+						let v = themes[k];
+						return {
+							label:v.name ?? k,
+							click:()=>{
+								sysInst.setTheme(k);
+							}
+						};
+					})
+				})()
 			}
 		]
 	},

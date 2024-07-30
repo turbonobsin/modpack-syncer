@@ -80,6 +80,8 @@ contextBridge.exposeInMainWorld("gAPI",{
     getImage:regf("getImage"),
     changeServerURL:regf("changeServerURL"),
 
+    getTheme:regf("getTheme"),
+
     // folders
     folder:{
         create:regf("folder-create"),
@@ -94,6 +96,7 @@ contextBridge.exposeInMainWorld("gAPI",{
     downloadRP:regf("downloadRP"),
     getRPs:regf("getRPs"),
     getRPImg:regf("getRPImg"),
+    genAllThePBR:regf("genAllThePBR"),
 
     dropdown:{
         mod:regf("dropdown-mod")
@@ -109,6 +112,8 @@ contextBridge.exposeInMainWorld("gAPI",{
     onInitReturnCB: (cb) => ipcRenderer.on("initReturnCB",(ev,data)=>cb(data)),
     refresh: (cb) => ipcRenderer.on("refresh",(ev,data)=>cb(data)),
     onMsg: (cb) => ipcRenderer.on("msg",(ev,data)=>cb(data)),
+    onEditImg:regl("editImg"),
+    onSetClientTheme:regl("setClientTheme"),
 
     onUpdateProgress:regl("updateProgress")
 } as IGlobalAPI);
@@ -125,10 +130,3 @@ contextBridge.exposeInMainWorld("gAPI",{
 //         console.log("INIT:",...args);
 //     });
 // });
-
-window.addEventListener("DOMContentLoaded",e=>{
-    // document.body.parentElement?.classList.add("themestyle-clean-dark");
-    document.body.parentElement?.classList.add("themestyle-dark");
-    // document.body.parentElement?.classList.add("themestyle-clean-light");
-    // document.body.parentElement?.classList.add("themestyle-light","theme-light2");
-});

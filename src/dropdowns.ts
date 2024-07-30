@@ -1,10 +1,10 @@
 import { BrowserWindow, dialog, ipcMain, Menu, MenuItemConstructorOptions, nativeImage, shell } from "electron";
-import { appPath, cleanModName, cleanModNameDisabled, getMainAccount, getModpackInst, getStandardInstData, initDB } from "./db";
+import { appPath, cleanModName, cleanModNameDisabled, dataPath, getMainAccount, getModpackInst, getStandardInstData, initDB } from "./db";
 import { errors, Result } from "./errors";
-import { ETL_Generic, evtTimeline, util_cp, util_lstat, util_mkdir, util_note, util_rename, util_rm, util_warn } from "./util";
+import { ETL_Generic, evtTimeline, util_cp, util_lstat, util_mkdir, util_note, util_readJSON, util_readText, util_readTOML, util_rename, util_rm, util_warn, util_writeJSON, util_writeText } from "./util";
 import path from "path";
 import { electron } from "process";
-import { checkForModUpdates, downloadRP, getModIndexFiles } from "./app";
+import { checkForModUpdates, downloadRP, genAllThePBR, getInstMods_old, getModIndexFiles } from "./app";
 import { openCCMenu } from "./menu_api";
 import { IMO_Combobox, IMO_Input, IMO_MultiSelect, InputMenu_InitData, ModsFolderDef, Res_InputMenu, UpdateProgress_InitData } from "./interface";
 
@@ -241,6 +241,16 @@ async function openEditModsAdditional(_w:BrowserWindow,iid:string){
             }
         },
         {
+            label:"Get Full Mod Info",
+            click:async ()=>{
+                if(!inst.meta) return;
+                let w = await openCCMenu<UpdateProgress_InitData>("update_progress_menu",{iid:inst.meta.iid});
+                await getInstMods_old({iid:inst.meta.iid});
+                w?.close();
+                _w.reload();
+            }
+        },
+        {
             label:"Gen Server Mods",
             click:async ()=>{
                 if(!inst.meta) return;
@@ -466,6 +476,22 @@ export const allDropdowns = {
 
         menu.popup({window:_w});
     },
+    rpAdditional:async (_w:BrowserWindow,iid:string)=>{
+        let inst = await getModpackInst(iid);
+        if(!inst || !inst.meta) return;
+
+        const menu = Menu.buildFromTemplate([
+            {
+                label:"Generate Auto PBR",
+                click:()=>{
+                    genAllThePBR(inst.meta!.iid,inst);
+                }
+            }
+        ]);
+        
+        // 
+        menu.popup({window:_w});
+    }
 };
 
 export async function toggleModEnabled(iid:string,filename:string,force?:boolean): Promise<Result<{newName:string}>>{

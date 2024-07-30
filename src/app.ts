@@ -1,9 +1,9 @@
 // app.ts
 
-import { app, BrowserWindow, dialog, ipcMain } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Menu, shell } from "electron";
 import path from "path";
 import { mainWindow } from "./main";
-import Seven from "node-7z";
+import Seven, { extract } from "node-7z";
 import sevenBin from "7zip-bin";
 import toml from "toml";
 import { Curseforge } from "node-curseforge";
@@ -421,6 +421,13 @@ export async function preInit(){
 
         return new Result(true);
     });
+    ipcMain.handle("genAllThePBR",async (ev,iid:string)=>{
+        let inst = await getModpackInst(iid);
+        return await genAllThePBR(iid,inst);
+    });
+    ipcMain.handle("getTheme",async (ev)=>{
+        return sysInst.meta?.theme;
+    });
 }
 
 export async function downloadRP(arg:Arg_DownloadRP){
@@ -675,20 +682,22 @@ export async function areModsUpToDate(iid:string){
     return res.upToDate;
 }
 export async function checkForModUpdates(w:BrowserWindow,iid:string){
-    let res = await areModsUpToDate(iid);
+    // let res = await areModsUpToDate(iid);
+    let res = (await getModUpdatesData(iid)).unwrap();
     if(res == undefined){
+        return;
         // await dialog.showMessageBox({
         //     message:"Something went wrong while checking for updates"
         // });
     }
-    else if(res){
+    else if(res.upToDate){
         await dialog.showMessageBox({
             message:"Up to date"
         });
     }
     else{
         let res2 = await dialog.showMessageBox({
-            message:"This pack has updates available!",
+            message:`This pack has updates available!\n\nRemove (Mods): (${res.res.mods.remove.length})\n${res.res.mods.remove.join("\n")}\n\nAdd (Mods): (${res.res.mods.add.length})\n${res.res.mods.add.join("\n")}\n\nAdd (Mod Indexes): (${res.res.indexes.add.length})\n${res.res.indexes.add.join("\n")}`,
             buttons:[
                 "Cancel",
                 "Sync",
@@ -699,7 +708,14 @@ export async function checkForModUpdates(w:BrowserWindow,iid:string){
         }
     }
 }
-async function getModUpdatesData(iid:string){
+async function getModUpdatesData(iid:string):Promise<Result<{
+    res:Res_GetModUpdates,
+    indexPath:string,
+    modsPath:string,
+    ignoreMods:string[],
+    inst:ModPackInst,
+    upToDate:boolean
+}>>{
     let inst = await getModpackInst(iid);
     if(!inst || !inst.meta) return errors.couldNotFindPack;
     // if(!inst.meta.linkName) return errors.failedToGetPackLink;
@@ -751,13 +767,12 @@ async function getModUpdatesData(iid:string){
         ignoreMods
     }));
     let res = resWrapped.unwrap();
-    if(!res) return new Result(undefined);
+    if(!res) return new Result(undefined as any);
     // if(!res) return resWrapped ?? Result.err("Failed to get mod updates");
 
     let upToDate = false;
     if(
         res.indexes.add.length == 0 &&
-        res.indexes.remove.length == 0 &&
         res.mods.add.length == 0 &&
         res.mods.remove.length == 0
     ){
@@ -768,6 +783,9 @@ async function getModUpdatesData(iid:string){
         
         // return new Result(res);
     }
+
+    util_note2("UPDATE: ");
+    console.log(res.mods.add.length,res.mods.remove.length,res.indexes.add.length,res.indexes.remove.length);
 
     return new Result({
         res,indexPath,modsPath,ignoreMods,inst,upToDate
@@ -857,44 +875,51 @@ async function syncMods(w:BrowserWindow,iid:string,noMsg=false): Promise<Result<
         }[] = [];
 
         console.log(">> STARTING UPDATE");
+        let proms:Promise<void>[] = [];
         for(let i = 0; i < items.length; i++){
-            let item = items[i];
-
-            if(item.action == ItemAction.add){ // add
-                console.log("add: ",item.path);
-
-                let url = new URL((sysInst.meta.serverURL+"/"+item.ep).replaceAll("\\","/").replaceAll("//","/"));
-                url.searchParams.set("id",inst.meta.meta.id);
-                url.searchParams.set("name",item.name);
-                let href = url.href;
+            proms.push(new Promise<void>(async resolve=>{
+                if(!sysInst.meta) return;
                 
-                let response = await fetch(href);
-                if(!response.ok){
-                    util_warn("Failed to get file: "+item.name+" ~ "+response.statusText+" ~ "+response.status);
-                    console.log(href);
-                    fails.push(item);
-                }
-                else{
-                    let buf = await response.arrayBuffer();
-                    await util_writeBinary(item.path,Buffer.from(buf));
-                }
-            }
-            else{ // remove
-                console.log("remove: ",item.path);
+                let item = items[i];
 
-                let response = await util_rename(item.path,path.join(path.dirname(item.path),".deleted",item.name));
-                // let response = await util_rm(item.path);
-                if(!response){
-                    util_warn("Failed to remove file: "+item.name);
-                    fails.push(item);
-                }
-            }
+                if(item.action == ItemAction.add){ // add
+                    console.log("add: ",item.path);
 
-            // await wait(1);
-            // await wait(1000);
-            
-            newW.webContents.send("updateProgress","main",i+1,total,item.action == ItemAction.add ? `Downloading: ${item.name}` : `Removing: ${item.name}`);
+                    let url = new URL((sysInst.meta.serverURL+"/"+item.ep).replaceAll("\\","/").replaceAll("//","/"));
+                    url.searchParams.set("id",inst!.meta!.meta.id);
+                    url.searchParams.set("name",item.name);
+                    let href = url.href;
+                    
+                    let response = await fetch(href);
+                    if(!response.ok){
+                        util_warn("Failed to get file: "+item.name+" ~ "+response.statusText+" ~ "+response.status);
+                        console.log(href);
+                        fails.push(item);
+                    }
+                    else{
+                        let buf = await response.arrayBuffer();
+                        await util_writeBinary(item.path,Buffer.from(buf));
+                    }
+                }
+                else{ // remove
+                    console.log("remove: ",item.path);
+
+                    let response = await util_rename(item.path,path.join(path.dirname(item.path),".deleted",item.name));
+                    // let response = await util_rm(item.path);
+                    if(!response){
+                        util_warn("Failed to remove file: "+item.name);
+                        fails.push(item);
+                    }
+                }
+
+                // await wait(1);
+                // await wait(1000);
+                
+                newW.webContents.send("updateProgress","main",i+1,total,item.action == ItemAction.add ? `Downloading: ${item.name}` : `Removing: ${item.name}`);
+            }));
         }
+        await Promise.all(proms);
+
         console.log(">> FINISHED UPDATE");
 
         let sections:any[] = [];
@@ -925,7 +950,7 @@ async function syncMods(w:BrowserWindow,iid:string,noMsg=false): Promise<Result<
         }
     }
     
-    return new Result(res);
+    return new Result(res as any);
 }
 enum ItemAction{
     add,
@@ -1118,7 +1143,9 @@ async function cacheModsRemote(iid:string): Promise<Result<RemoteModData[]>>{
     let indexPath = path.join(modsPath,".index");
     console.log(":: start cache mods (remote)");
 
-    let modCache:Map<string,RemoteModInst> = new Map();
+    // let modCache:Map<string,RemoteModInst> = new Map();
+    let changed:RemoteModInst[] = [];
+    let resultList:RemoteModInst[] = [];
     // 
 
     let req = {
@@ -1131,9 +1158,18 @@ async function cacheModsRemote(iid:string): Promise<Result<RemoteModData[]>>{
     for(const index of indexList){
         let slug = index.replace(".pw.toml","");
         
+        let foundRemote = instCache.remoteMods.get(slug);
+        if(foundRemote){
+            resultList.push(foundRemote);
+            continue;
+        }
+
         let remote = await new RemoteModInst(slug,indexPath).load();
         if(!remote.meta) await remote.postLoad();
-        modCache.set(slug,remote);
+        // modCache.set(slug,remote);
+        instCache.remoteMods.set(slug,remote);
+        changed.push(remote);
+        resultList.push(remote);
 
         if(!remote.meta){
             // util_warn("Couldn't find remote meta for: "+slug);
@@ -1166,7 +1202,8 @@ async function cacheModsRemote(iid:string): Promise<Result<RemoteModData[]>>{
                 }
             }).then(res=>{
                 for(const d of res.data as ModrinthModData[]){                
-                    let remote = modCache.get(d.slug);
+                    // let remote = modCache.get(d.slug);
+                    let remote = instCache.remoteMods.get(d.slug);
                     if(!remote){
                         util_warn("Failed to find remote mod cache object after receiving remote data: "+d.slug);
                         continue;
@@ -1192,7 +1229,8 @@ async function cacheModsRemote(iid:string): Promise<Result<RemoteModData[]>>{
         await new Promise<void>(async resolve=>{
             (await cf_mc)._client.get_mods(...req.cf_needsUpdate.map(v=>parseInt(v))).then(v=>{
                 for(const d of v){
-                    let remote = modCache.get(d.slug);
+                    // let remote = modCache.get(d.slug);
+                    let remote = instCache.remoteMods.get(d.slug);
                     if(!remote){
                         util_warn("Failed to find remote mod cache object after receiving remote data: "+d.slug);
                         continue;
@@ -1214,18 +1252,18 @@ async function cacheModsRemote(iid:string): Promise<Result<RemoteModData[]>>{
     if(err) return err;
 
     // save
-    for(const [slug,remote] of modCache){
+    for(const remote of changed){
         await remote.save();
     }
 
     console.log("Remote Stats (Modrinth):\nto update: "+req.mr_needsUpdate.length+" "+req.mr_needsUpdate.join(", ")+"\nupdated: "+mr_updated.length);
     console.log("Remote Stats (Curseforge):\nto update: "+req.cf_needsUpdate.length+" "+req.cf_needsUpdate.join(", ")+"\nupdated: "+cf_updated.length);
 
-    console.log(":: FINISH cache mods (remote)",modCache.size);
+    console.log(":: FINISH cache mods (remote)",changed.length);
 
-    let resultList = [...modCache.entries()].map(v=>v[1].meta).filter(v=>v != null);
+    // let resultList = [...modCache.entries()].map(v=>v[1].meta).filter(v=>v != null);
     // console.log("RESULT LIST:",resultList.map(v=>v.modrinth?.icon_url));
-    return new Result(resultList);
+    return new Result(resultList.map(v=>v.meta).filter(v=>v != null));
     // return new Result({});
 }
 
@@ -1550,7 +1588,7 @@ async function getInstMods(arg:Arg_GetInstMods): Promise<Result<Res_GetInstMods>
 
     return new Result(data);
 }
-async function getInstMods_old(arg:Arg_GetInstMods): Promise<Result<Res_GetInstMods>>{
+export async function getInstMods_old(arg:Arg_GetInstMods): Promise<Result<Res_GetInstMods>>{
     let time2 = performance.now();
     
     if(!sysInst.meta) return errors.noSys;
@@ -1756,6 +1794,176 @@ async function getInstMods_old(arg:Arg_GetInstMods): Promise<Result<Res_GetInstM
     // }
     // // 
     // return new Result(data);
+}
+
+export async function genAllThePBR(iid:string,inst:ModPackInst|undefined){
+    if(!inst) return;
+    
+    let res = (await getInstMods_old({iid})).unwrap();
+    if(!res) return;
+
+    let prismPath = inst.getRoot();
+    if(!prismPath) return errors.failedToGetPrismInstPath.unwrap();
+
+    util_note("Generating 'All The PBR'.");
+    // 
+
+    let rpID = "All The PBR (Generated)";
+    // let rpID = "All The PBR";
+
+    let loc = inst.getPrismInstPath();
+    if(!loc) return errors.failedToGetPrismInstPath.unwrap();
+    loc = path.join(loc,".minecraft","resourcepacks",rpID);
+    await util_mkdir(loc);
+    let defaultLoc = path.join(appPath,"internal","rp","allThePBR");
+
+    let w = await openCCMenu<UpdateProgress_InitData>("update_progress_menu",{iid});
+    if(!w) return errors.failedNewWindow.unwrap();
+
+    // create pack
+    let mcmeta = await util_readText(path.join(defaultLoc,"pack.mcmeta")) ?? JSON.stringify({
+        pack: {
+            pack_format: 15, // 15 is for 1.20.1
+            description: "A generated pack that automatically creates specular and normal maps from all textures provided from the mods in the current instance."
+        }
+    },undefined,2);
+    if(!await util_lstat(path.join(loc,"pack.mcmeta"))) await util_writeText(path.join(loc,"pack.mcmeta"),mcmeta);
+    if(!await util_lstat(path.join(loc,"pack.png"))) await util_cp(path.join(defaultLoc,"pack.png"),path.join(loc,"pack.png"));
+
+    let extractPath = path.join(path.join(appPath,".tmp","extract"));
+    // await util_rm(extractPath,true);
+    await util_mkdir(extractPath);
+    await util_rm(path.join(loc,"assets"),true);
+    
+    // 
+
+    let modsPath = path.join(prismPath,"mods");
+
+    if(w.isDestroyed()) return;
+
+    // extract all mods
+    let modsList = await util_readdirWithTypes(modsPath);
+    let proms:Promise<void>[] = [];
+
+    let completed = 0;
+    let modPaths:string[] = [];
+
+    w.webContents.send("updateProgress","main",0,1,"Init: extraction");
+    if(false) for(const f of modsList){
+        if(!f.isFile()) continue;
+        if(f.name.endsWith(".disabled")) continue;
+
+        if(w!.isDestroyed()) return;
+
+        proms.push(new Promise<void>(resolve=>{            
+            let end = ()=>{
+                completed++;
+                w!.webContents.send("updateProgress","main",completed,modsList.length,"Extracting: "+f.name);
+                
+                resolve();
+            };
+            
+            let newPath = path.join(extractPath,f.name);
+            modPaths.push(newPath);
+            let stream = Seven.extractFull(path.join(modsPath,f.name),newPath,{
+                $bin:pathTo7zip,
+                $cherryPick:["*.png"],
+                recursive:true
+            });
+            stream.on("end",()=>{
+                end();
+            });
+            stream.on("error",e=>{
+                console.log("err: ",e);
+                end();
+            });
+        }));
+    }
+    else{
+        modPaths = (await util_readdir(extractPath)).map(v=>path.join(extractPath,v));
+    }
+    await Promise.all(proms);
+
+    if(w.isDestroyed()) return;
+
+    // copy textures into pack
+    completed = 0;
+    let total = 0;
+    w.webContents.send("updateProgress","main",0,1,"Init: copy textures");
+    
+    for(const loc1 of modPaths){
+        let modNamePaths = await util_readdir(path.join(loc1,"assets"));
+        // total += modNamePaths.length; // quick copy all method
+
+        for(const name of modNamePaths){
+            if(w!.isDestroyed()) return;
+
+            async function loop(loc2:string){
+                let items = await util_readdirWithTypes(loc2);
+                for(const item of items){
+                    if(item.isDirectory()){
+                        await loop(path.join(loc2,item.name));
+                        return;
+                    }
+                    // file
+                    total++;
+                }
+            }
+            await loop(path.join(loc1,"assets",name,"textures","block"));
+        }
+    }
+    if(w.isDestroyed()) return;
+
+    for(const loc1 of modPaths){
+        if(w.isDestroyed()) return;
+        
+        let modNamePaths = await util_readdir(path.join(loc1,"assets"));
+        for(const name of modNamePaths){
+            if(w!.isDestroyed()) return;
+            
+            async function loop(loc2:string,loc3:string){
+                let items = await util_readdirWithTypes(loc2);
+                for(const item of items){
+                    if(item.isDirectory()){
+                        await loop(path.join(loc2,item.name),path.join(loc3,item.name));
+                        return;
+                    }
+                    // file
+                    await Promise.all([
+                        util_cp(path.join(loc2,item.name),path.join(loc3,item.name)),
+                        util_cp(path.join(loc2,item.name),path.join(loc3,item.name.substring(0,item.name.length-4)+"_n.png")), // normal map
+                        util_cp(path.join(loc2,item.name),path.join(loc3,item.name.substring(0,item.name.length-4)+"_s.png")), // specular map
+                    ]);
+
+                    completed++;
+                    w!.webContents.send("updateProgress","main",completed,total,`Copy: (${name}) - ${item.name}`);
+                }
+            }
+            await loop(path.join(loc1,"assets",name,"textures","block"),path.join(loc,"assets",name,"textures","block"));
+            
+            /////////////////
+            // quick copy all method
+            // let fromPath = path.join(loc1,"assets",name,"textures","block"); // only block textures are done for now
+            // let toPath = path.join(loc!,"assets",name,"textures","block");
+            // await util_mkdir(toPath,true); // is this needed?
+            // await util_cp(fromPath,toPath,true);
+
+            // completed++;
+            // w!.webContents.send("updateProgress","main",completed,total,`Copy: ${name}`);
+        }
+    }
+
+    if(w.isDestroyed()) return;
+
+    await wait(500);
+
+    // finish up
+    // await util_rm(extractPath,true);
+    w.webContents.send("updateProgress","main",1,1,"Finished");
+    w.close();
+    util_note("FINISHED",completed,total);
+
+    return true;
 }
 
 function getSimilarStringCount(s1?:string,s2?:string){
@@ -2355,10 +2563,10 @@ async function alertBox(w:BrowserWindow,message:string,title="Error"){
 // 
 
 import { ETL_Generic, evtTimeline, parseCFGFile, pathTo7zip, searchStringCompare, util_cp, util_lstat, util_mkdir, util_note, util_note2, util_readBinary, util_readdir, util_readdirWithTypes, util_readJSON, util_readText, util_readTOML, util_rename, util_rm, util_utimes, util_warn, util_writeBinary, util_writeJSON, util_writeText, wait } from "./util";
-import { AddRP_InitData, Arg_AddModToFolder, Arg_ChangeFolderType, Arg_CheckModUpdates, Arg_CreateFolder, Arg_DownloadRP, Arg_DownloadRPFile, Arg_GetInstances, Arg_GetInstMods, Arg_GetInstResourcePacks, Arg_GetInstScreenshots, Arg_GetPrismInstances, Arg_GetRPs, Arg_GetRPVersions, Arg_IID, Arg_RemoveRP, Arg_SearchPacks, Arg_SyncMods, Arg_UnpackRP, Arg_UploadRP, ArgC_GetRPs, CurseForgeUpdate, Data_PrismInstancesMenu, FSTestData, FullModData, InputMenu_InitData, InstGroups, LocalModData, MMCPack, ModData, ModifiedFile, ModifiedFileData, ModIndex, ModInfo, ModrinthModData, ModrinthUpdate, ModsFolder, ModsFolderDef, PackMetaData, RemoteModData, Res_DownloadRP, Res_GetInstMods, Res_GetInstResourcePacks, Res_GetInstScreenshots, Res_GetModIndexFiles, Res_GetPrismInstances, Res_GetRPs, Res_GetRPVersions, Res_InputMenu, Res_SyncMods, RPCache, UpdateProgress_InitData } from "./interface";
+import { AddRP_InitData, Arg_AddModToFolder, Arg_ChangeFolderType, Arg_CheckModUpdates, Arg_CreateFolder, Arg_DownloadRP, Arg_DownloadRPFile, Arg_GetInstances, Arg_GetInstMods, Arg_GetInstResourcePacks, Arg_GetInstScreenshots, Arg_GetPrismInstances, Arg_GetRPs, Arg_GetRPVersions, Arg_IID, Arg_RemoveRP, Arg_SearchPacks, Arg_SyncMods, Arg_UnpackRP, Arg_UploadRP, ArgC_GetRPs, CurseForgeUpdate, Data_PrismInstancesMenu, FSTestData, FullModData, InputMenu_InitData, InstGroups, LocalModData, MMCPack, ModData, ModifiedFile, ModifiedFileData, ModIndex, ModInfo, ModrinthModData, ModrinthUpdate, ModsFolder, ModsFolderDef, PackMetaData, RemoteModData, Res_DownloadRP, Res_GetInstMods, Res_GetInstResourcePacks, Res_GetInstScreenshots, Res_GetModIndexFiles, Res_GetModUpdates, Res_GetPrismInstances, Res_GetRPs, Res_GetRPVersions, Res_InputMenu, Res_SyncMods, RPCache, UpdateProgress_InitData } from "./interface";
 import { getModUpdates, getPackMeta, searchPacks, searchPacksMeta, semit, updateSocketURL } from "./network";
 import { ListPrismInstReason, openCCMenu, openCCMenuCB, SearchPacksMenu, ViewInstanceMenu } from "./menu_api";
-import { addInstance, cleanModName, cleanModNameDisabled, dataPath, getModFolderPath, getModpackInst, getModpackPath, instCache, LocalModInst, ModPackInst, RemoteModInst, slugMap, sysInst } from "./db";
+import { addInstance, appPath, cleanModName, cleanModNameDisabled, dataPath, getModFolderPath, getModpackInst, getModpackPath, instCache, LocalModInst, ModPackInst, RemoteModInst, slugMap, sysInst } from "./db";
 import { InstanceData } from "./db_types";
 import { errors, Result } from "./errors";
 import { readConfigFile, StringMappingType } from "typescript";

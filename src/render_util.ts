@@ -284,6 +284,12 @@ export class InitData<T>{
         
             this.init();
         });
+        window.gAPI.onSetClientTheme(theme=>{
+            console.log("SET THEME:",theme);
+            // localStorage.setItem("theme",theme ?? "dark");
+            // document.body.parentElement?.classList.add("themestyle-"+(theme ?? localStorage.getItem("theme") ?? "dark"));
+            setTheme(theme);
+        });
         
         setTimeout(()=>{
             if(this.hasLoadedPage) return;
@@ -320,4 +326,32 @@ export function getImageURL(path?:string){
         path = url1.href;
     }
     return path;
+}
+
+// 
+window.addEventListener("DOMContentLoaded",e=>{
+    // document.body.parentElement?.classList.add("themestyle-clean-dark");
+    // document.body.parentElement?.classList.add("themestyle-dark");
+    // document.body.parentElement?.classList.add("themestyle-clean-light");
+    // document.body.parentElement?.classList.add("themestyle-light","theme-light2");
+
+    // let url = new URL(location.href);
+    // let theme = url.searchParams.get("theme") ?? "dark";
+    // document.body.parentElement?.classList.add("themestyle-"+theme);
+    // url.searchParams.delete("theme");
+
+    let storedTheme = localStorage.getItem("theme");
+    if(storedTheme) setTheme(storedTheme);
+});
+export function setTheme(theme?:string){
+    if(!theme) theme = "dark";
+    
+    let par = document.body.parentElement;
+    if(!par) return;
+
+    let oldTheme = [...par.classList].find(v=>v.startsWith("themestyle-"));
+    if(oldTheme) par.classList.remove(oldTheme);
+
+    localStorage.setItem("theme",theme);
+    par.classList.add("themestyle-"+theme);
 }

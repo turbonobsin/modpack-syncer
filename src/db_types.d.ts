@@ -32,6 +32,7 @@ interface DBSys{
     ver:string;
     port:string;
     serverURL:string;
+    theme:string;
 
     prismRoot?:string;
     prismExe?:string;

@@ -8,9 +8,10 @@ import express from "express";
 import toml from "toml";
 import { changeServerURL, refreshMainWindow } from "./app";
 import { semit, updateSocketURL } from "./network";
-import { openCCMenu } from "./menu_api";
+import { openCCMenu, windowStack } from "./menu_api";
 import Seven from "node-7z";
 import axios from "axios";
+import { mainWindow } from "./main";
 
 export let appPath = app.getAppPath();
 export const dataPath = path.join(appPath,"data");
@@ -284,7 +285,8 @@ export class SysInst extends Inst<DBSys>{
             uid:0,
             ver:"0.0.1",
             port:"57152",
-            serverURL:""
+            serverURL:"",
+            theme:"dark"
         };
     }
     async postLoad() {
@@ -327,7 +329,52 @@ export class SysInst extends Inst<DBSys>{
         //     let fullPath = path.join(dataPath,"instances",iid,);
         // });
     }
+
+    async setTheme(theme:string){
+        if(!this.meta) return;
+        this.meta.theme = theme;
+        await this.save();
+
+        let ws = windowStack.concat(mainWindow);
+        for(const w of ws){
+            w.webContents.send("setClientTheme",theme);
+        }
+
+        // reloadAllWindows();
+    }
 }
+
+export const themes:Record<string,any> = {
+    "dark":{
+        name:"Dark"
+    },
+    "clean-dark":{
+        name:"Soft Dark"
+    },
+    "light":{
+        name:"Light"
+    },
+    "clean-light":{
+        name:"Soft Light"
+    },
+    "light2":{
+        name:"Light Alt"
+    },
+    "mint":{
+        name:"Mint"
+    },
+    "soft-colors":{
+        name:"Soft Colors"
+    }
+};
+
+export function reloadAllWindows(){
+    mainWindow.reload();
+    for(const w of windowStack){
+        w.reload();
+    }
+}
+
 export class UserInst extends Inst<DBUser>{
     constructor(filePath:string){
         super(filePath);

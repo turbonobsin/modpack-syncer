@@ -30,7 +30,7 @@
 import { FSTestData } from "./interface";
 import "./render_lib";
 import "./styles/renderer.css";
-import { loadModPackMetaPanel, SelectedItem, selectItem } from "./render_util";
+import { InitData, loadModPackMetaPanel, SelectedItem, selectItem } from "./render_util";
 import { InstanceData } from "./db_types";
 import { makeDivPart, MP_ActivityBarItem, MP_Article, MP_Button, MP_Div, MP_Flexbox, MP_Header, MP_HR, MP_Ops, MP_OutlinedBox, MP_P, MP_Section, MP_TabbedMenu, MP_Text, PartTextStyle } from "./menu_parts";
 import { MP_SearchStructure, qElm } from "./render_lib";
@@ -47,6 +47,10 @@ const viewPanel = document.querySelector("aside");
 const mainSection = new MP_Div({overrideDiv:qElm(".main-section")});
 
 // 
+
+let initData = new InitData(()=>{
+    console.log("loaded");
+});
 
 // b_addInstance?.addEventListener("click",e=>{
 //     window.gAPI.openMenu("search_packs");

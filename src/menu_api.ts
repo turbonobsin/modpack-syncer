@@ -7,6 +7,7 @@ import path from "path";
 import { InitMenuData } from "src/interface";
 import { util_warn } from "./util";
 import { mainWindow } from "./main";
+import { sysInst } from "./db";
 
 export let windowStack:BrowserWindow[] = [];
 
@@ -59,7 +60,10 @@ abstract class CCMenu{
         // Menu.setApplicationMenu(menu);
 
         // await w.loadURL(path.join(MAIN_WINDOW_VITE_DEV_SERVER_URL,"menus/search_packs.html"));
-        await w.loadURL(path.join(MAIN_WINDOW_VITE_DEV_SERVER_URL,"menus/"+this.startScript+".html"));
+        await w.loadURL(path.join(MAIN_WINDOW_VITE_DEV_SERVER_URL,"menus/"+this.startScript+`.html?theme=${sysInst.meta?.theme ?? "dark"}`));
+        // w.webContents.send("setTheme",);
+        w.webContents.send("setClientTheme",sysInst.meta?.theme);
+        
         if(data) w.webContents.send("initMenu",<InitMenuData<T>>{
             data
         });

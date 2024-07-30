@@ -544,12 +544,21 @@ async function loadSection(index:number,menu:MP_TabbedMenu){
                 combo,
                 new MP_Button({
                     label:"",
+                    className:"accent",
                     icon:"add",
                     onClick:(e,elm)=>{
                         window.gAPI.openMenu("add_rp_menu",{iid:initData.d.iid});
                         // window.gAPI.getRPs({
                         //     iid:initData.d.iid
                         // });
+                    }
+                }),
+                new MP_Button({
+                    label:"",
+                    icon:"more_vert",
+                    onClick:(e,elm)=>{
+                        // window.gAPI.genAllThePBR(initData.d.iid);
+                        window.gAPI.openDropdown("rpAdditional",initData.d.iid);
                     }
                 })
             );
