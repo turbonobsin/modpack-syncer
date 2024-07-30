@@ -232,7 +232,7 @@ async function openEditModsAdditional(_w:BrowserWindow,iid:string){
             ]
         },
         {
-            label:"Show in Folder",
+            label:"Show Folder",
             click:()=>{
                 let prismPath = inst.getPrismInstPath();
                 if(!prismPath) return errors.failedToGetPrismInstPath.unwrap();
@@ -485,6 +485,14 @@ export const allDropdowns = {
                 label:"Generate Auto PBR",
                 click:()=>{
                     genAllThePBR(inst.meta!.iid,inst);
+                }
+            },
+            {
+                label:"Show Folder",
+                click:()=>{
+                    let root = inst.getRoot();
+                    if(!root) return;
+                    shell.showItemInFolder(path.join(root,"resourcepacks"));
                 }
             }
         ]);

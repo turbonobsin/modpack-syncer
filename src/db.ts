@@ -286,6 +286,7 @@ export class SysInst extends Inst<DBSys>{
             ver:"0.0.1",
             port:"57152",
             serverURL:"",
+            // theme:"soft-colors"
             theme:"dark"
         };
     }

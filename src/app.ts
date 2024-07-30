@@ -270,6 +270,8 @@ export async function preInit(){
 
         w.webContents.send("updateProgress","main",0,100,"Initializing...");
 
+        let wasError = false;
+
         stream.on("progress",prog=>{
             w.webContents.send("updateProgress","main",prog.percent,100,"Extracting...");
         });
@@ -281,9 +283,15 @@ export async function preInit(){
         stream.on("error",err=>{
             util_warn("ERR extracting:");
             console.log(err);
+            wasError = true;
         });
 
-        return true;
+        if(!wasError){ // success
+            await util_mkdir(path.join(loc,".deleted"));
+            await util_rename(path.join(loc,arg.rpID),path.join(loc,".deleted",arg.rpID));
+        }
+
+        return !wasError;
     });
     ipcMain.handle("removeRP",(ev,arg:Arg_RemoveRP)=>{
         
@@ -613,6 +621,25 @@ export async function downloadRP(arg:Arg_DownloadRP){
     // console.log("FINISHED! -- total: ",completed);
     // console.log("Success:",success);
     // console.log("Failed:",failed);
+
+    // auto add it to options.txt (currently selected packs)
+    let optionsText = await util_readText(path.join(prismRoot,"options.txt"));
+    if(optionsText){
+        let lines = optionsText.split("\n");
+        let rpLineI = lines.findIndex(v=>v.startsWith("resourcePacks:"));
+        if(rpLineI != -1){
+            let rpLine = lines[rpLineI];
+            let split = rpLine.split(":");
+            let list = JSON.parse(split[1] || "[]") as string[];
+            let toAdd = "file/"+arg.rpID;
+            if(!list.includes(toAdd)){
+                list.push(toAdd);
+                
+                lines[rpLineI] = split[0]+":"+JSON.stringify(list);
+                await util_writeText(path.join(prismRoot,"options.txt"),lines.join("\n"));
+            }
+        }
+    }
 
     // show results
     w.webContents.send("updateProgress","main",total,total,"Finished.",{
@@ -1831,7 +1858,7 @@ export async function genAllThePBR(iid:string,inst:ModPackInst|undefined){
     if(!await util_lstat(path.join(loc,"pack.png"))) await util_cp(path.join(defaultLoc,"pack.png"),path.join(loc,"pack.png"));
 
     let extractPath = path.join(path.join(appPath,".tmp","extract"));
-    // await util_rm(extractPath,true);
+    await util_rm(extractPath,true);
     await util_mkdir(extractPath);
     await util_rm(path.join(loc,"assets"),true);
     
@@ -1958,7 +1985,7 @@ export async function genAllThePBR(iid:string,inst:ModPackInst|undefined){
     await wait(500);
 
     // finish up
-    // await util_rm(extractPath,true);
+    await util_rm(extractPath,true);
     w.webContents.send("updateProgress","main",1,1,"Finished");
     w.close();
     util_note("FINISHED",completed,total);
