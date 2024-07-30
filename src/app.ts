@@ -272,18 +272,22 @@ export async function preInit(){
 
         let wasError = false;
 
-        stream.on("progress",prog=>{
-            w.webContents.send("updateProgress","main",prog.percent,100,"Extracting...");
-        });
-        stream.on("end",()=>{
-            console.log(":: Finished unpacking");
-            w.close();
-            ev.sender.reload();
-        });
-        stream.on("error",err=>{
-            util_warn("ERR extracting:");
-            console.log(err);
-            wasError = true;
+        await new Promise<void>(resolve=>{
+            stream.on("progress",prog=>{
+                w.webContents.send("updateProgress","main",prog.percent,100,"Extracting...");
+            });
+            stream.on("end",()=>{
+                console.log(":: Finished unpacking");
+                w.close();
+                ev.sender.reload();
+                resolve();
+            });
+            stream.on("error",err=>{
+                util_warn("ERR extracting:");
+                console.log(err);
+                wasError = true;
+                resolve(); // I'm adding this here because I'm not sure if "end" will get called if there is an error
+            });
         });
 
         if(!wasError){ // success
