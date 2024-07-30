@@ -478,8 +478,8 @@ export async function downloadRP(arg:Arg_DownloadRP){
     let prismRoot = inst.getPrismInstPath();
     if(!prismRoot) return errors.failedToGetPrismInstPath.unwrap();
     
+    let alreadyHad = await util_lstat(path.join(prismRoot,".minecraft","resourcepacks",arg.rpID));
     let loc = path.join(prismRoot,".minecraft","resourcepacks",arg.rpID);
-    console.log("ARG:",arg);
 
     let w = await openCCMenu<UpdateProgress_InitData>("update_progress_menu",{iid:arg.iid});
     if(!w) return errors.failedNewWindow.unwrap();
@@ -627,20 +627,22 @@ export async function downloadRP(arg:Arg_DownloadRP){
     // console.log("Failed:",failed);
 
     // auto add it to options.txt (currently selected packs)
-    let optionsText = await util_readText(path.join(prismRoot,"options.txt"));
-    if(optionsText){
-        let lines = optionsText.split("\n");
-        let rpLineI = lines.findIndex(v=>v.startsWith("resourcePacks:"));
-        if(rpLineI != -1){
-            let rpLine = lines[rpLineI];
-            let split = rpLine.split(":");
-            let list = JSON.parse(split[1] || "[]") as string[];
-            let toAdd = "file/"+arg.rpID;
-            if(!list.includes(toAdd)){
-                list.push(toAdd);
-                
-                lines[rpLineI] = split[0]+":"+JSON.stringify(list);
-                await util_writeText(path.join(prismRoot,"options.txt"),lines.join("\n"));
+    if(!alreadyHad){
+        let optionsText = await util_readText(path.join(prismRoot,"options.txt"));
+        if(optionsText){
+            let lines = optionsText.split("\n");
+            let rpLineI = lines.findIndex(v=>v.startsWith("resourcePacks:"));
+            if(rpLineI != -1){
+                let rpLine = lines[rpLineI];
+                let split = rpLine.split(":");
+                let list = JSON.parse(split[1] || "[]") as string[];
+                let toAdd = "file/"+arg.rpID;
+                if(!list.includes(toAdd)){
+                    list.push(toAdd);
+                    
+                    lines[rpLineI] = split[0]+":"+JSON.stringify(list);
+                    await util_writeText(path.join(prismRoot,"options.txt"),lines.join("\n"));
+                }
             }
         }
     }

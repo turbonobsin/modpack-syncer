@@ -973,6 +973,8 @@ async function getInstResourcePacks(inst:ModPackInst,filter:SearchFilter): Promi
     const loc = path.join(prismPath,".minecraft","resourcepacks");
     let packList = await util_readdirWithTypes(loc,false);
     for(const fi_pack of packList){ // fileItem_pack
+        if(fi_pack.name.startsWith(".")) continue;
+        
         if(filter.query) if(!searchStringCompare(fi_pack.name,filter.query)) continue;
         
         if(fi_pack.isFile()){
