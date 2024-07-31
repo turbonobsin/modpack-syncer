@@ -70,9 +70,10 @@ export const errors = {
     modAlreadyInFolder: Result.err("That mod is already in this folder"),
     invalidFolderName: Result.err("Invalid folder name"),
 
-    failedUploadRP: Result.err("A file failed to upload, aborting."),
-    couldNotFindRPMeta: Result.err("Could not find meta data for this resource pack."),
+    failedUploadRP: Result.err("A file failed to upload, aborting"),
+    couldNotFindRPMeta: Result.err("Could not find meta data for this resource pack"),
     couldNotFindRPCache: Result.err("Could not find resource pack cache file"),
+    failedToRemoveRP: Result.err("Failed to remove resource pack"),
 
     // prism
     instgroupsRead: Result.err("Failed to read instance group data"),

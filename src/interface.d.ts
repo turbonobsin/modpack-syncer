@@ -722,6 +722,7 @@ export interface IGlobalAPI{
 
     onEditImg:(cb:(img:string,type:string)=>any)=>void;
     onSetClientTheme:(cb:(theme:string|undefined)=>void)=>void;
+    onUpdateSearch:(cb:(data:any)=>void)=>void;
     
     onUpdateProgress:(cb:(id:string,i:number,total:number,item:string,extra:any)=>void)=>void;
 }

@@ -1051,3 +1051,26 @@ export async function getMainAccount(): Promise<PrismAccount | undefined>{
 // 
 export let sysInst = new SysInst(path.join(dataPath,"sys.json"));
 export let slugMap = new SlugMap(path.join(dataPath,"slug_map.json"));
+
+// testing
+import ps from 'ps-node';
+import find from 'find-process';
+
+async function test(){
+    await wait(1000);
+
+    util_note("Running test...");
+    ps.lookup({command:"java"}, (Err, Programs) => {
+        if(Err) console.log("err:",Err);
+        util_note(123);
+        console.log(Programs);
+        // Programs.forEach(prog => {
+        //     util_note2("prog",prog.pid);
+        //     find('pid', prog.pid).then((progDetails) => {
+        //         const procName = progDetails.map(stuff => stuff.name)[0]
+        //         console.log(procName)
+        //     })
+        // });
+    })
+}
+// test();

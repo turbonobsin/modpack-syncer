@@ -633,6 +633,8 @@ export async function downloadRP(arg:Arg_DownloadRP){
         if(optionsText){
             let lines = optionsText.split("\n");
             let rpLineI = lines.findIndex(v=>v.startsWith("resourcePacks:"));
+            let altrpLineI = lines.findIndex(v=>v.startsWith("incompatibleResourcePacks:"));
+            let wasChange = false;
             if(rpLineI != -1){
                 let rpLine = lines[rpLineI];
                 let split = rpLine.split(":");
@@ -642,9 +644,22 @@ export async function downloadRP(arg:Arg_DownloadRP){
                     list.push(toAdd);
                     
                     lines[rpLineI] = split[0]+":"+JSON.stringify(list);
-                    await util_writeText(path.join(prismRoot,".minecraft","options.txt"),lines.join("\n"));
+                    wasChange = true;
                 }
             }
+            if(altrpLineI != -1){
+                let rpLine = lines[altrpLineI];
+                let split = rpLine.split(":");
+                let list = JSON.parse(split[1] || "[]") as string[];
+                let toAdd = "file/"+arg.rpID;
+                if(!list.includes(toAdd)){
+                    list.push(toAdd);
+                    
+                    lines[altrpLineI] = split[0]+":"+JSON.stringify(list);
+                    wasChange = true;
+                }
+            }
+            if(wasChange) await util_writeText(path.join(prismRoot,".minecraft","options.txt"),lines.join("\n"));
         }
     }
     else util_note("Already had the RP, skipping!");
@@ -662,6 +677,26 @@ export async function downloadRP(arg:Arg_DownloadRP){
             }
         ]
     });
+    if(failed.length == 0) w.close();
+
+    if(windowStack.some(v=>v.title == "Add Resource Pack")){ // may need to fix this later because it's no future proof if the title gets changed
+        let rpW = windowStack.findIndex(v=>v.title == "Add Resource Pack");
+        if(rpW != -1){
+            windowStack[rpW].close();
+            windowStack.splice(rpW,1);
+        }
+
+        // let rpW = windowStack.findIndex(v=>v.title == "Add Resource Pack");
+        // if(rpW != -1){
+        //     windowStack[rpW].close();
+        //     windowStack.splice(rpW,1);
+        // }
+
+        let last = windowStack[windowStack.length-1];
+        if(last?.title == "Edit Instance"){
+            last.webContents.send("updateSearch");
+        }
+    }
     
     await wait(500);
     // w.close();
@@ -2600,7 +2635,7 @@ async function alertBox(w:BrowserWindow,message:string,title="Error"){
 import { ETL_Generic, evtTimeline, parseCFGFile, pathTo7zip, searchStringCompare, util_cp, util_lstat, util_mkdir, util_note, util_note2, util_readBinary, util_readdir, util_readdirWithTypes, util_readJSON, util_readText, util_readTOML, util_rename, util_rm, util_utimes, util_warn, util_writeBinary, util_writeJSON, util_writeText, wait } from "./util";
 import { AddRP_InitData, Arg_AddModToFolder, Arg_ChangeFolderType, Arg_CheckModUpdates, Arg_CreateFolder, Arg_DownloadRP, Arg_DownloadRPFile, Arg_GetInstances, Arg_GetInstMods, Arg_GetInstResourcePacks, Arg_GetInstScreenshots, Arg_GetPrismInstances, Arg_GetRPs, Arg_GetRPVersions, Arg_IID, Arg_RemoveRP, Arg_SearchPacks, Arg_SyncMods, Arg_UnpackRP, Arg_UploadRP, ArgC_GetRPs, CurseForgeUpdate, Data_PrismInstancesMenu, FSTestData, FullModData, InputMenu_InitData, InstGroups, LocalModData, MMCPack, ModData, ModifiedFile, ModifiedFileData, ModIndex, ModInfo, ModrinthModData, ModrinthUpdate, ModsFolder, ModsFolderDef, PackMetaData, RemoteModData, Res_DownloadRP, Res_GetInstMods, Res_GetInstResourcePacks, Res_GetInstScreenshots, Res_GetModIndexFiles, Res_GetModUpdates, Res_GetPrismInstances, Res_GetRPs, Res_GetRPVersions, Res_InputMenu, Res_SyncMods, RPCache, UpdateProgress_InitData } from "./interface";
 import { getModUpdates, getPackMeta, searchPacks, searchPacksMeta, semit, updateSocketURL } from "./network";
-import { ListPrismInstReason, openCCMenu, openCCMenuCB, SearchPacksMenu, ViewInstanceMenu } from "./menu_api";
+import { ListPrismInstReason, openCCMenu, openCCMenuCB, SearchPacksMenu, ViewInstanceMenu, windowStack } from "./menu_api";
 import { addInstance, appPath, cleanModName, cleanModNameDisabled, dataPath, getModFolderPath, getModpackInst, getModpackPath, instCache, LocalModInst, ModPackInst, RemoteModInst, slugMap, sysInst } from "./db";
 import { InstanceData } from "./db_types";
 import { errors, Result } from "./errors";

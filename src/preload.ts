@@ -114,6 +114,7 @@ contextBridge.exposeInMainWorld("gAPI",{
     onMsg: (cb) => ipcRenderer.on("msg",(ev,data)=>cb(data)),
     onEditImg:regl("editImg"),
     onSetClientTheme:regl("setClientTheme"),
+    onUpdateSearch:regl("updateSearch"),
 
     onUpdateProgress:regl("updateProgress")
 } as IGlobalAPI);

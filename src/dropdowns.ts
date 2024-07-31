@@ -90,7 +90,7 @@ async function openModDropdown(w:BrowserWindow,iid:string,files:string[]){
             })()
         },
         {
-            label:"Show in Folder",
+            label:"Show in Explorer",
             click:()=>{
                 let prismPath = inst.getPrismInstPath();
                 if(!prismPath) return errors.failedToGetPrismInstPath.unwrap();
@@ -232,7 +232,7 @@ async function openEditModsAdditional(_w:BrowserWindow,iid:string){
             ]
         },
         {
-            label:"Show Folder",
+            label:"Show in Explorer",
             click:()=>{
                 let prismPath = inst.getPrismInstPath();
                 if(!prismPath) return errors.failedToGetPrismInstPath.unwrap();
@@ -462,6 +462,7 @@ export const allDropdowns = {
         let loc = inst.getPrismInstPath();
         if(!loc) return errors.failedToGetPrismInstPath.unwrap();
         loc = path.join(loc,".minecraft","resourcepacks",rpID);
+        let loc1 = loc;
 
         if(await util_lstat(path.join(loc,"assets"))) loc = path.join(loc,"assets");
 
@@ -470,6 +471,21 @@ export const allDropdowns = {
                 label:"Show in Explorer",
                 click:()=>{
                     shell.showItemInFolder(loc);
+                }
+            },
+            {
+                label:"Remove",
+                click:async ()=>{
+                    let res = await dialog.showMessageBox({
+                        message:`Are you sure you want to remove this resouce pack?\n\nIt will be moved to the "resourcepacks/.deleted" folder.`,
+                        buttons:["Cancel","Remove"]
+                    });
+                    if(res.response != 1) return;
+
+                    await util_mkdir(path.join(loc1,"..",".deleted"));
+                    let res2 = await util_rename(loc1,path.join(loc1,"..",".deleted",rpID));
+                    if(!res2) errors.failedToRemoveRP.unwrap();
+                    else _w.webContents.send("updateSearch");
                 }
             }
         ]);
@@ -488,7 +504,7 @@ export const allDropdowns = {
                 }
             },
             {
-                label:"Show Folder",
+                label:"Show in Explorer",
                 click:()=>{
                     let root = inst.getRoot();
                     if(!root) return;

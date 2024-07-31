@@ -650,6 +650,9 @@ async function loadSection(index:number,menu:MP_TabbedMenu){
 }
 
 let currentSearch:MP_SearchStructure<any>|undefined;
+window.gAPI.onUpdateSearch(data=>{
+    currentSearch?.submit();
+});
 
 const fullscreenCont = qElm(".fullscreen-cont") as HTMLElement | undefined;
 const imgCont = qElm(".img-cont") as HTMLElement | undefined;
