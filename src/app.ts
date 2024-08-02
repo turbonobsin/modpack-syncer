@@ -1901,9 +1901,9 @@ export async function genAllThePBR(iid:string,inst:ModPackInst|undefined){
     if(!await util_lstat(path.join(loc,"pack.png"))) await util_cp(path.join(defaultLoc,"pack.png"),path.join(loc,"pack.png"));
 
     let extractPath = path.join(path.join(appPath,".tmp","extract"));
-    await util_rm(extractPath,true);
+    if(await util_lstat(extractPath)) await util_rm(extractPath,true);
     await util_mkdir(extractPath);
-    await util_rm(path.join(loc,"assets"),true);
+    if(await util_lstat(path.join(loc,"assets"))) await util_rm(path.join(loc,"assets"),true);
     
     // 
 
@@ -1919,7 +1919,7 @@ export async function genAllThePBR(iid:string,inst:ModPackInst|undefined){
     let modPaths:string[] = [];
 
     w.webContents.send("updateProgress","main",0,1,"Init: extraction");
-    if(false) for(const f of modsList){
+    if(true) for(const f of modsList){
         if(!f.isFile()) continue;
         if(f.name.endsWith(".disabled")) continue;
 
@@ -2025,13 +2025,18 @@ export async function genAllThePBR(iid:string,inst:ModPackInst|undefined){
 
     if(w.isDestroyed()) return;
 
-    await wait(500);
+    // await wait(500);
 
     // finish up
-    await util_rm(extractPath,true);
+    if(await util_lstat(extractPath)) await util_rm(extractPath,true);
     w.webContents.send("updateProgress","main",1,1,"Finished");
     w.close();
     util_note("FINISHED",completed,total);
+
+    let last = windowStack.find(v=>v.title == "Edit Instance");
+    if(last){
+        last.webContents.send("updateSearch");
+    }
 
     return true;
 }
