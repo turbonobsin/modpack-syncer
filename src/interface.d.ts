@@ -258,6 +258,17 @@ interface RP_Data{
         sync?:RP_Sync;
     }
 }
+interface World_Data{
+    wID:string;
+    data?:{
+        icon?:string;
+    }
+    // data?:{ // data will be defined only if the Resource Pack has been unpacked into a folder (because I can't efficiently read the data otherwise)
+    //     icon?:string;
+    //     meta?:RP_MCMeta;
+    //     sync?:RP_Sync;
+    // }
+}
 interface RP_Sync{
     rpID:string;
 }
@@ -286,6 +297,13 @@ interface Arg_GetInstResourcePacks{
 }
 interface Res_GetInstResourcePacks{
     packs:RP_Data[];
+}
+interface Arg_GetInstWorlds{
+    iid:string;
+    filter:SearchFilter;
+}
+interface Res_GetInstWorlds{
+    worlds:World_Data[];
 }
 
 interface ModrinthUpdate{
@@ -646,6 +664,23 @@ interface Res_GetRPVersions{
     }[];
 }
 
+interface WorldMeta{
+    wID:string;
+    icon:string;
+    ownerUID:string;
+    ownerName:string;
+}
+interface Arg_GetWorldMeta{
+    iid?:string;
+    // 
+    mpID?:string;
+    wID:string;
+}
+interface Res_GetWorldMeta{
+    isPublished:boolean;
+    data?:WorldMeta;
+}
+
 // 
 
 export interface IGlobalAPI{
@@ -671,6 +706,8 @@ export interface IGlobalAPI{
     getInstScreenshots:(arg:Arg_GetInstScreenshots)=>Promise<Res_GetInstScreenshots>;
     getInstMods:(arg:Arg_GetInstMods)=>Promise<Res_GetInstMods>;
     getInstRPs:(arg:Arg_GetInstResourcePacks)=>Promise<Res_GetInstResourcePacks|undefined>;
+    getInstWorlds:(arg:Arg_GetInstWorlds)=>Promise<Res_GetInstWorlds|undefined>;
+    getWorld:(arg:Arg_GetWorldMeta)=>Promise<Res_GetWorldMeta|undefined>;
     
     getModIndexFiles:(arg:Arg_IID)=>Promise<Res_GetModIndexFiles>;
     cacheMods:(iid:string)=>Promise<void>;

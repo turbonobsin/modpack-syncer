@@ -515,6 +515,24 @@ export const allDropdowns = {
         
         // 
         menu.popup({window:_w});
+    },
+    worldsAdditional:async (_w:BrowserWindow,iid:string)=>{
+        let inst = await getModpackInst(iid);
+        if(!inst || !inst.meta) return;
+
+        const menu = Menu.buildFromTemplate([
+            {
+                label:"Show in Explorer",
+                click:()=>{
+                    let root = inst.getRoot();
+                    if(!root) return;
+                    shell.showItemInFolder(path.join(root,"saves"));
+                }
+            }
+        ]);
+        
+        // 
+        menu.popup({window:_w});
     }
 };
 

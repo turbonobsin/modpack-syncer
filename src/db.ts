@@ -2,7 +2,7 @@ import { app, dialog } from "electron";
 import { pathTo7zip, searchStringCompare, util_lstat, util_mkdir, util_note, util_note2, util_readBinary, util_readdir, util_readdirWithTypes, util_readJSON, util_readText, util_readTOML, util_warn, util_writeJSON, wait } from "./util";
 import path from "path";
 import { DBSys, DBUser, InstanceData as ModPackInstData, TmpFile } from "./db_types";
-import { Arg_AddModToFolder, Arg_ChangeFolderType, Arg_CreateFolder, Arg_EditFolder, Arg_UploadRP, Arg_UploadRPFile, FolderType, LocalModData, ModIndex, ModrinthModData, ModsFolder, ModsFolderDef, PackMetaData, PrismAccount, PrismAccountsData, RemoteModData, Res_GetInstResourcePacks, Res_UploadRP, RP_Data, RPCache, SearchFilter, SlugMapData, UpdateProgress_InitData } from "./interface";
+import { Arg_AddModToFolder, Arg_ChangeFolderType, Arg_CreateFolder, Arg_EditFolder, Arg_UploadRP, Arg_UploadRPFile, FolderType, LocalModData, ModIndex, ModrinthModData, ModsFolder, ModsFolderDef, PackMetaData, PrismAccount, PrismAccountsData, RemoteModData, Res_GetInstResourcePacks, Res_GetInstWorlds, Res_UploadRP, RP_Data, RPCache, SearchFilter, SlugMapData, UpdateProgress_InitData, World_Data } from "./interface";
 import { errors, Result } from "./errors";
 import express from "express";
 import toml from "toml";
@@ -540,6 +540,9 @@ export class ModPackInst extends Inst<ModPackInstData>{
     async getResourcePacks(filter:SearchFilter){
         return (await getInstResourcePacks(this,filter)).unwrap();
     }
+    async getWorlds(filter:SearchFilter){
+        return (await getInstWorlds(this,filter)).unwrap();
+    }
     async uploadRP(arg:Arg_UploadRP): Promise<boolean | undefined>{
         if(!this.meta) return;
         let prismPath = this.getPrismInstPath();
@@ -1025,6 +1028,72 @@ async function getInstResourcePacks(inst:ModPackInst,filter:SearchFilter): Promi
         });
         await inst.save();
     }
+    
+    // 
+    return new Result(resData);
+}
+async function getInstWorlds(inst:ModPackInst,filter:SearchFilter): Promise<Result<Res_GetInstWorlds>>{
+    if(!inst.meta) return errors.couldNotFindPack;
+    
+    let resData:Res_GetInstWorlds = {
+        worlds:[],
+    };
+
+    const prismPath = inst.getPrismInstPath();
+    if(!prismPath) return errors.failedToGetPrismInstPath;
+
+    const loc = path.join(prismPath,".minecraft","saves");
+    let worldList = await util_readdirWithTypes(loc,false);
+    for(const fi_world of worldList){ // fileItem_world
+        if(fi_world.name.startsWith(".")) continue;
+        
+        if(filter.query) if(!searchStringCompare(fi_world.name,filter.query)) continue;
+        
+        if(fi_world.isFile()){
+            resData.worlds.push({
+                wID:fi_world.name
+            });
+            continue;
+        }
+
+        let worldLoc = path.join(loc,fi_world.name);
+
+        let d:World_Data = {
+            wID:fi_world.name,
+            data:{
+                icon:path.join(worldLoc,"icon.png")
+            }
+        };
+        
+        resData.worlds.push(d);
+    }
+
+    // create metas if not defined
+    // if(!inst.meta.resourcepacks) inst.meta.resourcepacks = [];
+    // for(const world of resData.worlds){
+    //     let wPath = inst.getRPCachePath()!;
+    //     if(!await util_lstat(path.join(wPath,world.name+".json"))){
+    //         // let data = {
+    //         //     download:0,
+    //         //     upload:0,
+    //         //     modified:0,
+    //         // } as RPCache;
+    //         let data = {};
+    //         await util_writeJSON(path.join(wPath,world.name+".json"),data);
+    //     }
+        
+    //     // 
+        
+    //     if(inst.meta.resourcepacks.some(v=>v.rpID == world.name)) continue;
+    //     inst.meta.resourcepacks.push({
+    //         rpID:world.name,
+    //         lastModified:0,
+    //         lastUploaded:0,
+    //         lastDownloaded:0,
+    //         update:-1
+    //     });
+    //     await inst.save();
+    // }
     
     // 
     return new Result(resData);

@@ -2,7 +2,7 @@ import "../render_lib";
 import "../styles/edit_instance_menu.css";
 import { addClassToOps, makeDivPart, MP_ActivityBarItem, MP_Button, MP_Combobox, MP_Div, MP_Flexbox, MP_Flexbox_Ops, MP_Generic, MP_Grid, MP_Header, MP_HR, MP_Img, MP_P, MP_Section, MP_TabbedMenu, MP_TableList, MP_Text, MP_TR, PartTextStyle } from "../menu_parts";
 import { MP_SearchStructure, qElm } from "../render_lib";
-import { EditInst_InitData, FullModData, ModData, ModsFolder, Res_GetInstMods, RP_Data } from "../interface";
+import { EditInst_InitData, FullModData, ModData, ModsFolder, Res_GetInstMods, RP_Data, World_Data } from "../interface";
 import { deselectItem, getImageURL, InitData, SelectedItem, selectItem, wait } from "../render_util";
 import { io } from "socket.io-client";
 import { allDropdowns } from "src/dropdowns";
@@ -23,6 +23,7 @@ const tab_menu = new MP_TabbedMenu(
                 "Mods",
                 "Resource Packs",
                 "Screenshots",
+                "Worlds",
                 "Java Configuration",
                 "Settings"
             ][index];
@@ -237,6 +238,9 @@ async function loadFolder(folder:ModsFolder,menu:MP_TabbedMenu,search:MP_SearchS
 interface CMP_RP_Ops extends MP_Flexbox_Ops{
     data:RP_Data;
 }
+interface CMP_World_Ops extends MP_Flexbox_Ops{
+    data:World_Data;
+}
 class CMP_ResourcePackSimple extends MP_Flexbox{
     constructor(ops:CMP_RP_Ops){
         addClassToOps(ops,"mod-row");
@@ -373,6 +377,151 @@ class CMP_ResourcePackSimple extends MP_Flexbox{
                 }).autoJustify("start","center"),
                 new MP_P({
                     text:data.data.meta?.pack.description ?? "No description."
+                })
+            );
+        }
+    }
+}
+class CMP_World extends MP_Flexbox{
+    constructor(ops:CMP_World_Ops){
+        addClassToOps(ops,"mod-row");
+        ops.gap = "5px";
+        ops.alignItems = "center";
+        ops.marginBottom = "3px";
+
+        super(ops);
+    }
+    declare ops:CMP_World_Ops;
+    content = new MP_Div({className:"mod-row-content"});
+
+    load(): void {
+        super.load();
+
+        let d = this.ops.data;
+        let data = d.data;
+        
+        new MP_Img({
+            src:getImageURL(data?.icon),
+            minWidth:"25px",
+            minHeight:"25px",
+            width:"25px",
+            height:"25px",
+            className:"_loaded",
+            onClick:(e,elm)=>{
+                if(data?.icon) openImg(elm as HTMLImageElement);
+            }
+        }).addTo(this);
+
+        let cont = this.content.addTo(this);
+
+        new MP_Text({
+            text:d.wID,
+            marginRight:"auto"
+        }).addTo(cont);
+    }
+
+    static async showData(data:World_Data,aside:MP_Div){
+        let d = data;
+        const {head,body,footer} = setupAside(aside);
+
+        let w = await window.gAPI.getWorld({
+            iid:initData.d.iid,
+            wID:d.wID
+        });
+        if(!w) return; // didn't find it or you don't have permission
+        
+        head.addParts(
+            new MP_Header({text:d.wID}),
+            new MP_HR()
+        );
+
+        if(!w.isPublished){ // it's unpublished
+            body.addParts(
+                new MP_Img({
+                    src:getImageURL(d.data?.icon),
+                    width:"50%"
+                }).autoJustify("start","center"),
+                new MP_P({
+                    text:"The current World is unpublished.",
+                    className:"l-details"
+                }),
+                new MP_P({
+                    text:"Once published, anyone who has access to this modpack will be able to download the world.",
+                    className:"l-details"
+                }),
+                new MP_Button({
+                    label:"Publish",
+                    marginTop:"20px",
+                    onClick:async (e,elm)=>{
+                        // let res = await window.gAPI.unpackRP({iid:initData.d.iid,rpID:data.wID});
+                        // if(res) currentSearch?.submit();
+                    }
+                }).autoJustify("center","center"),
+            );
+        }
+        else{
+            head.e!.style.height = "unset";
+            head.addParts(
+                new MP_Flexbox({
+                    justifyContent:"space-between",
+                    alignItems:"center",
+                    marginBottom:"20px"
+                }).addParts(
+                    new MP_Button({
+                        // label:"Edit",
+                        label:"",
+                        icon:"more_vert",
+                        onClick:(e,elm)=>{
+                            window.gAPI.openDropdown("rpOptions",initData.d.iid,d.wID);
+                        }
+                    }),
+                    new MP_Button({
+                        // skipAdd:d.data?.sync != null,
+                        label:"Upload",
+                        icon:"upload",
+                        onClick:(e,elm)=>{
+                            window.gAPI.uploadRP({
+                                iid:initData.d.iid,
+                                mpID:"bob",
+                                name:d.wID,
+                                uid:"",
+                                uname:""
+                            });
+                        }
+                    }),
+                    new MP_Button({
+                        // skipAdd:d.data?.sync != null,
+                        label:"Download",
+                        icon:"download",
+                        className:"accent",
+                        onClick:(e,elm)=>{
+                            window.gAPI.downloadRP({
+                                iid:initData.d.iid,
+                                rpID:d.wID,
+                                mpID:"",
+                                lastDownloaded:-1
+                            });
+                        }
+                    }),//
+                    // new MP_Button({
+                    //     // skipAdd:d.data?.sync == null,
+                    //     skipAdd:true,
+                    //     label:"Sync",
+                    //     icon:"sync_alt",
+                    //     onClick:(e,elm)=>{
+    
+                    //     }
+                    // })
+                )
+            );
+            body.addParts(
+                new MP_Img({
+                    src:getImageURL(d.data?.icon),
+                    width:"50%"
+                }).autoJustify("start","center"),
+                new MP_P({
+                    // text:data.data.meta?.pack.description ?? "No description."
+                    text:"No description."
                 })
             );
         }
@@ -646,6 +795,55 @@ async function loadSection(index:number,menu:MP_TabbedMenu){
 
             checkVis();
         } break;
+        case 3:{
+            let search = new MP_SearchStructure<RP_Data>({
+                listId:"_",
+                submitOnOpen:true,
+                onSelect:(data,item)=>{
+                    CMP_World.showData(data,menu.aside);
+                },
+                onNoSelected:()=>{
+                    menu.aside.clearParts();
+                },
+                onSubmit:async (t,e,q)=>{
+                    let res = await window.gAPI.getInstWorlds({iid:initData.d.iid,filter:{query:q}});
+                    console.log("worlds:",res);
+                    if(!res) return;
+
+                    for(const world of res.worlds){
+                        let p = new CMP_World({data:world}).addTo(search.list);
+                        let sel = search.registerSelItem(world,p.content.e);
+                        if(p.e) p.e.addEventListener("mouseup",e=>{
+                            if(!sel) return;
+                            if(e.button != 2) return;
+                            if(!sel.isSelected()) sel.toggle(e);
+                            window.gAPI.openDropdown("worldItem",initData.d.iid,world.wID);
+                        });
+                    }
+                }
+            });
+            menu.main_body.addPart(search);
+            currentSearch = search;
+
+            search.mainOptions.addParts(
+                new MP_Button({
+                    label:"",
+                    className:"accent",
+                    icon:"add",
+                    onClick:(e,elm)=>{
+                        window.gAPI.openMenu("add_world_menu",{iid:initData.d.iid});
+                    }
+                }),
+                new MP_Button({
+                    label:"",
+                    icon:"more_vert",
+                    onClick:(e,elm)=>{
+                        // window.gAPI.genAllThePBR(initData.d.iid);
+                        window.gAPI.openDropdown("worldsAdditional",initData.d.iid);
+                    }
+                })
+            );
+        } break;
     }
 }
 
@@ -870,6 +1068,10 @@ async function init(){
         new MP_ActivityBarItem({ icon:"inbox_customize" }),
         new MP_ActivityBarItem({ icon:"texture" }),
         new MP_ActivityBarItem({ icon:"landscape" }),
+        new MP_ActivityBarItem({ icon:"grass" }),
+            // new MP_ActivityBarItem({ icon:"park" }),
+            // new MP_ActivityBarItem({ icon:"psychiatry" }),
+            // new MP_ActivityBarItem({ icon:"potted_plant" }),
         new MP_ActivityBarItem({ icon:"coffee" }),
         new MP_ActivityBarItem({ icon:"settings" }),
     );

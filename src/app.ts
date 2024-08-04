@@ -168,6 +168,29 @@ export async function preInit(){
 
         return res;
     });
+    ipcMain.handle("getInstWorlds",async (ev,arg:Arg_GetInstWorlds)=>{
+        let inst = await getModpackInst(arg.iid);
+        if(!inst) return errors.couldNotFindPack.unwrap();
+        
+        let res = inst.getWorlds(arg.filter);
+        if(!res) return;
+
+        return res;
+    });
+    ipcMain.handle("getWorld",async (ev,arg:Arg_GetWorldMeta)=>{
+        if(!arg.iid) return;
+
+        let inst = await getModpackInst(arg.iid);
+        if(!inst || !inst.meta) return errors.couldNotFindPack.unwrap();
+
+        let res = (await semit<Arg_GetWorldMeta,Res_GetWorldMeta>("getWorldMeta",{
+            ...arg,
+            mpID:inst.meta.meta.id
+        })).unwrap();
+        if(!res) return;
+
+        return res;
+    });
 
     ipcMain.handle("getModIndexFiles",async (ev,arg:Arg_IID)=>{
         return (await getModIndexFiles(arg)).unwrap();
@@ -2638,7 +2661,7 @@ async function alertBox(w:BrowserWindow,message:string,title="Error"){
 // 
 
 import { ETL_Generic, evtTimeline, parseCFGFile, pathTo7zip, searchStringCompare, util_cp, util_lstat, util_mkdir, util_note, util_note2, util_readBinary, util_readdir, util_readdirWithTypes, util_readJSON, util_readText, util_readTOML, util_rename, util_rm, util_utimes, util_warn, util_writeBinary, util_writeJSON, util_writeText, wait } from "./util";
-import { AddRP_InitData, Arg_AddModToFolder, Arg_ChangeFolderType, Arg_CheckModUpdates, Arg_CreateFolder, Arg_DownloadRP, Arg_DownloadRPFile, Arg_GetInstances, Arg_GetInstMods, Arg_GetInstResourcePacks, Arg_GetInstScreenshots, Arg_GetPrismInstances, Arg_GetRPs, Arg_GetRPVersions, Arg_IID, Arg_RemoveRP, Arg_SearchPacks, Arg_SyncMods, Arg_UnpackRP, Arg_UploadRP, ArgC_GetRPs, CurseForgeUpdate, Data_PrismInstancesMenu, FSTestData, FullModData, InputMenu_InitData, InstGroups, LocalModData, MMCPack, ModData, ModifiedFile, ModifiedFileData, ModIndex, ModInfo, ModrinthModData, ModrinthUpdate, ModsFolder, ModsFolderDef, PackMetaData, RemoteModData, Res_DownloadRP, Res_GetInstMods, Res_GetInstResourcePacks, Res_GetInstScreenshots, Res_GetModIndexFiles, Res_GetModUpdates, Res_GetPrismInstances, Res_GetRPs, Res_GetRPVersions, Res_InputMenu, Res_SyncMods, RPCache, UpdateProgress_InitData } from "./interface";
+import { AddRP_InitData, Arg_AddModToFolder, Arg_ChangeFolderType, Arg_CheckModUpdates, Arg_CreateFolder, Arg_DownloadRP, Arg_DownloadRPFile, Arg_GetInstances, Arg_GetInstMods, Arg_GetInstResourcePacks, Arg_GetInstScreenshots, Arg_GetInstWorlds, Arg_GetPrismInstances, Arg_GetRPs, Arg_GetRPVersions, Arg_GetWorldMeta, Arg_IID, Arg_RemoveRP, Arg_SearchPacks, Arg_SyncMods, Arg_UnpackRP, Arg_UploadRP, ArgC_GetRPs, CurseForgeUpdate, Data_PrismInstancesMenu, FSTestData, FullModData, InputMenu_InitData, InstGroups, LocalModData, MMCPack, ModData, ModifiedFile, ModifiedFileData, ModIndex, ModInfo, ModrinthModData, ModrinthUpdate, ModsFolder, ModsFolderDef, PackMetaData, RemoteModData, Res_DownloadRP, Res_GetInstMods, Res_GetInstResourcePacks, Res_GetInstScreenshots, Res_GetModIndexFiles, Res_GetModUpdates, Res_GetPrismInstances, Res_GetRPs, Res_GetRPVersions, Res_GetWorldMeta, Res_InputMenu, Res_SyncMods, RPCache, UpdateProgress_InitData } from "./interface";
 import { getModUpdates, getPackMeta, searchPacks, searchPacksMeta, semit, updateSocketURL } from "./network";
 import { ListPrismInstReason, openCCMenu, openCCMenuCB, SearchPacksMenu, ViewInstanceMenu, windowStack } from "./menu_api";
 import { addInstance, appPath, cleanModName, cleanModNameDisabled, dataPath, getModFolderPath, getModpackInst, getModpackPath, instCache, LocalModInst, ModPackInst, RemoteModInst, slugMap, sysInst } from "./db";
