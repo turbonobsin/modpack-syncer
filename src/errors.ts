@@ -87,4 +87,10 @@ export const errors = {
     // 
     failedNewWindow: Result.err("Failed to open window"),
     zipping: Result.err("Failed to pack/compress files"),
+
+    // worlds
+    worldDNE: Result.err("World does not exist"),
+    failedToPublishWorld: Result.err("Failed to publish world"),
+    failedToUnpublishWorld: Result.err("Failed to unpublish world"),
+    failedToRemoveWorld: Result.err("Failed to remove world"),
 };

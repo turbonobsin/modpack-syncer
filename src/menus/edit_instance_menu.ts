@@ -453,6 +453,11 @@ class CMP_World extends MP_Flexbox{
                     label:"Publish",
                     marginTop:"20px",
                     onClick:async (e,elm)=>{
+                        let res = await window.gAPI.publishWorld({
+                            iid:initData.d.iid,
+                            wID:w.wID
+                        });
+                        console.log("RES:",res);
                         // let res = await window.gAPI.unpackRP({iid:initData.d.iid,rpID:data.wID});
                         // if(res) currentSearch?.submit();
                     }
@@ -472,7 +477,7 @@ class CMP_World extends MP_Flexbox{
                         label:"",
                         icon:"more_vert",
                         onClick:(e,elm)=>{
-                            window.gAPI.openDropdown("rpOptions",initData.d.iid,d.wID);
+                            window.gAPI.openDropdown("worldOptions",initData.d.iid,d.wID);
                         }
                     }),
                     new MP_Button({
@@ -480,12 +485,9 @@ class CMP_World extends MP_Flexbox{
                         label:"Upload",
                         icon:"upload",
                         onClick:(e,elm)=>{
-                            window.gAPI.uploadRP({
+                            window.gAPI.uploadWorld({
                                 iid:initData.d.iid,
-                                mpID:"bob",
-                                name:d.wID,
-                                uid:"",
-                                uname:""
+                                wID:data.wID
                             });
                         }
                     }),
@@ -495,11 +497,9 @@ class CMP_World extends MP_Flexbox{
                         icon:"download",
                         className:"accent",
                         onClick:(e,elm)=>{
-                            window.gAPI.downloadRP({
+                            window.gAPI.downloadWorld({
                                 iid:initData.d.iid,
-                                rpID:d.wID,
-                                mpID:"",
-                                lastDownloaded:-1
+                                wID:data.wID
                             });
                         }
                     }),//
@@ -796,7 +796,7 @@ async function loadSection(index:number,menu:MP_TabbedMenu){
             checkVis();
         } break;
         case 3:{
-            let search = new MP_SearchStructure<RP_Data>({
+            let search = new MP_SearchStructure<World_Data>({
                 listId:"_",
                 submitOnOpen:true,
                 onSelect:(data,item)=>{

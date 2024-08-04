@@ -63,7 +63,11 @@ contextBridge.exposeInMainWorld("gAPI",{
     getInstMods:regf("getInstMods"),
     getInstRPs:regf("getInstRPs"),
     getInstWorlds:regf("getInstWorlds"),
+
     getWorld:regf("getWorld"),
+    publishWorld:regf("publishWorld"),
+    uploadWorld:regf("uploadWorld"),
+    downloadWorld:regf("downloadWorld"),
 
     checkForInstUpdates:regf("checkForInstUpdates"),
     updateInst:regf("updateInst"),

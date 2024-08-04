@@ -177,20 +177,6 @@ export async function preInit(){
 
         return res;
     });
-    ipcMain.handle("getWorld",async (ev,arg:Arg_GetWorldMeta)=>{
-        if(!arg.iid) return;
-
-        let inst = await getModpackInst(arg.iid);
-        if(!inst || !inst.meta) return errors.couldNotFindPack.unwrap();
-
-        let res = (await semit<Arg_GetWorldMeta,Res_GetWorldMeta>("getWorldMeta",{
-            ...arg,
-            mpID:inst.meta.meta.id
-        })).unwrap();
-        if(!res) return;
-
-        return res;
-    });
 
     ipcMain.handle("getModIndexFiles",async (ev,arg:Arg_IID)=>{
         return (await getModIndexFiles(arg)).unwrap();
@@ -463,6 +449,376 @@ export async function preInit(){
     ipcMain.handle("getTheme",async (ev)=>{
         return sysInst.meta?.theme;
     });
+
+    // worlds
+    ipcMain.handle("getWorld",async (ev,arg:Arg_GetWorldMeta)=>{
+        if(!arg.iid) return;
+
+        let inst = await getModpackInst(arg.iid);
+        if(!inst || !inst.meta) return errors.couldNotFindPack.unwrap();
+
+        let res = (await semit<Arg_GetWorldMeta,Res_GetWorldMeta>("getWorldMeta",{
+            ...arg,
+            mpID:inst.meta.meta.id
+        })).unwrap();
+        if(!res) return;
+
+        return res;
+    });
+    ipcMain.handle("publishWorld",async (ev,arg:Arg_PublishWorld)=>{
+        if(!arg.iid) return errors.invalid_args.unwrap();
+
+        let inst = await getModpackInst(arg.iid);
+        if(!inst || !inst.meta) return errors.couldNotFindPack.unwrap();
+        // 
+
+        let prismLoc = inst.getRoot();
+        if(!prismLoc) return errors.failedToGetPrismInstPath.unwrap();
+
+        let saveLoc = path.join(prismLoc,"saves",arg.wID);
+        if(!await util_lstat(saveLoc)) return errors.worldDNE;
+
+        let allowedDirs = [
+            "data",
+            "datapacks",
+            "DIM1",
+            "DIM-1",
+            "dimensions",
+            "entities",
+            "integratedscripting",
+            "poi",
+            "region",
+            // maybe? -----
+            "serverconfig",
+            "advancements",
+            "stats"
+        ];
+
+        let acc = await getMainAccount();
+        if(!acc) return;
+
+        let res = (await semit<SArg_PublishWorld,Res_GetWorldMeta>("publishWorld",{
+            mpID:inst.meta.meta.id,
+            wID:arg.wID,
+            allowedDirs,
+            ownerUID:acc.profile.id,
+            ownerName:acc.profile.name
+        })).unwrap();
+        if(!res) return errors.failedToPublishWorld;
+
+        let w = await openCCMenu<UpdateProgress_InitData>("update_progress_menu",{iid:arg.iid});
+        if(!w) return errors.failedNewWindow.unwrap();
+
+        util_note("STARTED publishing world...");
+        w.webContents.send("updateProgress","main",0,1,"Initializing...");
+
+        let completed = 0;
+        let total = 0;
+
+        let files:{
+            loc:string;
+            sloc:string;
+            name:string;
+        }[] = [];
+        let failed:string[] = [];
+        let success:string[] = [];
+
+        // let rootList = await util_readdir(saveLoc);
+        let loop = async (loc:string,sloc:string)=>{
+            let list = await util_readdirWithTypes(loc);
+            for(const item of list){
+                if(item.isDirectory()){
+                    await loop(path.join(loc,item.name),path.join(sloc,item.name));
+                    continue;
+                }
+                total++;
+                files.push({
+                    loc:path.join(loc,item.name),
+                    sloc:path.join(sloc,item.name),
+                    name:item.name
+                });
+            }
+        };
+        // for(const f of rootList){
+        //     // if(!allowedDirs.includes(f)) continue; // THIS IS DISABLED FOR THE FIRST PUBLISH AND FIRST DOWNLOAD
+        //     await loop(path.join(saveLoc,f),f);
+        // }
+        await loop(path.join(saveLoc),"");
+
+        for(const {loc,sloc,name} of files){
+            let buf = await util_readBinary(loc);
+            if(!buf){
+                failed.push(sloc);
+                continue;
+            }
+            
+            let fres = (await semit<Arg_UploadWorldFile,boolean>("upload_world_file",{ // file res
+                buf,
+                mpID:inst.meta.meta.id,
+                path:sloc,
+                uid:acc.profile.id,
+                uname:acc.profile.name,
+                wID:arg.wID
+            })).unwrap();
+            if(!fres){
+                failed.push(sloc);
+                continue;
+            }
+
+            console.log("Upload: "+sloc);
+            w.webContents.send("updateProgress","main",completed,total,"Upload: "+name);
+            completed++;
+            success.push(sloc);
+        }
+
+        w.webContents.send("updateProgress","main",completed,total,"Finished.",{
+            sections:[
+                {
+                    header:`Failed: (${failed.length})`,
+                    items:failed
+                },
+                {
+                    header:`Success: (${success.length})`,
+                    items:success
+                }
+            ]
+        });
+
+        util_note("FINISHED publishing world...");
+        if(failed.length == 0) w.close();
+        else{
+            let res1 = (await semit<Arg_UnpublishWorld,boolean>("unpublishWorld",{
+                mpID:inst.meta.meta.id,
+                uid:acc.profile.id,
+                wID:arg.wID
+            })).unwrap();
+            if(!res1) return errors.failedToUnpublishWorld;
+            return;
+        }
+
+        let w2 = windowStack.find(v=>v.title == "Edit Instance");
+        if(w2) w2.webContents.send("updateSearch");
+
+        return new Result(true);
+    });
+    ipcMain.handle("uploadWorld",async (ev,arg:Arg_UploadWorld)=>{
+        return await uploadWorld(arg);
+    });
+    ipcMain.handle("downloadWorld",async (ev,arg:Arg_DownloadWorld)=>{
+        return await downloadWorld(arg);
+    });
+}
+
+export async function uploadWorld(arg:Arg_UploadWorld){
+    if(!arg.iid) return errors.invalid_args.unwrap();
+
+    let inst = await getModpackInst(arg.iid);
+    if(!inst || !inst.meta) return errors.couldNotFindPack.unwrap();
+    // 
+
+    let prismLoc = inst.getRoot();
+    if(!prismLoc) return errors.failedToGetPrismInstPath.unwrap();
+
+    let saveLoc = path.join(prismLoc,"saves",arg.wID);
+    if(!await util_lstat(saveLoc)) return errors.worldDNE.unwrap();
+    
+    let acc = await getMainAccount();
+    if(!acc) return;
+
+    let allowedDirs = (await semit<Arg_GetAllowedDirs,string[]|undefined>("getAllowedDirs",{
+        mpID:inst.meta.meta.id,
+        wID:arg.wID
+    })).unwrap();
+    if(!allowedDirs) return;
+
+    let w = await openCCMenu<UpdateProgress_InitData>("update_progress_menu",{iid:arg.iid});
+    if(!w) return errors.failedNewWindow.unwrap();
+
+    util_note("STARTED uploading world...");
+    w.webContents.send("updateProgress","main",0,1,"Initializing...");
+
+    let completed = 0;
+    let total = 0;
+
+    let files:{
+        loc:string;
+        sloc:string;
+        name:string;
+    }[] = [];
+    let failed:string[] = [];
+    let success:string[] = [];
+
+    let rootList = await util_readdir(saveLoc);
+    let loop = async (loc:string,sloc:string)=>{
+        let list = await util_readdirWithTypes(loc);
+        for(const item of list){
+            if(item.isDirectory()){
+                await loop(path.join(loc,item.name),path.join(sloc,item.name));
+                continue;
+            }
+            total++;
+            files.push({
+                loc:path.join(loc,item.name),
+                sloc:path.join(sloc,item.name),
+                name:item.name
+            });
+        }
+    };
+    for(const f of rootList){
+        if(!allowedDirs.includes(f)) continue; // THIS IS DISABLED FOR THE FIRST PUBLISH AND FIRST DOWNLOAD
+        await loop(path.join(saveLoc,f),f);
+    }
+
+    for(const {loc,sloc,name} of files){
+        let buf = await util_readBinary(loc);
+        if(!buf){
+            failed.push(sloc);
+            continue;
+        }
+        
+        let fres = (await semit<Arg_UploadWorldFile,boolean>("upload_world_file",{ // file res
+            buf,
+            mpID:inst.meta.meta.id,
+            path:sloc,
+            uid:acc.profile.id,
+            uname:acc.profile.name,
+            wID:arg.wID
+        })).unwrap();
+        if(!fres){
+            failed.push(sloc);
+            continue;
+        }
+
+        w.webContents.send("updateProgress","main",completed,total,"Upload: "+name);
+        completed++;
+        success.push(sloc);
+    }
+
+    // 
+    w.webContents.send("updateProgress","main",completed,total,"Finished.",{
+        sections:[
+            {
+                header:`Failed: (${failed.length})`,
+                items:failed
+            },
+            {
+                header:`Success: (${success.length})`,
+                items:success
+            }
+        ]
+    });
+
+    util_note("FINISHED uploading world...");
+
+    return true;
+}
+export async function downloadWorld(arg:Arg_DownloadWorld){
+    if(!arg.iid) return errors.invalid_args.unwrap();
+
+    let inst = await getModpackInst(arg.iid);
+    if(!inst || !inst.meta) return errors.couldNotFindPack.unwrap();
+    // 
+
+    let prismLoc = inst.getRoot();
+    if(!prismLoc) return errors.failedToGetPrismInstPath.unwrap();
+
+    let saveLoc = path.join(prismLoc,"saves",arg.wID);
+    if(!await util_lstat(saveLoc)) return errors.worldDNE.unwrap();
+    
+    let acc = await getMainAccount();
+    if(!acc) return;
+
+    let res = (await semit<Arg_GetWorldFiles,Res_GetWorldFiles>("getWorldFiles",{
+        mpID:inst.meta.meta.id,
+        wID:arg.wID
+    })).unwrap();
+    if(!res) return;
+
+    let w = await openCCMenu<UpdateProgress_InitData>("update_progress_menu",{iid:arg.iid});
+    if(!w) return errors.failedNewWindow.unwrap();
+
+    util_note("STARTED downloading world...");
+    w.webContents.send("updateProgress","main",0,1,"Initializing...");
+
+    let failed:string[] = [];
+    let success:string[] = [];
+    let completed = 0;
+    let total = res.files.length;
+
+    for(const {loc,sloc,n} of res.files){
+        let fres = (await semit<Arg_DownloadWorldFile,ModifiedFileData>("download_world_file",{ // file res
+            mpID:inst.meta.meta.id,
+            path:sloc,
+            wID:arg.wID
+        })).unwrap();
+        if(!fres){
+            failed.push(sloc);
+            // console.log("FAILED [1] - "+sloc);
+            continue;
+        }
+
+        await util_mkdir(path.dirname(path.join(saveLoc,sloc)));
+        let res = await util_writeBinary(path.join(saveLoc,sloc),Buffer.from(fres.buf));
+        if(!res){
+            failed.push(sloc);
+            // console.log("FAILED [2] - "+sloc,path.join(saveLoc,sloc));
+        }
+        else success.push(sloc);
+
+        w.webContents.send("updateProgress","main",completed,total,"Upload: "+n);
+        completed++;
+    }
+
+    // 
+    w.webContents.send("updateProgress","main",completed,total,"Finished.",{
+        sections:[
+            {
+                header:`Failed: (${failed.length})`,
+                items:failed
+            },
+            {
+                header:`Success: (${success.length})`,
+                items:success
+            }
+        ]
+    });
+
+    util_note("FINISHED downloading world...");
+
+    return true;
+}
+export async function unpublishWorld(arg:{
+    iid:string;
+    wID:string;
+}){
+    if(!arg.iid) return errors.invalid_args.unwrap();
+
+    let inst = await getModpackInst(arg.iid);
+    if(!inst || !inst.meta) return errors.couldNotFindPack.unwrap();
+
+    let acc = await getMainAccount();
+    if(!acc) return;
+    
+    let res1 = (await semit<Arg_UnpublishWorld,boolean>("unpublishWorld",{
+        mpID:inst.meta.meta.id,
+        uid:acc.profile.id,
+        wID:arg.wID
+    })).unwrap();
+    if(!res1) return errors.failedToUnpublishWorld;
+
+    let w2 = windowStack.find(v=>v.title == "Edit Instance");
+    if(w2) w2.webContents.send("updateSearch");
+
+    return new Result(true);
+}
+
+const extractTMP = path.join(appPath,".tmp","extract");
+async function startExtractTMP(){
+    await util_rm(extractTMP,true);
+    return util_mkdir(extractTMP,true);
+}
+function endExtractTMP(){
+    return util_rm(extractTMP,true);
 }
 
 export async function downloadRP(arg:Arg_DownloadRP){
@@ -2661,10 +3017,10 @@ async function alertBox(w:BrowserWindow,message:string,title="Error"){
 // 
 
 import { ETL_Generic, evtTimeline, parseCFGFile, pathTo7zip, searchStringCompare, util_cp, util_lstat, util_mkdir, util_note, util_note2, util_readBinary, util_readdir, util_readdirWithTypes, util_readJSON, util_readText, util_readTOML, util_rename, util_rm, util_utimes, util_warn, util_writeBinary, util_writeJSON, util_writeText, wait } from "./util";
-import { AddRP_InitData, Arg_AddModToFolder, Arg_ChangeFolderType, Arg_CheckModUpdates, Arg_CreateFolder, Arg_DownloadRP, Arg_DownloadRPFile, Arg_GetInstances, Arg_GetInstMods, Arg_GetInstResourcePacks, Arg_GetInstScreenshots, Arg_GetInstWorlds, Arg_GetPrismInstances, Arg_GetRPs, Arg_GetRPVersions, Arg_GetWorldMeta, Arg_IID, Arg_RemoveRP, Arg_SearchPacks, Arg_SyncMods, Arg_UnpackRP, Arg_UploadRP, ArgC_GetRPs, CurseForgeUpdate, Data_PrismInstancesMenu, FSTestData, FullModData, InputMenu_InitData, InstGroups, LocalModData, MMCPack, ModData, ModifiedFile, ModifiedFileData, ModIndex, ModInfo, ModrinthModData, ModrinthUpdate, ModsFolder, ModsFolderDef, PackMetaData, RemoteModData, Res_DownloadRP, Res_GetInstMods, Res_GetInstResourcePacks, Res_GetInstScreenshots, Res_GetModIndexFiles, Res_GetModUpdates, Res_GetPrismInstances, Res_GetRPs, Res_GetRPVersions, Res_GetWorldMeta, Res_InputMenu, Res_SyncMods, RPCache, UpdateProgress_InitData } from "./interface";
+import { AddRP_InitData, Arg_AddModToFolder, Arg_ChangeFolderType, Arg_CheckModUpdates, Arg_CreateFolder, Arg_DownloadRP, Arg_DownloadRPFile, Arg_DownloadWorld, Arg_DownloadWorldFile, Arg_GetAllowedDirs, Arg_GetInstances, Arg_GetInstMods, Arg_GetInstResourcePacks, Arg_GetInstScreenshots, Arg_GetInstWorlds, Arg_GetPrismInstances, Arg_GetRPs, Arg_GetRPVersions, Arg_GetWorldFiles, Arg_GetWorldMeta, Arg_IID, Arg_PublishWorld, Arg_RemoveRP, Arg_SearchPacks, Arg_SyncMods, Arg_UnpackRP, Arg_UnpublishWorld, Arg_UploadRP, Arg_UploadWorld, Arg_UploadWorldFile, ArgC_GetRPs, CurseForgeUpdate, Data_PrismInstancesMenu, FSTestData, FullModData, InputMenu_InitData, InstGroups, LocalModData, MMCPack, ModData, ModifiedFile, ModifiedFileData, ModIndex, ModInfo, ModrinthModData, ModrinthUpdate, ModsFolder, ModsFolderDef, PackMetaData, RemoteModData, Res_DownloadRP, Res_GetInstMods, Res_GetInstResourcePacks, Res_GetInstScreenshots, Res_GetModIndexFiles, Res_GetModUpdates, Res_GetPrismInstances, Res_GetRPs, Res_GetRPVersions, Res_GetWorldFiles, Res_GetWorldMeta, Res_InputMenu, Res_SyncMods, RPCache, SArg_PublishWorld, UpdateProgress_InitData } from "./interface";
 import { getModUpdates, getPackMeta, searchPacks, searchPacksMeta, semit, updateSocketURL } from "./network";
 import { ListPrismInstReason, openCCMenu, openCCMenuCB, SearchPacksMenu, ViewInstanceMenu, windowStack } from "./menu_api";
-import { addInstance, appPath, cleanModName, cleanModNameDisabled, dataPath, getModFolderPath, getModpackInst, getModpackPath, instCache, LocalModInst, ModPackInst, RemoteModInst, slugMap, sysInst } from "./db";
+import { addInstance, appPath, cleanModName, cleanModNameDisabled, dataPath, getMainAccount, getModFolderPath, getModpackInst, getModpackPath, instCache, LocalModInst, ModPackInst, RemoteModInst, slugMap, sysInst } from "./db";
 import { InstanceData } from "./db_types";
 import { errors, Result } from "./errors";
 import { readConfigFile, StringMappingType } from "typescript";

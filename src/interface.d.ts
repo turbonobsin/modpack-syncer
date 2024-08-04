@@ -665,7 +665,6 @@ interface Res_GetRPVersions{
 }
 
 interface WorldMeta{
-    wID:string;
     icon:string;
     ownerUID:string;
     ownerName:string;
@@ -678,7 +677,61 @@ interface Arg_GetWorldMeta{
 }
 interface Res_GetWorldMeta{
     isPublished:boolean;
+    wID:string;
     data?:WorldMeta;
+}
+interface Arg_PublishWorld{
+    iid:string;
+    wID:string;
+}
+interface SArg_PublishWorld{ // server arg
+    mpID:string;
+    wID:string;
+    allowedDirs:string[];
+    ownerUID:string;
+    ownerName:string;
+}
+interface Arg_UnpublishWorld{
+    mpID:string;
+    wID:string;
+    uid:string;
+}
+interface Arg_UploadWorldFile{
+    path:string;
+    mpID:string;
+    wID:string;
+    uid:string;
+    uname:string;
+    buf:Uint8Array;
+}
+interface Arg_DownloadWorldFile{
+    path:string;
+    mpID:string;
+    wID:string;
+}
+interface Arg_UploadWorld{
+    iid:string;
+    wID:string;
+}
+interface Arg_DownloadWorld{
+    iid:string;
+    wID:string;
+}
+interface Arg_GetAllowedDirs{
+    mpID:string;
+    wID:string;
+}
+interface Arg_GetWorldFiles{
+    mpID:string;
+    wID:string;
+}
+interface Res_GetWorldFiles{
+    files:WorldFile[];
+}
+interface WorldFile{
+    n:string;
+    loc:string;
+    sloc:string;
 }
 
 // 
@@ -707,7 +760,12 @@ export interface IGlobalAPI{
     getInstMods:(arg:Arg_GetInstMods)=>Promise<Res_GetInstMods>;
     getInstRPs:(arg:Arg_GetInstResourcePacks)=>Promise<Res_GetInstResourcePacks|undefined>;
     getInstWorlds:(arg:Arg_GetInstWorlds)=>Promise<Res_GetInstWorlds|undefined>;
+
+    // worlds
     getWorld:(arg:Arg_GetWorldMeta)=>Promise<Res_GetWorldMeta|undefined>;
+    publishWorld:(arg:Arg_PublishWorld)=>Promise<boolean>;
+    uploadWorld:(arg:Arg_UploadWorld)=>Promise<boolean>;
+    downloadWorld:(arg:Arg_DownloadWorld)=>Promise<boolean>;
     
     getModIndexFiles:(arg:Arg_IID)=>Promise<Res_GetModIndexFiles>;
     cacheMods:(iid:string)=>Promise<void>;

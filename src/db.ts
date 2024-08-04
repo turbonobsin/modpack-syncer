@@ -637,6 +637,8 @@ export class ModPackInst extends Inst<ModPackInstData>{
                         
                         totalFiles++;
                         let buf = await util_readBinary(fileLoc);
+                        if(!buf) continue;
+
                         let file = new FFile(item.name,buf);
                         f.items.push(file);
                         files.push({

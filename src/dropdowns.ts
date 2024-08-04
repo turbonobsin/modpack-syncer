@@ -4,7 +4,7 @@ import { errors, Result } from "./errors";
 import { ETL_Generic, evtTimeline, util_cp, util_lstat, util_mkdir, util_note, util_readJSON, util_readText, util_readTOML, util_rename, util_rm, util_warn, util_writeJSON, util_writeText } from "./util";
 import path from "path";
 import { electron } from "process";
-import { checkForModUpdates, downloadRP, genAllThePBR, getInstMods_old, getModIndexFiles } from "./app";
+import { checkForModUpdates, downloadRP, genAllThePBR, getInstMods_old, getModIndexFiles, unpublishWorld } from "./app";
 import { openCCMenu } from "./menu_api";
 import { IMO_Combobox, IMO_Input, IMO_MultiSelect, InputMenu_InitData, ModsFolderDef, Res_InputMenu, UpdateProgress_InitData } from "./interface";
 
@@ -533,7 +533,67 @@ export const allDropdowns = {
         
         // 
         menu.popup({window:_w});
-    }
+    },
+    worldItem:async (_w:BrowserWindow,iid:string,wID:string)=>{
+        let inst = await getModpackInst(iid);
+        if(!inst || !inst.meta) return;
+
+        let loc = inst.getPrismInstPath();
+        if(!loc) return errors.failedToGetPrismInstPath.unwrap();
+        loc = path.join(loc,".minecraft","saves",wID);
+        let loc1 = loc;
+
+        let menu = Menu.buildFromTemplate([
+            {
+                label:"Show in Explorer",
+                click:()=>{
+                    shell.showItemInFolder(loc);
+                }
+            },
+            {
+                label:"Remove",
+                click:async ()=>{
+                    let res = await dialog.showMessageBox({
+                        message:`Are you sure you want to remove this world?\n\nIt will be moved to the "saves/.deleted" folder.`,
+                        buttons:["Cancel","Remove"]
+                    });
+                    if(res.response != 1) return;
+
+                    await util_mkdir(path.join(loc1,"..",".deleted"));
+                    let res2 = await util_rename(loc1,path.join(loc1,"..",".deleted",wID));
+                    if(!res2) errors.failedToRemoveWorld.unwrap();
+                    else _w.webContents.send("updateSearch");
+                }
+            }
+        ]);
+
+        menu.popup({window:_w});
+    },
+    worldOptions:async (_w:BrowserWindow,iid:string,wID:string)=>{
+        let inst = await getModpackInst(iid);
+        if(!inst || !inst.meta) return;
+
+        let user = await getMainAccount();
+        if(!user) return;
+
+        let menu = Menu.buildFromTemplate([
+            {
+                label:"Unpublish",
+                click:async ()=>{
+                    let res = await dialog.showMessageBox({
+                        message:"Are you sure you want to unpublish this world?\n\nYou can only do this if you were the original publisher of the world.\n\nProceed with caution, this could cause unexpected issues.",
+                        buttons:["Cancel","Unpublish"]
+                    });
+                    if(res.response != 1) return;
+                    unpublishWorld({
+                        iid,wID
+                    });
+                }
+            }
+        ]);
+
+        menu.popup({window:_w});
+    },
 };
 
 export async function toggleModEnabled(iid:string,filename:string,force?:boolean): Promise<Result<{newName:string}>>{
