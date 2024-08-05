@@ -80,6 +80,22 @@ export async function preInit(){
                 continue;
             }
             list.push(inst.meta);
+
+            let prismRoot = inst.getRoot();
+            if(prismRoot){
+                let cfg = parseCFGFile(await util_readText(path.join(prismRoot,"..","instance.cfg")));
+                if(!cfg){
+                    util_warn("Failed to read pack config: "+inst);
+                    inst.meta.loc = path.join(prismRoot,"icon.png");
+                }
+                else{
+                    let iconKey = cfg.getValue("iconKey");
+                    let iconPath = path.join(sysInst.meta!.prismRoot!,"icons",iconKey+".png");
+                    if(!await util_lstat(iconPath)) inst.meta.loc = path.join(prismRoot,"icon.png");
+                    else inst.meta.loc = iconPath;
+                }               
+            }
+            else inst.meta.loc = "";
         }
 
         return list;
@@ -140,6 +156,10 @@ export async function preInit(){
         // instCfg.setValue("JavaVersion","21.0.3");
         // instCfg.setValue("OverrideJavaLocation","true");
         // await util_writeText(cfgPath,instCfg.toText());
+
+        pack.meta.isRunning = true;
+        pack.meta.lastLaunched = Date.now();
+        await pack.save();
 
         let cmd = `${path.join(sysInst.meta.prismExe,"prismlauncher")} --launch "${pack.meta.linkName}"`;
         util_warn("EXEC:",cmd);
@@ -451,19 +471,8 @@ export async function preInit(){
     });
 
     // worlds
-    ipcMain.handle("getWorld",async (ev,arg:Arg_GetWorldMeta)=>{
-        if(!arg.iid) return;
-
-        let inst = await getModpackInst(arg.iid);
-        if(!inst || !inst.meta) return errors.couldNotFindPack.unwrap();
-
-        let res = (await semit<Arg_GetWorldMeta,Res_GetWorldMeta>("getWorldMeta",{
-            ...arg,
-            mpID:inst.meta.meta.id
-        })).unwrap();
-        if(!res) return;
-
-        return res;
+    ipcMain.handle("getWorld",async (ev,arg:Arg_GetWorldInfo)=>{
+        return await getWorld(arg);
     });
     ipcMain.handle("publishWorld",async (ev,arg:Arg_PublishWorld)=>{
         if(!arg.iid) return errors.invalid_args.unwrap();
@@ -497,7 +506,7 @@ export async function preInit(){
         let acc = await getMainAccount();
         if(!acc) return;
 
-        let res = (await semit<SArg_PublishWorld,Res_GetWorldMeta>("publishWorld",{
+        let res = (await semit<SArg_PublishWorld,Res_GetWorldInfo>("publishWorld",{
             mpID:inst.meta.meta.id,
             wID:arg.wID,
             allowedDirs,
@@ -604,12 +613,83 @@ export async function preInit(){
     ipcMain.handle("uploadWorld",async (ev,arg:Arg_UploadWorld)=>{
         return await uploadWorld(arg);
     });
-    ipcMain.handle("downloadWorld",async (ev,arg:Arg_DownloadWorld)=>{
-        return await downloadWorld(arg);
+    ipcMain.handle("downloadWorld",async (ev,arg:Arg_DownloadWorld,useTime=true)=>{
+        // if(arg.forceAllFiles) useTime = false; // might not need this
+        return await downloadWorld(arg,useTime);
+    });
+    ipcMain.handle("getServerWorlds",async (ev,arg:Arg_GetServerWorlds)=>{
+        if(!arg.iid) return errors.invalid_args.unwrap();
+
+        let inst = await getModpackInst(arg.iid);
+        if(!inst || !inst.meta) return errors.couldNotFindPack.unwrap();
+
+        let prismRoot = inst.getRoot();
+        if(!prismRoot) return errors.failedToGetPrismInstPath.unwrap();
+        
+        let existing = await util_readdir(path.join(prismRoot,"saves"));
+        // let existing = inst.meta.worlds.map(v=>v.wID); // even though this is faster, if the user changes the name of a world manually or deletes it manually then it may be screwed up
+        
+        let res = (await semit<SArg_GetServerWorlds,Res_GetServerWorlds>("getServerWorlds",{
+            existing,
+            mpID:inst.meta.meta.id
+        })).unwrap();
+        if(!res) return;
+
+        for(const w of res.list){
+            w.icon = path.join(prismRoot,"saves",w.wID,"icon.png");
+        }
+
+        return res;
+    });
+    ipcMain.handle("getWorldImg",async (ev,iid:string,wID:string)=>{
+        if(!sysInst.meta) return errors.noSys.unwrap();
+        
+        let inst = await getModpackInst(iid);
+        if(!inst || !inst.meta) return errors.couldNotFindPack.unwrap();
+
+        if(!inst.meta.meta.id) return errors.failedToGetPackLink.unwrap();
+
+        let url = new URL(sysInst.meta.serverURL.replaceAll("\\","/"));
+        url.pathname = "world_image";
+        url.searchParams.set("mpID",inst.meta.meta.id);
+        url.searchParams.set("wID",wID);
+
+        return url.href;
+    });
+    ipcMain.handle("takeWorldOwnership",async (ev,arg:Arg_TakeWorldOwnership)=>{
+        if(!sysInst.meta) return errors.noSys.unwrap();
+        
+        let inst = await getModpackInst(arg.iid);
+        if(!inst || !inst.meta) return errors.couldNotFindPack.unwrap();
+        if(!inst.meta.meta.id) return errors.failedToGetPackLink.unwrap();
+
+        let res = (await semit<SArg_TakeWorldOwnership,boolean>("takeWorldOwnership",{
+            ...arg,
+            mpID:inst.meta.meta.id
+        })).unwrap();
+        if(!res) return;
     });
 }
 
-export async function uploadWorld(arg:Arg_UploadWorld){
+export async function getWorld(arg:Arg_GetWorldInfo):Promise<Res_GetWorldInfo|undefined>{
+    if(!arg.iid) return;
+
+    let inst = await getModpackInst(arg.iid);
+    if(!inst || !inst.meta) return errors.couldNotFindPack.unwrap();
+
+    let res = (await semit<Arg_GetWorldInfo,Res_GetWorldInfo>("getWorldMeta",{
+        ...arg,
+        mpID:inst.meta.meta.id
+    })).unwrap();
+    if(!res) return;
+
+    let w = inst.meta.worlds.find(v=>v.wID == arg.wID);
+    res.yourUpdate = w?.update ?? 0;
+
+    return res;
+}
+
+export async function uploadWorld(arg:Arg_UploadWorld,useTime=true){
     if(!arg.iid) return errors.invalid_args.unwrap();
 
     let inst = await getModpackInst(arg.iid);
@@ -625,9 +705,13 @@ export async function uploadWorld(arg:Arg_UploadWorld){
     let acc = await getMainAccount();
     if(!acc) return;
 
+    let wMeta = inst.meta.worlds.find(v=>v.wID == arg.wID);
+    if(!wMeta) return errors.couldNotFindWorldMeta.unwrap();
+
     let allowedDirs = (await semit<Arg_GetAllowedDirs,string[]|undefined>("getAllowedDirs",{
         mpID:inst.meta.meta.id,
-        wID:arg.wID
+        wID:arg.wID,
+        uid:acc.profile.id
     })).unwrap();
     if(!allowedDirs) return;
 
@@ -648,13 +732,24 @@ export async function uploadWorld(arg:Arg_UploadWorld){
     let failed:string[] = [];
     let success:string[] = [];
 
+    let syncTime = wMeta.lastSync ?? -1;
+
     let rootList = await util_readdir(saveLoc);
     let loop = async (loc:string,sloc:string)=>{
         let list = await util_readdirWithTypes(loc);
         for(const item of list){
+            if(w.isDestroyed()) return;
             if(item.isDirectory()){
                 await loop(path.join(loc,item.name),path.join(sloc,item.name));
                 continue;
+            }
+            if(useTime){
+                let stat = await util_lstat(path.join(loc,item.name));
+                if(!stat){
+                    util_warn("This error should never happen, failed to open stats after just detecting it was there: ",loc,item.name);
+                    continue;
+                }
+                if(Math.max(stat.mtimeMs,stat.birthtimeMs) <= syncTime) continue; // skip
             }
             total++;
             files.push({
@@ -669,7 +764,19 @@ export async function uploadWorld(arg:Arg_UploadWorld){
         await loop(path.join(saveLoc,f),f);
     }
 
+    if(w.isDestroyed()) return;
+
+    if(total == 0){
+        w.close();
+        await dialog.showMessageBox({
+            message:"Up to date"
+        });
+        return;
+    }
+
     for(const {loc,sloc,name} of files){
+        if(w.isDestroyed()) return;
+        
         let buf = await util_readBinary(loc);
         if(!buf){
             failed.push(sloc);
@@ -710,9 +817,23 @@ export async function uploadWorld(arg:Arg_UploadWorld){
 
     util_note("FINISHED uploading world...");
 
+    let res2 = (await semit<Arg_FinishUploadWorld,Res_FinishUploadWorld>("finishUploadWorld",{
+        mpID:inst.meta.meta.id,
+        wID:arg.wID,
+        uid:acc.profile.id,
+        uname:acc.profile.name
+    })).unwrap();
+    if(!res2) return;
+    
+    wMeta.update = res2.update;
+    wMeta.lastSync = Date.now();
+    await inst.save();
+
+    windowStack.find(v=>v.title == "Edit Instance")?.webContents.send("updateSearch");
+
     return true;
 }
-export async function downloadWorld(arg:Arg_DownloadWorld){
+export async function downloadWorld(arg:Arg_DownloadWorld,useTime=true){
     if(!arg.iid) return errors.invalid_args.unwrap();
 
     let inst = await getModpackInst(arg.iid);
@@ -723,16 +844,53 @@ export async function downloadWorld(arg:Arg_DownloadWorld){
     if(!prismLoc) return errors.failedToGetPrismInstPath.unwrap();
 
     let saveLoc = path.join(prismLoc,"saves",arg.wID);
-    if(!await util_lstat(saveLoc)) return errors.worldDNE.unwrap();
+    // if(!await util_lstat(saveLoc)) return errors.worldDNE.unwrap();
+    await util_mkdir(saveLoc,true);
     
     let acc = await getMainAccount();
     if(!acc) return;
 
+    let wMeta = inst.meta.worlds.find(v=>v.wID == arg.wID);
+    // if(!wMeta) return errors.couldNotFindWorldMeta.unwrap();
+    if(!wMeta){
+        wMeta = {
+            wID:arg.wID,
+            lastSync:-1,
+            update:-1
+        };
+        inst.meta.worlds.push(wMeta);
+        await inst.save();
+    }
+
+    // let world = await getWorld({iid:arg.iid,wID:arg.wID,mpID:inst.meta.meta.id});
+    // if(!world || !world.data) return errors.couldNotFindWorldMeta.unwrap(); //[2] - may need to change this error to something more unique in the future but it shouldn't be likely to happen if the others passed
+
     let res = (await semit<Arg_GetWorldFiles,Res_GetWorldFiles>("getWorldFiles",{
         mpID:inst.meta.meta.id,
-        wID:arg.wID
+        wID:arg.wID,
+        useTime,
+        syncTime:wMeta.lastSync ?? -1,
+        update:wMeta.update ?? -1,
+        uid:acc.profile.id,
+        forceAllFiles:arg.forceAllFiles
     })).unwrap();
     if(!res) return;
+
+    if(res.files.length == 0){
+        util_note2(wMeta.update,res.update);
+        await dialog.showMessageBox({
+            message:"Up to date"
+        });
+        return;
+    }
+
+    // DONT KNOW OF AN EASY FIX FOR THIS YET
+    // if(wMeta.update >= res.update){
+    //     await dialog.showMessageBox({
+    //         message:"Up to date"
+    //     });
+    //     return;
+    // }
 
     let w = await openCCMenu<UpdateProgress_InitData>("update_progress_menu",{iid:arg.iid});
     if(!w) return errors.failedNewWindow.unwrap();
@@ -746,6 +904,8 @@ export async function downloadWorld(arg:Arg_DownloadWorld){
     let total = res.files.length;
 
     for(const {loc,sloc,n} of res.files){
+        if(w.isDestroyed()) return;
+        
         let fres = (await semit<Arg_DownloadWorldFile,ModifiedFileData>("download_world_file",{ // file res
             mpID:inst.meta.meta.id,
             path:sloc,
@@ -753,15 +913,16 @@ export async function downloadWorld(arg:Arg_DownloadWorld){
         })).unwrap();
         if(!fres){
             failed.push(sloc);
-            // console.log("FAILED [1] - "+sloc);
+            console.log("FAILED [1] - "+sloc);
             continue;
         }
 
-        await util_mkdir(path.dirname(path.join(saveLoc,sloc)));
+        let folderRes = await util_mkdir(path.dirname(path.join(saveLoc,sloc)),true);
+        if(!folderRes) util_warn("Error creating folder: "+path.dirname(path.join(saveLoc,sloc)));
         let res = await util_writeBinary(path.join(saveLoc,sloc),Buffer.from(fres.buf));
         if(!res){
             failed.push(sloc);
-            // console.log("FAILED [2] - "+sloc,path.join(saveLoc,sloc));
+            console.log("FAILED [2] - "+sloc,path.join(saveLoc,sloc));
         }
         else success.push(sloc);
 
@@ -774,16 +935,27 @@ export async function downloadWorld(arg:Arg_DownloadWorld){
         sections:[
             {
                 header:`Failed: (${failed.length})`,
-                items:failed
+                text:failed
             },
             {
                 header:`Success: (${success.length})`,
-                items:success
+                text:success
             }
         ]
     });
+    
+    wMeta.update = res.update;
+    wMeta.lastSync = Date.now();
+    await inst.save();
 
-    util_note("FINISHED downloading world...");
+    util_note("FINISHED downloading world...",failed);
+
+    windowStack.find(v=>v.title == "Edit Instance")?.webContents.send("updateSearch");
+
+    if(failed.length == 0){
+        windowStack.find(v=>v.title == "Add World")?.close();
+        w.close();
+    }
 
     return true;
 }
@@ -1956,9 +2128,9 @@ async function getInstMods(arg:Arg_GetInstMods): Promise<Result<Res_GetInstMods>
             }
             let cleanName = cleanModName(file.name);
 
-            let fNameI = inst.meta.folders.findIndex(v=>v.mods.includes(cleanName));
+            let fRef = inst.meta.folders.find(v=>v.mods.includes(cleanName));
             let f:ModsFolder | undefined;
-            if(fNameI != -1) f = data.folders[fNameI];
+            if(fRef) f = data.folders.find(v=>v.name == fRef.name);
 
             if(!f) f = rootFolder;
             if(!f){
@@ -1992,6 +2164,7 @@ async function getInstMods(arg:Arg_GetInstMods): Promise<Result<Res_GetInstMods>
                         instCache.remoteMods.set(cleanName,rinst);
                     }
                 }
+                cacheData.meta.file = file.name; // hopefully fix
                 f.mods.push({
                     local:cacheData.meta,
                     remote:remoteCache
@@ -3017,7 +3190,7 @@ async function alertBox(w:BrowserWindow,message:string,title="Error"){
 // 
 
 import { ETL_Generic, evtTimeline, parseCFGFile, pathTo7zip, searchStringCompare, util_cp, util_lstat, util_mkdir, util_note, util_note2, util_readBinary, util_readdir, util_readdirWithTypes, util_readJSON, util_readText, util_readTOML, util_rename, util_rm, util_utimes, util_warn, util_writeBinary, util_writeJSON, util_writeText, wait } from "./util";
-import { AddRP_InitData, Arg_AddModToFolder, Arg_ChangeFolderType, Arg_CheckModUpdates, Arg_CreateFolder, Arg_DownloadRP, Arg_DownloadRPFile, Arg_DownloadWorld, Arg_DownloadWorldFile, Arg_GetAllowedDirs, Arg_GetInstances, Arg_GetInstMods, Arg_GetInstResourcePacks, Arg_GetInstScreenshots, Arg_GetInstWorlds, Arg_GetPrismInstances, Arg_GetRPs, Arg_GetRPVersions, Arg_GetWorldFiles, Arg_GetWorldMeta, Arg_IID, Arg_PublishWorld, Arg_RemoveRP, Arg_SearchPacks, Arg_SyncMods, Arg_UnpackRP, Arg_UnpublishWorld, Arg_UploadRP, Arg_UploadWorld, Arg_UploadWorldFile, ArgC_GetRPs, CurseForgeUpdate, Data_PrismInstancesMenu, FSTestData, FullModData, InputMenu_InitData, InstGroups, LocalModData, MMCPack, ModData, ModifiedFile, ModifiedFileData, ModIndex, ModInfo, ModrinthModData, ModrinthUpdate, ModsFolder, ModsFolderDef, PackMetaData, RemoteModData, Res_DownloadRP, Res_GetInstMods, Res_GetInstResourcePacks, Res_GetInstScreenshots, Res_GetModIndexFiles, Res_GetModUpdates, Res_GetPrismInstances, Res_GetRPs, Res_GetRPVersions, Res_GetWorldFiles, Res_GetWorldMeta, Res_InputMenu, Res_SyncMods, RPCache, SArg_PublishWorld, UpdateProgress_InitData } from "./interface";
+import { AddRP_InitData, Arg_AddModToFolder, Arg_ChangeFolderType, Arg_CheckModUpdates, Arg_CreateFolder, Arg_DownloadRP, Arg_DownloadRPFile, Arg_DownloadWorld, Arg_DownloadWorldFile, Arg_FinishUploadWorld, Arg_GetAllowedDirs, Arg_GetInstances, Arg_GetInstMods, Arg_GetInstResourcePacks, Arg_GetInstScreenshots, Arg_GetInstWorlds, Arg_GetPrismInstances, Arg_GetRPs, Arg_GetRPVersions, Arg_GetServerWorlds, Arg_GetWorldFiles, Arg_GetWorldInfo, Arg_IID, Arg_PublishWorld, Arg_RemoveRP, Arg_SearchPacks, Arg_SyncMods, Arg_TakeWorldOwnership, Arg_UnpackRP, Arg_UnpublishWorld, Arg_UploadRP, Arg_UploadWorld, Arg_UploadWorldFile, ArgC_GetRPs, CurseForgeUpdate, Data_PrismInstancesMenu, FSTestData, FullModData, InputMenu_InitData, InstGroups, LocalModData, MMCPack, ModData, ModifiedFile, ModifiedFileData, ModIndex, ModInfo, ModrinthModData, ModrinthUpdate, ModsFolder, ModsFolderDef, PackMetaData, RemoteModData, Res_DownloadRP, Res_FinishUploadWorld, Res_GetInstMods, Res_GetInstResourcePacks, Res_GetInstScreenshots, Res_GetModIndexFiles, Res_GetModUpdates, Res_GetPrismInstances, Res_GetRPs, Res_GetRPVersions, Res_GetServerWorlds, Res_GetWorldFiles, Res_GetWorldInfo, Res_InputMenu, Res_SyncMods, RPCache, SArg_GetServerWorlds, SArg_PublishWorld, SArg_TakeWorldOwnership, UpdateProgress_InitData } from "./interface";
 import { getModUpdates, getPackMeta, searchPacks, searchPacksMeta, semit, updateSocketURL } from "./network";
 import { ListPrismInstReason, openCCMenu, openCCMenuCB, SearchPacksMenu, ViewInstanceMenu, windowStack } from "./menu_api";
 import { addInstance, appPath, cleanModName, cleanModNameDisabled, dataPath, getMainAccount, getModFolderPath, getModpackInst, getModpackPath, instCache, LocalModInst, ModPackInst, RemoteModInst, slugMap, sysInst } from "./db";
@@ -3030,6 +3203,7 @@ import { Dirent } from "fs";
 import { CineonToneMapping } from "three";
 import axios from "axios";
 import { toggleModEnabled, allDropdowns } from "./dropdowns";
+import { text } from "stream/consumers";
 
 async function fsTest(customPath?:string): Promise<FSTestData|undefined>{
     let instancePath:string;

@@ -1,9 +1,10 @@
 import { io } from "socket.io-client";
-import { Arg_CheckModUpdates, Arg_GetModUpdates, Arg_SearchPacks, PackMetaData, Res_GetModUpdates, Res_SearchPacks, Res_SearchPacksMeta } from "./interface";
+import { Arg_CheckModUpdates, Arg_GetModUpdates, Arg_SearchPacks, PackMetaData, Res_GetModUpdates, Res_SearchPacks, Res_SearchPacksMeta, UpdateSearch } from "./interface";
 import { util_warn } from "./util";
 import { errors, Result } from "./errors";
-import { sysInst } from "./db";
+import { instCache, ModPackInst, sysInst } from "./db";
 import { Socket } from "socket.io";
+import { windowStack } from "./menu_api";
 // const socket = io({
 //     host:"http://localhost:3000"
 // });
@@ -24,6 +25,25 @@ export function updateSocketURL(){
 console.log("---loaded network.ts");
 
 // 
+
+socket.on("updateSearch",(arg:UpdateSearch)=>{
+    let w = windowStack.find(v=>v.title == "Edit Instance");
+    if(!w) return;
+
+    let inst:ModPackInst|undefined;
+    for(const [k,v] of instCache.modpack){
+        if(v.meta?.meta.id != arg.mpID){
+            inst = v;
+            break;
+        }
+    }
+    if(!inst) return;
+    if(!inst.meta?.meta.id) return;
+
+    w.webContents.send("updateSearch",{
+        iid:inst.meta.meta.id
+    });
+});
 
 export type Err<T> = {
     err?:string,

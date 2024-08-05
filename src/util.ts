@@ -236,6 +236,38 @@ export function util_utimes(path:string,ops:{
     // });
 }
 
+export function util_testAccess(loc:fs.PathLike){
+    return new Promise<boolean>(resolve=>{
+        fs.open(loc,(err,fd)=>{
+            if(err){
+                // console.log("-- there was an err: ",err);
+                resolve(false);
+            }
+            // EPERM
+    
+            if(err && err.code == "EBUSY"){
+                // console.log("file is locked, do nothing.");
+                resolve(false);
+            }
+            else if(err && err.code == "ENOENT"){
+                // console.log("it was deleted.");
+                resolve(false);
+            }
+            else{
+                // console.log(">> File is accessible.",fd);
+                resolve(true);
+                if(fd != undefined) fs.close(fd,()=>{
+                    fs.unlink(loc,err=>{
+                        if(!err){
+                            // console.log("deleted?");
+                        }
+                    });
+                });
+            }
+        });
+    });
+}
+
 // 
 export function util_warn(...text:string[]){
     // console.log('\x1b[36m%s\x1b[0m', 'I am cyan'); // cyan

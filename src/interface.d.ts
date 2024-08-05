@@ -262,7 +262,7 @@ interface World_Data{
     wID:string;
     data?:{
         icon?:string;
-    }
+    };
     // data?:{ // data will be defined only if the Resource Pack has been unpacked into a folder (because I can't efficiently read the data otherwise)
     //     icon?:string;
     //     meta?:RP_MCMeta;
@@ -649,6 +649,9 @@ interface AddRP_InitData{
     iid:string;
     // data:Res_GetRPs;
 }
+interface AddWorld_InitData{
+    iid:string;
+}
 
 interface Arg_GetRPVersions{
     mpID:string;
@@ -664,22 +667,27 @@ interface Res_GetRPVersions{
     }[];
 }
 
-interface WorldMeta{
+interface WorldInfo{
     icon:string;
     ownerUID:string;
     ownerName:string;
+    update:number;
+    publisherName:string;
 }
-interface Arg_GetWorldMeta{
+interface Arg_GetWorldInfo{
     iid?:string;
     // 
     mpID?:string;
     wID:string;
 }
-interface Res_GetWorldMeta{
+interface Res_GetWorldInfo{
     isPublished:boolean;
     wID:string;
-    data?:WorldMeta;
+    data?:WorldInfo;
+    yourUpdate:number; // for just the client side
+    state:WorldState;
 }
+type WorldState = "" | "inUse";
 interface Arg_PublishWorld{
     iid:string;
     wID:string;
@@ -716,22 +724,78 @@ interface Arg_UploadWorld{
 interface Arg_DownloadWorld{
     iid:string;
     wID:string;
+    forceAllFiles?:boolean;
 }
 interface Arg_GetAllowedDirs{
     mpID:string;
     wID:string;
+    uid:string;
 }
 interface Arg_GetWorldFiles{
     mpID:string;
     wID:string;
+    useTime:boolean;
+    syncTime:number;
+    update:number;
+    uid:string;
+    forceAllFiles?:boolean;
 }
 interface Res_GetWorldFiles{
     files:WorldFile[];
+    update:number;
 }
 interface WorldFile{
     n:string;
     loc:string;
     sloc:string;
+}
+interface WorldMeta{
+    wID:string;
+    lastSync:number; // this time is when the last sync (download or upload) has completely finished so it doesn't include the files it just did something with and it works in both directions for upload/download
+    update:number; // not sure if I'll use this but it's for future proofing and hopefully faster up to date checks
+}
+interface Arg_FinishUploadWorld{
+    mpID:string;
+    wID:string;
+    uid:string;
+    uname:string;
+}
+interface Res_FinishUploadWorld{
+    update:number;
+}
+interface Arg_GetServerWorlds{
+    iid:string;
+}
+interface SArg_GetServerWorlds{
+    mpID:string;
+    existing:string[];
+}
+interface Res_GetServerWorlds{
+    list:ServerWorld[];
+}
+interface ServerWorld{
+    wID:string;
+    icon:string;
+    publisherName:string;
+    ownerName:string;
+    update:number;
+}
+interface Arg_TakeWorldOwnership{
+    iid:string;
+    wID:string;
+    uid:string;
+    uname:string;
+}
+interface SArg_TakeWorldOwnership{
+    mpID:string;
+    wID:string;
+    uid:string;
+    uname:string;
+}
+
+interface UpdateSearch{
+    mpID:string;
+    id:string;
 }
 
 // 
@@ -762,10 +826,13 @@ export interface IGlobalAPI{
     getInstWorlds:(arg:Arg_GetInstWorlds)=>Promise<Res_GetInstWorlds|undefined>;
 
     // worlds
-    getWorld:(arg:Arg_GetWorldMeta)=>Promise<Res_GetWorldMeta|undefined>;
+    getWorld:(arg:Arg_GetWorldInfo)=>Promise<Res_GetWorldInfo|undefined>;
     publishWorld:(arg:Arg_PublishWorld)=>Promise<boolean>;
     uploadWorld:(arg:Arg_UploadWorld)=>Promise<boolean>;
-    downloadWorld:(arg:Arg_DownloadWorld)=>Promise<boolean>;
+    downloadWorld:(arg:Arg_DownloadWorld,useTime=true)=>Promise<boolean>;
+    getServerWorlds:(arg:Arg_GetServerWorlds)=>Promise<Res_GetServerWorlds>;
+    getWorldImg:(iid:string,wID:string)=>Promise<string>;
+    takeWorldOwnership:(arg:Arg_TakeWorldOwnership)=>Promise<boolean>;
     
     getModIndexFiles:(arg:Arg_IID)=>Promise<Res_GetModIndexFiles>;
     cacheMods:(iid:string)=>Promise<void>;

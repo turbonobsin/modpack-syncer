@@ -4,7 +4,7 @@ import { errors, Result } from "./errors";
 import { ETL_Generic, evtTimeline, util_cp, util_lstat, util_mkdir, util_note, util_readJSON, util_readText, util_readTOML, util_rename, util_rm, util_warn, util_writeJSON, util_writeText } from "./util";
 import path from "path";
 import { electron } from "process";
-import { checkForModUpdates, downloadRP, genAllThePBR, getInstMods_old, getModIndexFiles, unpublishWorld } from "./app";
+import { checkForModUpdates, downloadRP, downloadWorld, genAllThePBR, getInstMods_old, getModIndexFiles, getWorld, unpublishWorld, uploadWorld } from "./app";
 import { openCCMenu } from "./menu_api";
 import { IMO_Combobox, IMO_Input, IMO_MultiSelect, InputMenu_InitData, ModsFolderDef, Res_InputMenu, UpdateProgress_InitData } from "./interface";
 
@@ -560,7 +560,9 @@ export const allDropdowns = {
                     if(res.response != 1) return;
 
                     await util_mkdir(path.join(loc1,"..",".deleted"));
-                    let res2 = await util_rename(loc1,path.join(loc1,"..",".deleted",wID));
+                    let tar = path.join(loc1,"..",".deleted",wID);
+                    await util_rm(path.join(loc1,"..",".deleted",wID),true); // delete it so if deleted again it won't error, or is this bad?
+                    let res2 = await util_rename(loc1,tar);
                     if(!res2) errors.failedToRemoveWorld.unwrap();
                     else _w.webContents.send("updateSearch");
                 }
@@ -576,7 +578,33 @@ export const allDropdowns = {
         let user = await getMainAccount();
         if(!user) return;
 
+        let wMeta = inst.meta.worlds.find(v=>v.wID == wID);
+        if(!wMeta) return;
+        let world = await getWorld({
+            iid,wID,mpID:inst.meta.meta.id
+        });
+        if(!world) return;
+
         let menu = Menu.buildFromTemplate([
+            {
+                label:"Take Ownership",
+                enabled:world.data?.ownerName != world.data?.publisherName,
+                click:()=>{
+
+                }
+            },
+            {
+                label:"Force Upload",
+                click:()=>{
+                    uploadWorld({iid,wID},false);
+                }
+            },
+            {
+                label:"Force Download",
+                click:()=>{
+                    downloadWorld({iid,wID},false);
+                }
+            },
             {
                 label:"Unpublish",
                 click:async ()=>{

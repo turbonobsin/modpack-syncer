@@ -140,6 +140,14 @@ export class AddRPMenu extends CCMenu{
         return "add_rp_menu";
     }
 }
+export class AddWorldMenu extends CCMenu{
+    constructor(){
+        super("add_world_menu",1000,800);
+    }
+    getId(): string {
+        return "add_world_menu";
+    }
+}
 
 // 
 class CCMenuRegistry{
@@ -194,3 +202,4 @@ ccMenuRegistry.register(new EditInstanceMenu());
 ccMenuRegistry.register(new UpdateProgressMenu());
 ccMenuRegistry.register(new InputMenu());
 ccMenuRegistry.register(new AddRPMenu());
+ccMenuRegistry.register(new AddWorldMenu());

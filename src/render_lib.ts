@@ -94,7 +94,7 @@ export class MP_SearchStructure<T> extends MP_Div{
         });
 
         this.list = new MP_Div({
-            className:this.ops.listId+"-grid-items list"+(this.ops.customListFormat?" "+this.ops.customListFormat:"")
+            className:"search-structure-list "+this.ops.listId+"-grid-items list"+(this.ops.customListFormat?" "+this.ops.customListFormat:"")
         });
 
         this.addParts(

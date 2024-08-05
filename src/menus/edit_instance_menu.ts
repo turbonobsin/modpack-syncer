@@ -1,8 +1,8 @@
 import "../render_lib";
 import "../styles/edit_instance_menu.css";
-import { addClassToOps, makeDivPart, MP_ActivityBarItem, MP_Button, MP_Combobox, MP_Div, MP_Flexbox, MP_Flexbox_Ops, MP_Generic, MP_Grid, MP_Header, MP_HR, MP_Img, MP_P, MP_Section, MP_TabbedMenu, MP_TableList, MP_Text, MP_TR, PartTextStyle } from "../menu_parts";
+import { addClassToOps, makeDivPart, MP_ActivityBarItem, MP_Button, MP_Combobox, MP_Div, MP_Flexbox, MP_Flexbox_Ops, MP_Generic, MP_Grid, MP_Header, MP_HR, MP_Img, MP_Section, MP_TabbedMenu, MP_TableList, MP_P, MP_Text, MP_TR, PartTextStyle } from "../menu_parts";
 import { MP_SearchStructure, qElm } from "../render_lib";
-import { EditInst_InitData, FullModData, ModData, ModsFolder, Res_GetInstMods, RP_Data, World_Data } from "../interface";
+import { EditInst_InitData, FullModData, ModData, ModsFolder, Res_GetInstMods, RP_Data, World_Data, WorldState } from "../interface";
 import { deselectItem, getImageURL, InitData, SelectedItem, selectItem, wait } from "../render_util";
 import { io } from "socket.io-client";
 import { allDropdowns } from "src/dropdowns";
@@ -30,6 +30,11 @@ const tab_menu = new MP_TabbedMenu(
         }
     }
 );
+
+function getWorldStateText(state:WorldState){
+    if(state == "" || !state) return "Available to use";
+    else if(state == "inUse") return "In use";
+}
 
 interface MP_ModRow_Ops extends MP_Flexbox_Ops{
     mod:FullModData;
@@ -430,8 +435,71 @@ class CMP_World extends MP_Flexbox{
         });
         if(!w) return; // didn't find it or you don't have permission
         
+        let updateAvailable = ((w.data?.update ?? 0) > w.yourUpdate);
+
         head.addParts(
-            new MP_Header({text:d.wID}),
+            new MP_Header({}).addParts(
+                new MP_Flexbox({
+                    justifyContent:"space-between"
+                }).addParts(
+                    new MP_Text({text:d.wID}),
+                    new MP_Div({
+                        skipAdd:!w.data,
+                        textAlign:"right"
+                    }).addParts(
+                        new MP_Div({
+                            className:"l-desc",
+                            fontSize:"11px",
+                            text:"Current Version: "+((w.yourUpdate ?? 0)/10)
+                        }),
+                        new MP_Div({
+                            className:"l-desc",
+                            fontSize:"11px",
+                            innerHTML:"Latest Version: "+`<span class="${updateAvailable ? "accent-text" : ""}">${((w.data?.update ?? 0)/10)}${updateAvailable?"^":""}</span>` // only dividing by 10 to make it more readable and rememberable
+                        })
+                    )
+                ),
+                new MP_P({
+                    skipAdd:!w.data,
+                    className:"l-desc",
+                    text:"Publisher: "+w.data?.publisherName,
+                    marginBottom:"0px"
+                }),
+                new MP_P({
+                    skipAdd:!w.data,
+                    className:"l-desc accent-text",
+                    text:"Current Owner: "+w.data?.ownerName,
+                    marginTop:"0px"
+                }),
+                new MP_P({
+                    skipAdd:!w.data,
+                    className:"l-desc",
+                    text:"State: ",
+                }).addParts(
+                    new MP_Text({
+                        text:getWorldStateText(w.state),
+                    }).onPostLoad(p=>{
+                        p.e!.style.textTransform = "uppercase";
+                        p.e!.style.fontWeight = "bold";
+                        // if(w.state == "inUse") p.e!.style.fontWeight = "bold";
+                        // else p.e!.classList.add("accent-text");
+                    })
+                ),
+                new MP_Flexbox({
+                    justifyContent:"space-between",
+                    skipAdd:true
+                }).addParts(
+                    new MP_Text({
+                        text:"Your Version: "+((w.yourUpdate ?? 0)/10),
+                        className:"l-desc",
+                    }),
+                    new MP_Text({
+                        skipAdd:!w.data,
+                        className:"l-desc",
+                        text:"Latest: "+((w.data?.update ?? 0)/10) // only dividing by 10 to make it more readable and rememberable
+                    }),
+                ),
+            ),
             new MP_HR()
         );
 
@@ -442,7 +510,7 @@ class CMP_World extends MP_Flexbox{
                     width:"50%"
                 }).autoJustify("start","center"),
                 new MP_P({
-                    text:"The current World is unpublished.",
+                    text:"The current world is unpublished.",
                     className:"l-details"
                 }),
                 new MP_P({
@@ -538,8 +606,10 @@ function setupAside(aside:MP_Div){
 async function loadSection(index:number,menu:MP_TabbedMenu){
     menu.aside.clearParts();
 
+    tab_menu.aside.e!.classList.remove("hide");
+
     switch(index){
-        case 0:{
+        case 0:{           
             let search = new MP_SearchStructure<FullModData>({
                 listId:"_",
                 // listId:"instance",
@@ -612,6 +682,14 @@ async function loadSection(index:number,menu:MP_TabbedMenu){
                     for(const folder of res.folders){
                         await loadFolder(folder,menu,search);
                     }
+
+                    let total = res.folders.reduce((p,v,i,ar)=>p+v.mods.length,0);
+                    menu.main_header.parts[0].parts[0].clearFromPoint(1);
+                    let l_total = menu.main_header.parts[0].parts[0].addPart(
+                        new MP_Text({
+                            text:` (${total})`
+                        })
+                    );
                 }
             });
             currentSearch = search;
@@ -717,6 +795,7 @@ async function loadSection(index:number,menu:MP_TabbedMenu){
         } break;
         case 2:{
             currentSearch = undefined;
+            tab_menu.aside.e!.classList.add("hide");
 
             let res = await window.gAPI.getInstScreenshots({iid:initData.d.iid});
             if(!res) return;
@@ -849,6 +928,7 @@ async function loadSection(index:number,menu:MP_TabbedMenu){
 
 let currentSearch:MP_SearchStructure<any>|undefined;
 window.gAPI.onUpdateSearch(data=>{
+    if(data.iid != initData.d.iid) return;
     currentSearch?.submit();
 });
 

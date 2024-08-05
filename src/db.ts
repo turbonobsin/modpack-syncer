@@ -1,5 +1,5 @@
 import { app, dialog } from "electron";
-import { pathTo7zip, searchStringCompare, util_lstat, util_mkdir, util_note, util_note2, util_readBinary, util_readdir, util_readdirWithTypes, util_readJSON, util_readText, util_readTOML, util_warn, util_writeJSON, wait } from "./util";
+import { pathTo7zip, searchStringCompare, util_lstat, util_mkdir, util_note, util_note2, util_readBinary, util_readdir, util_readdirWithTypes, util_readJSON, util_readText, util_readTOML, util_testAccess, util_warn, util_writeJSON, wait } from "./util";
 import path from "path";
 import { DBSys, DBUser, InstanceData as ModPackInstData, TmpFile } from "./db_types";
 import { Arg_AddModToFolder, Arg_ChangeFolderType, Arg_CreateFolder, Arg_EditFolder, Arg_UploadRP, Arg_UploadRPFile, FolderType, LocalModData, ModIndex, ModrinthModData, ModsFolder, ModsFolderDef, PackMetaData, PrismAccount, PrismAccountsData, RemoteModData, Res_GetInstResourcePacks, Res_GetInstWorlds, Res_UploadRP, RP_Data, RPCache, SearchFilter, SlugMapData, UpdateProgress_InitData, World_Data } from "./interface";
@@ -12,6 +12,7 @@ import { openCCMenu, windowStack } from "./menu_api";
 import Seven from "node-7z";
 import axios from "axios";
 import { mainWindow } from "./main";
+import { i } from "vite/dist/node/types.d-aGj9QkWt";
 
 export let appPath = app.getAppPath();
 export const dataPath = path.join(appPath,"data");
@@ -203,6 +204,9 @@ abstract class Inst<T>{
             let v = cache.get(this.filePath);
             if(v) return v as this; // MAY NEED SOME EXTRA WORK LIKE WHEN IT BECOMES STALE
         }
+
+        // need to actually store in the map....
+        if(cache) cache.set(this.filePath,this);
 
         // console.log("----- read: ",this.filePath);
         
@@ -397,7 +401,10 @@ export class ModPackInst extends Inst<ModPackInstData>{
     }
     async getAnyDefault(): Promise<any | undefined> {
         return {
-            folders:[]
+            folders:[],
+            worlds:[],
+            isRunning:false,
+            lastLaunched:0,
         };
     }
 
@@ -939,7 +946,11 @@ function makeInstanceData(meta:PackMetaData){
         update:0,
         meta,
         folders:[],
-        resourcepacks:[]
+        resourcepacks:[],
+        worlds:[],
+        loc:"",
+        isRunning:false,
+        lastLaunched:0,
     };
     return data;
 }
@@ -1098,6 +1109,31 @@ async function getInstWorlds(inst:ModPackInst,filter:SearchFilter): Promise<Resu
     // }
     
     // 
+
+    let hasChangedInst = false;
+    for(const w of resData.worlds){
+        if(!inst.meta.worlds.find(v=>v.wID == w.wID)){
+            inst.meta.worlds.push({
+                wID:w.wID,
+                lastSync:-1,
+                update:-1
+            });
+            hasChangedInst = true;
+        }
+    }
+
+    let found = resData.worlds.map(v=>v.wID);
+    for(const w of inst.meta.worlds){
+        if(!found.includes(w.wID)){
+            // remove worlds from the cache/meta data that have been deleted
+            let ind = inst.meta.worlds.indexOf(w);
+            if(ind != -1) inst.meta.worlds.splice(ind,1);
+            hasChangedInst = true;
+        }
+    }
+
+    if(hasChangedInst) await inst.save();
+
     return new Result(resData);
 }
 
@@ -1145,3 +1181,45 @@ export let slugMap = new SlugMap(path.join(dataPath,"slug_map.json"));
 //     })
 // }
 // // test();
+
+async function instanceRunCheck(){
+    for(const [k,v] of instCache.modpack){
+        await wait(20);
+        if(!v.meta?.isRunning) continue;
+        // 
+
+        let fail = async ()=>{
+            if(!v.meta) return;
+            v.meta.isRunning = false;
+            await v.save();
+        };
+
+        let mpID = v.meta.meta.id;
+        util_note("Checking for running... : "+mpID);
+
+        let prismLoc = v.getRoot();
+        if(!prismLoc){
+            await fail();
+            continue;
+        }
+        let loc = path.join(prismLoc,"logs","latest.log");
+        if(!util_lstat(loc)){
+            await fail();
+            continue;
+        }
+        let isRunning = await util_testAccess(loc);
+        if(!isRunning) if((Date.now() - v.meta.lastLaunched) > 120000){ // 2 minutes - 120000
+            v.meta.isRunning = false;
+            await v.save();
+            util_warn(">> STOPPED INSTANCE: "+mpID);
+            continue;
+        }
+        // 
+        
+        util_note2("Instance is running: "+mpID);
+    }
+    
+    await wait(500);
+    instanceRunCheck();
+}
+instanceRunCheck();

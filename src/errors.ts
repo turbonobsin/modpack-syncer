@@ -93,4 +93,5 @@ export const errors = {
     failedToPublishWorld: Result.err("Failed to publish world"),
     failedToUnpublishWorld: Result.err("Failed to unpublish world"),
     failedToRemoveWorld: Result.err("Failed to remove world"),
+    couldNotFindWorldMeta: Result.err("Could not find world meta"),
 };

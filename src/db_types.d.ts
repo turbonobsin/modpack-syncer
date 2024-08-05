@@ -1,4 +1,4 @@
-import { ModsFolder, ModsFolderDef, PackMetaData } from "./interface";
+import { ModsFolder, ModsFolderDef, PackMetaData, WorldMeta } from "./interface";
 
 type IId = string;
 type FId = string;
@@ -46,6 +46,10 @@ export interface InstanceData{
     iid:string;
     update:number;
     meta:PackMetaData;
+    loc:string;
+
+    isRunning:boolean;
+    lastLaunched:number;
     
     linkName?:string;
 
@@ -60,6 +64,7 @@ export interface InstanceData{
     folders:ModsFolderDef[];
 
     resourcepacks:RP_Meta[];
+    worlds:WorldMeta[];
 
     // auth:{
     //     users:any[]

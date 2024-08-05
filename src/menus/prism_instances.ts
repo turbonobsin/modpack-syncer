@@ -1,6 +1,7 @@
 import "../render_lib";
 import "../render_util";
 import "../styles/prism_instances.css";
+import "../styles/search_packs_menu.css";
 import { MP_Article, MP_Button, MP_Div, MP_Flexbox, MP_Header, MP_HR, MP_OutlinedBox, MP_P, MP_Section, MP_Text, PartTextStyle } from "../menu_parts";
 import { InitData, loadDefaultAside, SelectedItem, selectItem } from "../render_util";
 import { Data_PrismInstancesMenu, InitMenuData, PrismInstance } from "src/interface";

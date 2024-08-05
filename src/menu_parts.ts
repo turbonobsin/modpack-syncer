@@ -19,6 +19,7 @@ export interface MP_Ops{
     __tag?:string;
     skipAdd?:boolean;
     fontSize?:string;
+    textAlign?:string;
 
     margin?:string;
     marginTop?:string;
@@ -174,6 +175,20 @@ export abstract class MenuPart{
         if(this.e){
             this.e.textContent = "";
         }
+        this.parts = [];
+    }
+    clearFromPoint(startI:number){
+        let amt = this.parts.length-startI;
+        for(let i = 0; i < amt; i++){
+            this.parts[startI].remove();
+        }
+    }
+    remove(){
+        if(this.parent){
+            let ind = this.parent.parts.indexOf(this);
+            if(ind != -1) this.parent.parts.splice(ind,1);
+        }
+        this.e?.remove();
     }
     onPostLoad(f:(p:this)=>void){
         // this._onPostLoad = f;
@@ -245,6 +260,7 @@ export abstract class MenuPart{
             if(o.classList) e.classList.add(...o.classList);
             if(o.id) e.id = o.id;
             if(o.fontSize) e.style.fontSize = o.fontSize;
+            if(o.textAlign) e.style.textAlign = o.textAlign;
             if(o.margin) e.style.margin = o.margin;
             if(o.marginTop) e.style.marginTop = o.marginTop;
             if(o.marginLeft) e.style.marginLeft = o.marginLeft;
@@ -994,6 +1010,25 @@ export class MP_Img extends MenuPart{
 export class MP_Aside extends MenuPart{
     create(): void {
         this.e = document.createElement("aside");
+    }
+}
+
+export class MP_ImgCube extends MP_Div{
+    constructor(ops:MP_Img_Ops){
+        addClassToOps(ops,"img-cube");
+        
+        super(ops);
+    }
+    declare ops:MP_Img_Ops;
+    create(): void {
+        this.e = document.createElement("div");
+
+        for(let i = 0; i < 6; i++){
+            let img = document.createElement("img");
+            img.className = "i"+i;
+            img.src = this.ops.src;
+            this.e.appendChild(img);
+        }
     }
 }
 

@@ -79,7 +79,9 @@
 	/* --accent1-t1:#111; */
 	--accent1:rgba(65, 105, 225, 0.171);
 	--accent1-t1:#000;
+	--accent1-t2:rgba(65, 105, 225, 0.871);
 	--text-dim:#444;
+	--text-dim2:#ccc;
 
 	/*  */
 	--input-focus:royalblue;
@@ -223,6 +225,7 @@
 	--accent1-t1:#000;
 	--accent1-t2:rgba(28, 131, 131, 0.826);
 	--text-dim:#444;
+	--text-dim2:#ccc;
 	
 	/* input */
 	--input-bg:#e8e8e8;
@@ -240,6 +243,8 @@
 	--t1:#aaa;
 	--t2:#bbb;
 	--text-dim:#aaa;
+	/* --text-dim2:#33353a; */
+	--text-dim2:#4b4e56;
 
 	--menu-bg:#1A1F28;
 	--menu-border:#14171E;
@@ -366,4 +371,8 @@ body {
 }
 .icon{
 	max-width:1em;
+}
+
+button.disabled{
+	background-color:var(--text-dim2);
 }

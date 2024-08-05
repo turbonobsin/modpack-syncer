@@ -288,3 +288,33 @@ td,th{
 .progress-details{
 
 }
+
+/* Img Cube */
+.img-cube{
+    width:40px;
+    height:40px;
+}
+.img-cube img{
+    position:absolute;
+    width:40px;
+    height:40px;
+    transform-style:preserve-3d;
+}
+.img-cube img.i0{
+    transform:translateX(-20px) rotateX(-45deg) rotateY(-45deg);
+}
+.img-cube img.i1{
+
+}
+.img-cube img.i2{
+
+}
+.img-cube img.i3{
+
+}
+.img-cube img.i4{
+
+}
+.img-cube img.i5{
+
+}

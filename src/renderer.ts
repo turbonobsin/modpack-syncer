@@ -30,9 +30,9 @@
 import { FSTestData } from "./interface";
 import "./render_lib";
 import "./styles/renderer.css";
-import { InitData, loadModPackMetaPanel, SelectedItem, selectItem } from "./render_util";
+import { getImageURL, InitData, loadModPackMetaPanel, SelectedItem, selectItem } from "./render_util";
 import { InstanceData } from "./db_types";
-import { makeDivPart, MP_ActivityBarItem, MP_Article, MP_Button, MP_Div, MP_Flexbox, MP_Header, MP_HR, MP_Ops, MP_OutlinedBox, MP_P, MP_Section, MP_TabbedMenu, MP_Text, PartTextStyle } from "./menu_parts";
+import { makeDivPart, MP_ActivityBarItem, MP_Article, MP_Button, MP_Div, MP_Flexbox, MP_Header, MP_HR, MP_Img, MP_ImgCube, MP_Ops, MP_OutlinedBox, MP_P, MP_Section, MP_TabbedMenu, MP_Text, PartTextStyle } from "./menu_parts";
 import { MP_SearchStructure, qElm } from "./render_lib";
 
 console.log('👋 This message is being logged by "renderer.ts", included via Vite');
@@ -226,6 +226,7 @@ export class CMP_FullInst extends MP_Article {
     constructor(ops: CMP_FullInst_Ops) {
         if (!ops.classList) ops.classList = [];
         ops.classList.push("instance-item");
+        // ops.marginBottom = "5px";
         super(ops);
     }
     declare ops: CMP_FullInst_Ops;
@@ -301,7 +302,7 @@ export class CMP_FullInst extends MP_Article {
                     justifyContent:"space-between"
                 }).addParts(
                     new MP_Button({
-                        label:"Launch",
+                        label:(inst.isRunning ? "Running" : "Launch"),
                         className:"b-inst-launch",
                         disabled:!this.canLaunch(),
                         icon:"rocket_launch",
@@ -310,6 +311,8 @@ export class CMP_FullInst extends MP_Article {
                             // let res = await window.gAPI.addInstance(meta);
                             // console.log("RES:",res);
                         }
+                    }).onPostLoad(p=>{
+                        if(inst.isRunning) p.e!.disabled = true;
                     }),
                     new MP_Button({
                         label:"Sync",
@@ -369,46 +372,116 @@ export class CMP_FullInst extends MP_Article {
     load(): void {
         super.load();
         if (!this.e) return;
+        this.e.style.display = "grid";
+        this.e.style.gridTemplateColumns = "auto 1fr";
+        // this.e.style.gap = "5px";
 
         let data = this.ops.data;
 
         this.addParts(
-            new MP_Header({
-                textContent: data.meta.name,
-                className: "l-title"
-            }),
-            new MP_Div({
-                classList: ["details"]
+            new MP_Flexbox({
+                width:"80px",
+                height:"80px",
+                justifyContent:"center",
+                alignItems:"center"
             }).addParts(
-                new MP_P({
-                    text: "",
-                    classList: ["l-version"]
+                new MP_Div({}).onPostLoad(p=>{
+                    let src = data.loc ? getImageURL(data.loc) : "";
+                    p.e!.style.backgroundImage = `url(${src})`;
+                    p.e!.style.backgroundSize = "contain";
+                    p.e!.style.width = "100%";
+                    p.e!.style.height = "100%";
+                    p.e!.style.backgroundPosition = "center";
+                    p.e!.style.margin = "10px";
+                    p.e!.style.backgroundRepeat = "no-repeat";
+
+                    let img = document.createElement("img");
+                    img.src = src;
+                    img.onload = ()=>{
+                        if(img.width <= 32 || img.height <= 32) p.e!.style.imageRendering = "pixelated";
+                    };
+                }),
+                new MP_ImgCube({
+                    skipAdd:true,
+                    src:data.loc ? getImageURL(data.loc) : ""
+                }),
+            ),
+            new MP_Flexbox({
+                direction:"column",
+                margin:"10px",
+                marginLeft:"0px"
+            }).addParts(
+                new MP_Header({
+
                 }).addParts(
-                    new MP_Text({ text: data.meta.version }),
-                    new MP_Text({ text: data.meta.loader })
+                    new MP_Flexbox({
+                        justifyContent:"space-between",
+                    }).addParts(
+                        new MP_Div({
+                            text: data.meta.name,
+                            className: "l-title"
+                        }),
+                        new MP_Div({
+                            text: "",
+                            className: "l-version"
+                        }).addParts(
+                            new MP_Text({
+                                text: data.meta.version,
+                                marginRight:"5px"
+                            }),
+                            // new MP_Text({ text: data.meta.loader.toWel })
+                            new MP_Div({
+                                text:data.meta.loader,
+                                className:"l-loader",
+                            }).onPostLoad(p=>{
+                                p.e!.style.display = "inline-block";
+                            })
+                        ),
+                    )
                 ),
-                new MP_P({
-                    text: data.meta.desc,
-                    classList: ["l-desc"]
-                }).onPostLoad(p => {
-                    if (!p.e) return;
-
-                    let tmp = document.createElement("span");
-                    tmp.style.whiteSpace = "nowrap";
-                    tmp.style.fontSize = "12px";
-                    tmp.textContent = p.e?.textContent ?? null;
-
-                    document.body.appendChild(tmp);
-                    let w = tmp.offsetWidth;
-                    tmp.remove();
-
-                    let maxWidth = 178.4 * 2;
-                    if (w > maxWidth) {
-                        p.e.classList.add("overflow");
-                    }
+                new MP_Div({
+                    className:"details l-desc",
+                    text:data.meta.desc
                 })
             )
         );
+        // this.addParts(
+        //     new MP_Header({
+        //         textContent: data.meta.name,
+        //         className: "l-title"
+        //     }),
+        //     new MP_Div({
+        //         classList: ["details"]
+        //     }).addParts(
+        //         new MP_P({
+        //             text: "",
+        //             classList: ["l-version"]
+        //         }).addParts(
+        //             new MP_Text({ text: data.meta.version }),
+        //             new MP_Text({ text: data.meta.loader })
+        //         ),
+        //         new MP_P({
+        //             text: data.meta.desc,
+        //             classList: ["l-desc"]
+        //         }).onPostLoad(p => {
+        //             if (!p.e) return;
+
+        //             let tmp = document.createElement("span");
+        //             tmp.style.whiteSpace = "nowrap";
+        //             tmp.style.fontSize = "12px";
+        //             tmp.textContent = p.e?.textContent ?? null;
+
+        //             document.body.appendChild(tmp);
+        //             let w = tmp.offsetWidth;
+        //             tmp.remove();
+
+        //             let maxWidth = 178.4 * 2;
+        //             if (w > maxWidth) {
+        //                 p.e.classList.add("overflow");
+        //             }
+        //         })
+        //     )
+        // );
 
         this.e.addEventListener("dblclick",e=>{
             if(!this.canLaunch()) return;
@@ -471,7 +544,9 @@ async function loadData(data:FSTestData){
 }
 
 const search = new MP_SearchStructure<CMP_FullInst>({
-    listId:"instance",
+    listId:"full-inst",
+    // listId:"instance",
+    // customListFormat:"view-list2",
     // margin:"15px",
     onSelect:(data,item)=>{
         
