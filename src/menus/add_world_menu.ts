@@ -2,10 +2,9 @@ import "../render_lib";
 import "../render_util";
 import { AddWorld_InitData, ServerWorld, WorldInfo, WorldMeta } from "../interface";
 import { MP_SearchStructure, qElm } from "../render_lib";
-import { getImageURL, InitData, loadDefaultAside, searchStringCompare } from "../render_util";
+import { getImageURL, getWorldStateText, InitData, loadDefaultAside, searchStringCompare } from "../render_util";
 import { makeDivPart, MP_Article, MP_Aside, MP_Button, MP_Div, MP_Flexbox, MP_Grid, MP_Header, MP_HR, MP_Img, MP_P, MP_TD, MP_Text } from "../menu_parts";
 import "../styles/menus_custom.css";
-import { getWorldStateText } from "src/preload";
 
 console.log("loaded page");
 

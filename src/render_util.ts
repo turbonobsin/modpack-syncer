@@ -1,5 +1,5 @@
 import { MenuPart, MP_Button, MP_Div, MP_Header, MP_P, MP_Text } from "./menu_parts";
-import { InitMenuData, PackMetaData } from "./interface";
+import { InitMenuData, PackMetaData, WorldState } from "./interface";
 
 export function loadDefaultAside(aside:MenuPart,ops:{
     title:string,
@@ -354,4 +354,14 @@ export function setTheme(theme?:string){
 
     localStorage.setItem("theme",theme);
     par.classList.add("themestyle-"+theme);
+}
+
+export function getWorldStateText(state:WorldState){
+    if(state == "" || !state) return "Available to use";
+    
+    return {
+        "inUse":"In use",
+        "uploading":"Owner is uploading...",
+        "downloading":"Downloading..."
+    }[state];
 }
