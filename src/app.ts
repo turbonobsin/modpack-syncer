@@ -663,6 +663,12 @@ export async function preInit(){
         if(!inst || !inst.meta) return errors.couldNotFindPack.unwrap();
         if(!inst.meta.meta.id) return errors.failedToGetPackLink.unwrap();
 
+        let acc = await getMainAccount();
+        if(!acc) return;
+
+        arg.uid = acc.profile.id;
+        arg.uname = acc.profile.name;
+
         let res = (await semit<SArg_TakeWorldOwnership,boolean>("takeWorldOwnership",{
             ...arg,
             mpID:inst.meta.meta.id

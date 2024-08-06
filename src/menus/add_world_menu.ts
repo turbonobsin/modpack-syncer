@@ -5,6 +5,7 @@ import { MP_SearchStructure, qElm } from "../render_lib";
 import { getImageURL, InitData, loadDefaultAside, searchStringCompare } from "../render_util";
 import { makeDivPart, MP_Article, MP_Aside, MP_Button, MP_Div, MP_Flexbox, MP_Grid, MP_Header, MP_HR, MP_Img, MP_P, MP_TD, MP_Text } from "../menu_parts";
 import "../styles/menus_custom.css";
+import { getWorldStateText } from "src/preload";
 
 console.log("loaded page");
 
@@ -57,7 +58,20 @@ async function showData(data:ServerWorld,aside:MP_Div){
             className:"l-desc accent-text",
             text:"Current Owner: "+data.ownerName,
             marginTop:"0px"
-        })
+        }),
+        new MP_P({
+            className:"l-desc",
+            text:"State: ",
+        }).addParts(
+            new MP_Text({
+                text:getWorldStateText(data.state),
+            }).onPostLoad(p=>{
+                p.e!.style.textTransform = "uppercase";
+                p.e!.style.fontWeight = "bold";
+                // if(w.state == "inUse") p.e!.style.fontWeight = "bold";
+                // else p.e!.classList.add("accent-text");
+            })
+        ),
     ).addTo(head);
 
     {
@@ -83,6 +97,12 @@ async function showData(data:ServerWorld,aside:MP_Div){
                         window.gAPI.downloadWorld({iid:initData.d.iid,wID,forceAllFiles:true});
                     }
                 }),//
+                new MP_Button({
+                    label:"Take Ownership",
+                    onClick:(e,elm)=>{
+                        window.gAPI.takeWorldOwnership({iid:initData.d.iid,wID,uid:"",uname:""});
+                    }
+                }),
                 // new MP_Button({
                 //     // skipAdd:d.data?.sync == null,
                 //     skipAdd:true,

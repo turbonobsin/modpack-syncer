@@ -2,7 +2,7 @@
 // https://www.electronjs.org/docs/latest/tutorial/process-model#preload-scripts
 
 import { contextBridge, ContextBridge, ipcRenderer } from "electron";
-import { IGlobalAPI, PackMetaData } from "./interface";
+import { IGlobalAPI, PackMetaData, WorldState } from "./interface";
 
 function promiseWrapper<T>(channel:string,...args:unknown[]){
     return async ()=>{
@@ -141,3 +141,13 @@ contextBridge.exposeInMainWorld("gAPI",{
 //         console.log("INIT:",...args);
 //     });
 // });
+
+export function getWorldStateText(state:WorldState){
+    if(state == "" || !state) return "Available to use";
+    
+    return {
+        "inUse":"In use",
+        "uploading":"Owner is uploading...",
+        "downloading":"Downloading..."
+    }[state];
+}

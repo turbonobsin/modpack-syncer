@@ -6,6 +6,7 @@ import { EditInst_InitData, FullModData, ModData, ModsFolder, Res_GetInstMods, R
 import { deselectItem, getImageURL, InitData, SAPI2_Item, SelectedItem, selectItem, wait } from "../render_util";
 import { io } from "socket.io-client";
 import { allDropdowns } from "src/dropdowns";
+import { getWorldStateText } from "src/preload";
 
 let initData = new InitData<EditInst_InitData>(init);
 
@@ -30,16 +31,6 @@ const tab_menu = new MP_TabbedMenu(
         }
     }
 );
-
-function getWorldStateText(state:WorldState){
-    if(state == "" || !state) return "Available to use";
-    
-    return {
-        "inUse":"In use",
-        "uploading":"Owner is uploading...",
-        "downloading":"Downloading..."
-    }[state];
-}
 
 interface MP_ModRow_Ops extends MP_Flexbox_Ops{
     mod:FullModData;
