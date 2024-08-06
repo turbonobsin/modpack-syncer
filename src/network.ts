@@ -41,7 +41,9 @@ socket.on("updateSearch",(arg:UpdateSearch)=>{
     if(!inst.meta?.meta.id) return;
 
     w.webContents.send("updateSearch",{
-        iid:inst.meta.meta.id
+        iid:inst.meta.meta.id,
+        id:arg.id,
+        data:arg.data
     });
 });
 

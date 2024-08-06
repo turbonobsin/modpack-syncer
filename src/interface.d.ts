@@ -687,7 +687,7 @@ interface Res_GetWorldInfo{
     yourUpdate:number; // for just the client side
     state:WorldState;
 }
-type WorldState = "" | "inUse";
+type WorldState = "" | "inUse" | "uploading" | "downloading";
 interface Arg_PublishWorld{
     iid:string;
     wID:string;
@@ -780,6 +780,18 @@ interface ServerWorld{
     ownerName:string;
     update:number;
 }
+interface Arg_SetWorldState{
+    iid:string;
+    wID:string;
+    uid:string;
+    state:WorldState;
+}
+interface SArg_SetWorldState{
+    mpID:string;
+    wID:string;
+    uid:string;
+    state:WorldState;
+}
 interface Arg_TakeWorldOwnership{
     iid:string;
     wID:string;
@@ -794,8 +806,10 @@ interface SArg_TakeWorldOwnership{
 }
 
 interface UpdateSearch{
+    iid?:string;
     mpID:string;
     id:string;
+    data:any;
 }
 
 // 

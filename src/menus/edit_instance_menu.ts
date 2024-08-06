@@ -2,8 +2,8 @@ import "../render_lib";
 import "../styles/edit_instance_menu.css";
 import { addClassToOps, makeDivPart, MP_ActivityBarItem, MP_Button, MP_Combobox, MP_Div, MP_Flexbox, MP_Flexbox_Ops, MP_Generic, MP_Grid, MP_Header, MP_HR, MP_Img, MP_Section, MP_TabbedMenu, MP_TableList, MP_P, MP_Text, MP_TR, PartTextStyle } from "../menu_parts";
 import { MP_SearchStructure, qElm } from "../render_lib";
-import { EditInst_InitData, FullModData, ModData, ModsFolder, Res_GetInstMods, RP_Data, World_Data, WorldState } from "../interface";
-import { deselectItem, getImageURL, InitData, SelectedItem, selectItem, wait } from "../render_util";
+import { EditInst_InitData, FullModData, ModData, ModsFolder, Res_GetInstMods, RP_Data, UpdateSearch, World_Data, WorldState } from "../interface";
+import { deselectItem, getImageURL, InitData, SAPI2_Item, SelectedItem, selectItem, wait } from "../render_util";
 import { io } from "socket.io-client";
 import { allDropdowns } from "src/dropdowns";
 
@@ -33,7 +33,12 @@ const tab_menu = new MP_TabbedMenu(
 
 function getWorldStateText(state:WorldState){
     if(state == "" || !state) return "Available to use";
-    else if(state == "inUse") return "In use";
+    
+    return {
+        "inUse":"In use",
+        "uploading":"Owner is uploading...",
+        "downloading":"Downloading..."
+    }[state];
 }
 
 interface MP_ModRow_Ops extends MP_Flexbox_Ops{
@@ -603,11 +608,13 @@ function setupAside(aside:MP_Div){
     return {head,body,footer};
 }
 
+let curSection = 0;
 async function loadSection(index:number,menu:MP_TabbedMenu){
     menu.aside.clearParts();
 
     tab_menu.aside.e!.classList.remove("hide");
 
+    curSection = index;
     switch(index){
         case 0:{           
             let search = new MP_SearchStructure<FullModData>({
@@ -927,8 +934,14 @@ async function loadSection(index:number,menu:MP_TabbedMenu){
 }
 
 let currentSearch:MP_SearchStructure<any>|undefined;
-window.gAPI.onUpdateSearch(data=>{
-    if(data.iid != initData.d.iid) return;
+window.gAPI.onUpdateSearch((data:UpdateSearch)=>{
+    if(data?.iid != undefined) if(data.iid != initData.d.iid) return;
+    if(data?.id != undefined){
+        if(data.id == "world"){
+            if(curSection != 3) return;
+            if(!currentSearch?.sel.items.some((v:SAPI2_Item<World_Data>)=>v.data.wID == data.data.wID)) return;
+        }
+    }
     currentSearch?.submit();
 });
 
