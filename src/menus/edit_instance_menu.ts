@@ -6,7 +6,7 @@ import { EditInst_InitData, FullModData, ModData, ModsFolder, Res_GetInstMods, R
 import { deselectItem, getImageURL, InitData, SAPI2_Item, SelectedItem, selectItem, wait } from "../render_util";
 import { io } from "socket.io-client";
 import { allDropdowns } from "src/dropdowns";
-import { getWorldStateText } from "src/preload";
+import { getWorldStateText } from "../preload";
 
 let initData = new InitData<EditInst_InitData>(init);
 
