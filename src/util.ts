@@ -3,7 +3,11 @@ import fs from "fs";
 import path from "path";
 import toml from "toml";
 
-export const pathTo7zip = path.join(app.getAppPath(),"node_modules","7zip-bin","win","x64","7za.exe");
+export let pathTo7zip = path.join(app.getAppPath(),"node_modules","7zip-bin","win","x64","7za.exe");
+if(process.platform == "darwin"){
+    pathTo7zip = path.join(app.getAppPath(),"node_modules","7zip-bin","mac","arm64","7za");
+    util_note2("DETECTED MACOS: set 7zip path to: "+pathTo7zip);
+}
 
 export async function wait(delay:number){
     return new Promise<void>(resolve=>{
