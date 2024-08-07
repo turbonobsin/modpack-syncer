@@ -488,7 +488,7 @@ class CMP_World extends MP_Flexbox{
                     text:"State: ",
                 }).addParts(
                     new MP_Text({
-                        text:getWorldStateText(w.state,w.data!.ownerName,w.yourName),
+                        text:getWorldStateText(w.state,w.data?.ownerName,w.yourName),
                     }).onPostLoad(p=>{
                         p.e!.style.textTransform = "uppercase";
                         p.e!.style.fontWeight = "bold";
