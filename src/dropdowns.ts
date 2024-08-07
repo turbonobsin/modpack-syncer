@@ -4,7 +4,7 @@ import { errors, Result } from "./errors";
 import { ETL_Generic, evtTimeline, util_cp, util_lstat, util_mkdir, util_note, util_readJSON, util_readText, util_readTOML, util_rename, util_rm, util_warn, util_writeJSON, util_writeText } from "./util";
 import path from "path";
 import { electron } from "process";
-import { checkForModUpdates, downloadRP, downloadWorld, genAllThePBR, getInstMods_old, getModIndexFiles, getWorld, unpublishWorld, uploadWorld } from "./app";
+import { checkForModUpdates, downloadRP, downloadWorld, genAllThePBR, getInstMods_old, getModIndexFiles, getWorld, takeWorldOwnership, unpublishWorld, uploadWorld } from "./app";
 import { openCCMenu } from "./menu_api";
 import { IMO_Combobox, IMO_Input, IMO_MultiSelect, InputMenu_InitData, ModsFolderDef, Res_InputMenu, UpdateProgress_InitData } from "./interface";
 
@@ -590,7 +590,11 @@ export const allDropdowns = {
                 label:"Take Ownership",
                 enabled:world.data?.ownerName != world.data?.publisherName,
                 click:()=>{
-
+                    takeWorldOwnership({
+                        iid,wID,
+                        uid:user.profile.id,
+                        uname:user.profile.name
+                    });
                 }
             },
             {

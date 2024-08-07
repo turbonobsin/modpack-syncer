@@ -657,24 +657,28 @@ export async function preInit(){
         return url.href;
     });
     ipcMain.handle("takeWorldOwnership",async (ev,arg:Arg_TakeWorldOwnership)=>{
-        if(!sysInst.meta) return errors.noSys.unwrap();
-        
-        let inst = await getModpackInst(arg.iid);
-        if(!inst || !inst.meta) return errors.couldNotFindPack.unwrap();
-        if(!inst.meta.meta.id) return errors.failedToGetPackLink.unwrap();
-
-        let acc = await getMainAccount();
-        if(!acc) return;
-
-        arg.uid = acc.profile.id;
-        arg.uname = acc.profile.name;
-
-        let res = (await semit<SArg_TakeWorldOwnership,boolean>("takeWorldOwnership",{
-            ...arg,
-            mpID:inst.meta.meta.id
-        })).unwrap();
-        if(!res) return;
+        return await takeWorldOwnership(arg);
     });
+}
+
+export async function takeWorldOwnership(arg:Arg_TakeWorldOwnership): Promise<boolean | undefined>{
+    if(!sysInst.meta) return errors.noSys.unwrap();
+        
+    let inst = await getModpackInst(arg.iid);
+    if(!inst || !inst.meta) return errors.couldNotFindPack.unwrap();
+    if(!inst.meta.meta.id) return errors.failedToGetPackLink.unwrap();
+
+    let acc = await getMainAccount();
+    if(!acc) return;
+
+    arg.uid = acc.profile.id;
+    arg.uname = acc.profile.name;
+
+    let res = (await semit<SArg_TakeWorldOwnership,boolean>("takeWorldOwnership",{
+        ...arg,
+        mpID:inst.meta.meta.id
+    })).unwrap();
+    if(!res) return;
 }
 
 export async function getWorld(arg:Arg_GetWorldInfo):Promise<Res_GetWorldInfo|undefined>{

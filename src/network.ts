@@ -1,6 +1,6 @@
 import { io } from "socket.io-client";
 import { Arg_CheckModUpdates, Arg_GetModUpdates, Arg_SearchPacks, PackMetaData, Res_GetModUpdates, Res_SearchPacks, Res_SearchPacksMeta, UpdateSearch } from "./interface";
-import { util_warn } from "./util";
+import { util_note2, util_warn } from "./util";
 import { errors, Result } from "./errors";
 import { instCache, ModPackInst, sysInst } from "./db";
 import { Socket } from "socket.io";
@@ -27,6 +27,8 @@ console.log("---loaded network.ts");
 // 
 
 socket.on("updateSearch",(arg:UpdateSearch)=>{
+    util_note2("GOT UPDATE SEARCH: ",arg);
+    
     let w = windowStack.find(v=>v.title == "Edit Instance");
     if(!w) return;
 

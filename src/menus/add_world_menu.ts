@@ -58,7 +58,7 @@ async function showData(data:ServerWorld,aside:MP_Div){
             text:"Current Owner: "+data.ownerName,
             marginTop:"0px"
         }),
-        new MP_P({
+        new MP_P({ 
             className:"l-desc",
             text:"State: ",
         }).addParts(
