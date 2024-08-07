@@ -31,9 +31,9 @@ abstract class CCMenu{
                 preload: path.join(__dirname, "preload.js"),
             },
             // parent:mainWindow,
-            parent:windowStack[windowStack.length-1] ?? mainWindow,
+            // parent:windowStack[windowStack.length-1] ?? mainWindow,
             center:true,
-            modal:true
+            // modal:true
         });
         windowStack.push(w);
 
