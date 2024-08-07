@@ -68,6 +68,7 @@ import { changeServerURL, preInit } from "./app";
 import { initDB, sysInst, themes } from "./db";
 import "./network";
 import { InitMenuData } from "./interface";
+import { getConnectionStatus } from "./network";
 
 const appMenu = Menu.buildFromTemplate([
 	{
@@ -81,6 +82,14 @@ const appMenu = Menu.buildFromTemplate([
 	{
 		label:"Data",
 		submenu:[
+			{
+				label:"Test Connection",
+				click:()=>{
+					dialog.showMessageBox({
+						message:"Server URL: "+sysInst.meta?.serverURL+"\n\nConnected: "+getConnectionStatus()
+					});
+				}
+			},
 			{
 				label:"Set Server URL",
 				click:()=>{

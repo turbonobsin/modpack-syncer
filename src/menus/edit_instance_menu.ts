@@ -422,11 +422,22 @@ class CMP_World extends MP_Flexbox{
         let d = data;
         const {head,body,footer} = setupAside(aside);
 
+        let loadingText = new MP_Header({
+            text:"Loading..."
+        });
+        head.addPart(loadingText);
+
         let w = await window.gAPI.getWorld({
             iid:initData.d.iid,
             wID:d.wID
         });
-        if(!w) return; // didn't find it or you don't have permission
+        console.log("W:",w);
+        if(!w){
+            loadingText.e!.textContent = "Failed to get world info.";
+            return; // didn't find it or you don't have permission
+        }
+
+        head.clearParts();
         
         let updateAvailable = ((w.data?.update ?? 0) > w.yourUpdate);
 
@@ -462,6 +473,13 @@ class CMP_World extends MP_Flexbox{
                     skipAdd:!w.data,
                     className:"l-desc accent-text",
                     text:"Current Owner: "+w.data?.ownerName,
+                    marginTop:"0px",
+                    marginBottom:"0px",
+                }),
+                new MP_P({
+                    skipAdd:!w.data,
+                    className:"l-desc",
+                    text:"You: "+w.yourName,
                     marginTop:"0px"
                 }),
                 new MP_P({
@@ -470,7 +488,7 @@ class CMP_World extends MP_Flexbox{
                     text:"State: ",
                 }).addParts(
                     new MP_Text({
-                        text:getWorldStateText(w.state),
+                        text:getWorldStateText(w.state,w.data!.ownerName,w.yourName),
                     }).onPostLoad(p=>{
                         p.e!.style.textTransform = "uppercase";
                         p.e!.style.fontWeight = "bold";
@@ -527,6 +545,12 @@ class CMP_World extends MP_Flexbox{
         }
         else{
             head.e!.style.height = "unset";
+
+            let canLaunch = true;
+            if(w.isRunning) canLaunch = false;
+            // if(canLaunch) if(w.data?.ownerName != w.yourName) canLaunch = false;
+            if(canLaunch) if(w.state != "") canLaunch = false;
+
             head.addParts(
                 new MP_Flexbox({
                     justifyContent:"space-between",
@@ -541,27 +565,36 @@ class CMP_World extends MP_Flexbox{
                             window.gAPI.openDropdown("worldOptions",initData.d.iid,d.wID);
                         }
                     }),
+                    // new MP_Button({
+                    //     // skipAdd:d.data?.sync != null,
+                    //     label:"Upload",
+                    //     icon:"upload",
+                    //     onClick:(e,elm)=>{
+                    //         window.gAPI.uploadWorld({
+                    //             iid:initData.d.iid,
+                    //             wID:data.wID
+                    //         });
+                    //     }
+                    // }),
+                    // new MP_Button({
+                    //     // skipAdd:d.data?.sync != null,
+                    //     label:"Download",
+                    //     icon:"download",
+                    //     className:"accent",
+                    //     onClick:(e,elm)=>{
+                    //         window.gAPI.downloadWorld({
+                    //             iid:initData.d.iid,
+                    //             wID:data.wID
+                    //         });
+                    //     }
+                    // }),//
                     new MP_Button({
-                        // skipAdd:d.data?.sync != null,
-                        label:"Upload",
-                        icon:"upload",
-                        onClick:(e,elm)=>{
-                            window.gAPI.uploadWorld({
-                                iid:initData.d.iid,
-                                wID:data.wID
-                            });
-                        }
-                    }),
-                    new MP_Button({
-                        // skipAdd:d.data?.sync != null,
-                        label:"Download",
-                        icon:"download",
+                        label:(w.isRunning ? "Running" : "Launch"),
+                        icon:(w.isRunning ? "sports_esports" : "rocket_launch"),
                         className:"accent",
+                        disabled:!canLaunch,
                         onClick:(e,elm)=>{
-                            window.gAPI.downloadWorld({
-                                iid:initData.d.iid,
-                                wID:data.wID
-                            });
+                            window.gAPI.launchInstance(initData.d.iid);
                         }
                     }),//
                     // new MP_Button({
@@ -685,6 +718,15 @@ async function loadSection(index:number,menu:MP_TabbedMenu){
                             text:` (${total})`
                         })
                     );
+                },
+                getItemByID:(s,id)=>{
+                    return s.sel.items.find(v=>v.data.local.file == id);
+                },
+                getItemUniqueID(item){
+                    return item.data.local.file;
+                },
+                getScrollableElm(){
+                    return menu.main.e;
                 }
             });
             currentSearch = search;
@@ -712,7 +754,6 @@ async function loadSection(index:number,menu:MP_TabbedMenu){
             );
 
             menu.main_body.addPart(search);
-            console.log(search.e);
             if(search.e){
                 // search.e.style.display = "grid";
                 // search.e.style.gridTemplateRows = "auto 1fr";
@@ -881,7 +922,7 @@ async function loadSection(index:number,menu:MP_TabbedMenu){
                 },
                 onSubmit:async (t,e,q)=>{
                     let res = await window.gAPI.getInstWorlds({iid:initData.d.iid,filter:{query:q}});
-                    console.log("worlds:",res);
+                    console.log("WORLDS:",res);
                     if(!res) return;
 
                     for(const world of res.worlds){
@@ -894,6 +935,15 @@ async function loadSection(index:number,menu:MP_TabbedMenu){
                             window.gAPI.openDropdown("worldItem",initData.d.iid,world.wID);
                         });
                     }
+                },
+                getItemByID(s,id){
+                    return s.sel.items.find(v=>v.data.wID == id);
+                },
+                getItemUniqueID(item){
+                    return item.data.wID;
+                },
+                getScrollableElm(){
+                    return menu.main.e;
                 }
             });
             menu.main_body.addPart(search);
@@ -922,16 +972,25 @@ async function loadSection(index:number,menu:MP_TabbedMenu){
 }
 
 let currentSearch:MP_SearchStructure<any>|undefined;
-window.gAPI.onUpdateSearch((data:UpdateSearch)=>{
-    if(data?.iid != undefined) if(data.iid != initData.d.iid) return;
-    if(data?.id != undefined){
-        if(data.id == "world"){
-            if(curSection != 3) return;
-            if(!currentSearch?.sel.items.some((v:SAPI2_Item<World_Data>)=>v.data.wID == data.data.wID)) return;
+setTimeout(()=>{
+    console.log("> SETUP UPDATE SEARCH LISTENER");
+    window.gAPI.onUpdateSearch((data?:UpdateSearch)=>{
+        console.log("...updating search:",data);
+        
+        if(data?.mpID != undefined) if(data.mpID != initData.d.mpID) return;
+        if(data?.id != undefined){
+            if(data.id == "world"){
+                if(curSection != 3) return;
+                if(data.data.wID != "*"){
+                    console.log("ITEMS:",currentSearch?.sel.items);
+                    let item = currentSearch?.sel.items.some((v:SAPI2_Item<World_Data>)=>v.data.wID == data.data.wID);
+                    if(!item) return;
+                }
+            }
         }
-    }
-    currentSearch?.submit();
-});
+        currentSearch?.refresh();
+    });
+},2000);
 
 const fullscreenCont = qElm(".fullscreen-cont") as HTMLElement | undefined;
 const imgCont = qElm(".img-cont") as HTMLElement | undefined;

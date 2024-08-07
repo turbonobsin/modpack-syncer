@@ -106,6 +106,7 @@ interface CmdInitData{
 }
 interface EditInst_InitData{
     iid:string;
+    mpID:string;
 }
 interface UpdateProgress_InitData{
     iid:string;
@@ -262,6 +263,7 @@ interface World_Data{
     wID:string;
     data?:{
         icon?:string;
+        // isRunning:boolean;
     };
     // data?:{ // data will be defined only if the Resource Pack has been unpacked into a folder (because I can't efficiently read the data otherwise)
     //     icon?:string;
@@ -685,7 +687,9 @@ interface Res_GetWorldInfo{
     wID:string;
     data?:WorldInfo;
     yourUpdate:number; // for just the client side
+    yourName:string; // for just the client side
     state:WorldState;
+    isRunning:boolean;
 }
 type WorldState = "" | "inUse" | "uploading" | "downloading";
 interface Arg_PublishWorld{
@@ -802,6 +806,17 @@ interface Arg_TakeWorldOwnership{
 interface SArg_TakeWorldOwnership{
     mpID:string;
     wID:string;
+    uid:string;
+    uname:string;
+}
+interface Arg_GenericWorld{
+    mpID:string;
+    wID:string;
+    uid:string;
+    uname:string;
+}
+interface Arg_LaunchInst{
+    mpID:string;
     uid:string;
     uname:string;
 }

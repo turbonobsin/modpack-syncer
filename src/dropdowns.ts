@@ -4,9 +4,10 @@ import { errors, Result } from "./errors";
 import { ETL_Generic, evtTimeline, util_cp, util_lstat, util_mkdir, util_note, util_readJSON, util_readText, util_readTOML, util_rename, util_rm, util_warn, util_writeJSON, util_writeText } from "./util";
 import path from "path";
 import { electron } from "process";
-import { checkForModUpdates, downloadRP, downloadWorld, genAllThePBR, getInstMods_old, getModIndexFiles, getWorld, takeWorldOwnership, unpublishWorld, uploadWorld } from "./app";
+import { checkForModUpdates, downloadRP, downloadWorld, genAllThePBR, getInstMods_old, getModIndexFiles, getWorld, launchInstance, takeWorldOwnership, unpublishWorld, uploadWorld } from "./app";
 import { openCCMenu } from "./menu_api";
-import { IMO_Combobox, IMO_Input, IMO_MultiSelect, InputMenu_InitData, ModsFolderDef, Res_InputMenu, UpdateProgress_InitData } from "./interface";
+import { Arg_FinishUploadWorld, IMO_Combobox, IMO_Input, IMO_MultiSelect, InputMenu_InitData, ModsFolderDef, Res_InputMenu, UpdateProgress_InitData } from "./interface";
+import { semit } from "./network";
 
 // const folderIcon = nativeImage.createFromPath(path.join(appPath,"icons","folder.svg"));
 const folderIcon = path.join(appPath,"icons","folder.png");
@@ -585,10 +586,18 @@ export const allDropdowns = {
         });
         if(!world) return;
 
+        console.log(">> NOTE: ",world.data?.ownerName,world.data?.publisherName);
+
         let menu = Menu.buildFromTemplate([
+            // {
+            //     label:"Launch",
+            //     click:()=>{
+            //         launchInstance(iid);
+            //     }
+            // },
             {
                 label:"Take Ownership",
-                enabled:world.data?.ownerName != world.data?.publisherName,
+                enabled:world.data?.ownerName != user.profile.name,
                 click:()=>{
                     takeWorldOwnership({
                         iid,wID,
@@ -596,6 +605,21 @@ export const allDropdowns = {
                         uname:user.profile.name
                     });
                 }
+            },
+            {
+                label:"Upload",
+                click:()=>{
+                    uploadWorld({iid,wID});
+                }
+            },
+            {
+                label:"Download",
+                click:()=>{
+                    downloadWorld({iid,wID});
+                }
+            },
+            {
+                type:"separator"
             },
             {
                 label:"Force Upload",
@@ -610,6 +634,9 @@ export const allDropdowns = {
                 }
             },
             {
+                type:"separator"
+            },
+            {
                 label:"Unpublish",
                 click:async ()=>{
                     let res = await dialog.showMessageBox({
@@ -620,6 +647,22 @@ export const allDropdowns = {
                     unpublishWorld({
                         iid,wID
                     });
+                }
+            },
+            {
+                label:"Force Fix Broken State",
+                click:async ()=>{
+                    let res = await dialog.showMessageBox({
+                        message:"Are you sure you want to FORCE the world into an available state?\n\nYou should only do this if an error occured when you tried to upload or download the pack and it got stuck or if there was some uncaught error after a game crash.\n\nIf not used properly it can cause world corruption.",
+                        buttons:["Cancel","FORCE"]
+                    });
+                    if(res.response != 1) return;
+                    (await semit<Arg_FinishUploadWorld,boolean>("forceFixBrokenWorldState",{
+                        mpID:inst.meta!.meta.id,
+                        wID,
+                        uid:user.profile.id,
+                        uname:user.profile.name
+                    })).unwrap();
                 }
             }
         ]);

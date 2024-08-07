@@ -356,12 +356,17 @@ export function setTheme(theme?:string){
     par.classList.add("themestyle-"+theme);
 }
 
-export function getWorldStateText(state:WorldState){
+export function getWorldStateText(state:WorldState,ownerName:string|undefined,yourName:string){
     if(state == "" || !state) return "Available to use";
+    let pre = "";
+    if(ownerName != undefined){
+        if(ownerName != yourName) pre = ownerName+" is ";
+        else pre = "You are ";
+    }
     
-    return {
-        "inUse":"In use",
-        "uploading":"Owner is uploading...",
+    return pre+{
+        "inUse":"Playing",
+        "uploading":"Uploading...",
         "downloading":"Downloading..."
     }[state];
 }

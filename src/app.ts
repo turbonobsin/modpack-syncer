@@ -138,39 +138,14 @@ export async function preInit(){
         return (await getPrismInstances(getWindow(ev),arg)).unwrap();
     });
     ipcMain.handle("launchInstance",async (ev,iid:string)=>{
-        // exec("notepad");
-        if(!sysInst.meta) return;
-        if(!sysInst.meta.prismExe) return;
-
-        if(!await ensurePrismLinked(getWindow(ev))) return;
-
-        let pack = await getModpackInst(iid);
-        if(!pack) return;
-        if(!pack.meta) return;
-        if(!pack.meta.linkName) return;
-
-        // let cfgPath = path.join(sysInst.meta.prismRoot,"instances",pack.meta.linkName,"instance.cfg");
-        // let instCfg = parseCFGFile(await util_readText(cfgPath));
-        // if(!instCfg) return;
-        // instCfg.setValue("JavaPath","C:/Program Files (x86)/Minecraft Launcher/runtime/java-runtime-delta/windows-x64/java-runtime-delta/bin/javaw.exe");
-        // instCfg.setValue("JavaVersion","21.0.3");
-        // instCfg.setValue("OverrideJavaLocation","true");
-        // await util_writeText(cfgPath,instCfg.toText());
-
-        pack.meta.isRunning = true;
-        pack.meta.lastLaunched = Date.now();
-        await pack.save();
-
-        let cmd = `${path.join(sysInst.meta.prismExe,"prismlauncher")} --launch "${pack.meta.linkName}"`;
-        util_warn("EXEC:",cmd);
-        exec(cmd);
+        return await launchInstance(iid,ev);
     });
 
     ipcMain.handle("showEditInstance",async (ev,iid:string)=>{
         let inst = await getModpackInst(iid);
         if(!inst || !inst.meta) return;
 
-        await openCCMenu("edit_instance_menu",{iid});
+        await openCCMenu("edit_instance_menu",{iid,mpID:inst.meta.meta.id});
     });
 
     ipcMain.handle("getInstScreenshots",async (ev,arg:Arg_GetInstScreenshots)=>{
@@ -188,11 +163,8 @@ export async function preInit(){
 
         return res;
     });
-    ipcMain.handle("getInstWorlds",async (ev,arg:Arg_GetInstWorlds)=>{
-        let inst = await getModpackInst(arg.iid);
-        if(!inst) return errors.couldNotFindPack.unwrap();
-        
-        let res = inst.getWorlds(arg.filter);
+    ipcMain.handle("getInstWorlds",async (ev,arg:Arg_GetInstWorlds)=>{        
+        let res = getWorlds(arg.iid,arg.filter);
         if(!res) return;
 
         return res;
@@ -374,56 +346,7 @@ export async function preInit(){
 
     // more inst stuff
     ipcMain.handle("checkForInstUpdates",async (ev,iid:string)=>{
-        console.log("CHECK FOR INST UPDATES:",iid);
-
-        let window = getWindow(ev);
-        if(!window) return;
-
-        let inst = await getModpackInst(iid);
-        if(!inst || !inst.meta) return errors.couldNotFindPack.unwrap();
-
-        console.log(11);
-
-        // if(!inst.meta.meta.id) return errors.failedToGetPackLink.unwrap();
-
-        console.log(22);
-        
-        let res = (await semit<Arg_GetRPVersions,Res_GetRPVersions>("getRPVersions",{
-            mpID:inst.meta.meta.id,
-            current:inst.meta.resourcepacks.map(v=>{
-                return {
-                    rpID:v.rpID,
-                    update:v.update
-                };
-            })
-        })).unwrap();
-        if(!res) return;
-
-        console.log("VERSIONS:",res.versions);
-
-        let res1 = (await syncMods(window,iid,true)).unwrap();
-        let modsUpToDate = res1?.upToDate;
-
-        let proms:Promise<any>[] = [];
-        for(const v of res.versions){
-            proms.push(downloadRP({
-                iid,lastDownloaded:-1,
-                mpID:inst.meta.meta.id,
-                rpID:v.rpID
-            }));
-        }
-        await Promise.all(proms);
-
-        if(modsUpToDate && res.versions.length == 0){
-            await dialog.showMessageBox({
-                message:"Up to date"
-            });
-        }
-        else{
-            await dialog.showMessageBox({
-                message:"Finished"
-            });
-        }
+        return await checkForInstUpdates(iid);
     });
     // ipcMain.handle("updateInst",async (ev,iid:string)=>{
 
@@ -514,6 +437,8 @@ export async function preInit(){
             ownerName:acc.profile.name
         })).unwrap();
         if(!res) return errors.failedToPublishWorld;
+
+        res.yourName = acc.profile.name;
 
         let w = await openCCMenu<UpdateProgress_InitData>("update_progress_menu",{iid:arg.iid});
         if(!w) return errors.failedNewWindow.unwrap();
@@ -661,6 +586,155 @@ export async function preInit(){
     });
 }
 
+export async function checkForInstUpdates(iid:string,ev?:Electron.IpcMainInvokeEvent,ignoreWorlds=false){
+    console.log("CHECK FOR INST UPDATES:",iid);
+
+    let window:BrowserWindow|undefined = mainWindow;
+    if(ev){
+        window = getWindow(ev);
+        if(!window) return;
+    }
+
+    let inst = await getModpackInst(iid);
+    if(!inst || !inst.meta) return errors.couldNotFindPack.unwrap();
+
+    console.log(11);
+
+    // if(!inst.meta.meta.id) return errors.failedToGetPackLink.unwrap();
+
+    console.log(22);
+    
+    let res = (await semit<Arg_GetRPVersions,Res_GetRPVersions>("getRPVersions",{
+        mpID:inst.meta.meta.id,
+        current:inst.meta.resourcepacks.map(v=>{
+            return {
+                rpID:v.rpID,
+                update:v.update
+            };
+        })
+    })).unwrap();
+    if(!res) return;
+
+    console.log("VERSIONS:",res.versions);
+
+    // sync mods
+    let res1 = (await syncMods(window,iid,true)).unwrap();
+    let modsUpToDate = res1?.upToDate;
+
+    // sync rps
+    let proms:Promise<any>[] = [];
+    for(const v of res.versions){
+        proms.push(downloadRP({
+            iid,lastDownloaded:-1,
+            mpID:inst.meta.meta.id,
+            rpID:v.rpID
+        }));
+    }
+    await Promise.all(proms);
+
+    // sync worlds
+    if(!ignoreWorlds){
+        let acc = await getMainAccount();
+        if(acc){
+            let worlds = inst.meta.worlds;
+            for(const w of worlds){
+                if(w.lastSync == -1) continue;
+
+                let res1 = await takeWorldOwnership({
+                    iid,wID:w.wID,
+                    uid:acc.profile.id,
+                    uname:acc.profile.name
+                });
+                if(!res1) return;
+        
+                let res = await downloadWorld({
+                    iid,wID:w.wID
+                },undefined,true);
+                if(!res) return;
+            }
+        }
+    }
+
+    // finish
+    if(modsUpToDate && res.versions.length == 0){
+        await dialog.showMessageBox({
+            message:"Up to date"
+        });
+    }
+    else{
+        await dialog.showMessageBox({
+            message:"Finished"
+        });
+    }
+}
+
+export async function launchInstance(iid:string,ev?:Electron.IpcMainInvokeEvent){
+    // exec("notepad");
+    if(!sysInst.meta) return;
+    if(!sysInst.meta.prismExe) return;
+
+    if(ev) if(!await ensurePrismLinked(getWindow(ev))) return;
+
+    let pack = await getModpackInst(iid);
+    if(!pack) return;
+    if(!pack.meta) return;
+    if(!pack.meta.linkName) return;
+
+    // let cfgPath = path.join(sysInst.meta.prismRoot,"instances",pack.meta.linkName,"instance.cfg");
+    // let instCfg = parseCFGFile(await util_readText(cfgPath));
+    // if(!instCfg) return;
+    // instCfg.setValue("JavaPath","C:/Program Files (x86)/Minecraft Launcher/runtime/java-runtime-delta/windows-x64/java-runtime-delta/bin/javaw.exe");
+    // instCfg.setValue("JavaVersion","21.0.3");
+    // instCfg.setValue("OverrideJavaLocation","true");
+    // await util_writeText(cfgPath,instCfg.toText());
+
+    let acc = await getMainAccount();
+    if(!acc) return;
+
+    let worlds = pack.meta.worlds;
+    for(const w of worlds){
+        if(w.lastSync == -1) continue;
+
+        let res1 = await takeWorldOwnership({
+            iid,wID:w.wID,
+            uid:acc.profile.id,
+            uname:acc.profile.name
+        });
+        if(!res1) return;
+
+        let res = await downloadWorld({
+            iid,wID:w.wID
+        },undefined,true);
+        if(!res) return;
+    }
+    
+    let res = (await semit<Arg_LaunchInst,boolean>("startLaunchInst",{
+        mpID:pack.meta.meta.id,
+        uid:acc.profile.id,
+        uname:acc.profile.name
+    })).unwrap();
+    if(!res) return;
+
+    await checkForInstUpdates(iid,undefined,true);
+
+    pack.meta.isRunning = true;
+    pack.meta.lastLaunched = Date.now();
+    await pack.save();
+
+    let cmd = `${path.join(sysInst.meta.prismExe,"prismlauncher")} --launch "${pack.meta.linkName}"`;
+    util_note("EXEC:",cmd);
+    exec(cmd);
+
+    windowStack.find(v=>v.title == "Edit Instance")?.webContents.send("updateSearch",{
+        mpID:pack.meta.meta.id,
+        id:"world",
+        data:{
+            wID:"*"
+        }
+    });
+    mainWindow.reload();
+}
+
 export async function takeWorldOwnership(arg:Arg_TakeWorldOwnership): Promise<boolean | undefined>{
     if(!sysInst.meta) return errors.noSys.unwrap();
         
@@ -679,6 +753,8 @@ export async function takeWorldOwnership(arg:Arg_TakeWorldOwnership): Promise<bo
         mpID:inst.meta.meta.id
     })).unwrap();
     if(!res) return;
+
+    return true;
 }
 
 export async function getWorld(arg:Arg_GetWorldInfo):Promise<Res_GetWorldInfo|undefined>{
@@ -693,13 +769,17 @@ export async function getWorld(arg:Arg_GetWorldInfo):Promise<Res_GetWorldInfo|un
     })).unwrap();
     if(!res) return;
 
+    let acc = await getMainAccount();
+    res.yourName = acc?.profile.name ?? "(Can't load your account)";
+
     let w = inst.meta.worlds.find(v=>v.wID == arg.wID);
     res.yourUpdate = w?.update ?? 0;
+    res.isRunning = inst.meta.isRunning;
 
     return res;
 }
 
-export async function uploadWorld(arg:Arg_UploadWorld,useTime=true){
+export async function uploadWorld(arg:Arg_UploadWorld,useTime=true,delayedWindow=false,noUpToDateMsg=false){
     if(!arg.iid) return errors.invalid_args.unwrap();
 
     let inst = await getModpackInst(arg.iid);
@@ -725,11 +805,14 @@ export async function uploadWorld(arg:Arg_UploadWorld,useTime=true){
     })).unwrap();
     if(!allowedDirs) return;
 
-    let w = await openCCMenu<UpdateProgress_InitData>("update_progress_menu",{iid:arg.iid});
-    if(!w) return errors.failedNewWindow.unwrap();
+    let w:BrowserWindow|undefined;
+    if(!delayedWindow){
+        w = await openCCMenu<UpdateProgress_InitData>("update_progress_menu",{iid:arg.iid});
+        if(!w) return errors.failedNewWindow.unwrap();
+        w.webContents.send("updateProgress","main",0,1,"Initializing 'upload world'...");
+    }
 
     util_note("STARTED uploading world...");
-    w.webContents.send("updateProgress","main",0,1,"Initializing...");
 
     let completed = 0;
     let total = 0;
@@ -748,7 +831,7 @@ export async function uploadWorld(arg:Arg_UploadWorld,useTime=true){
     let loop = async (loc:string,sloc:string)=>{
         let list = await util_readdirWithTypes(loc);
         for(const item of list){
-            if(w.isDestroyed()) return;
+            if(w?.isDestroyed()) return;
             if(item.isDirectory()){
                 await loop(path.join(loc,item.name),path.join(sloc,item.name));
                 continue;
@@ -774,42 +857,83 @@ export async function uploadWorld(arg:Arg_UploadWorld,useTime=true){
         await loop(path.join(saveLoc,f),f);
     }
 
-    if(w.isDestroyed()) return;
+    if(w?.isDestroyed()) return;
 
     if(total == 0){
-        w.close();
-        await dialog.showMessageBox({
+        w?.close();
+        if(!noUpToDateMsg) await dialog.showMessageBox({
             message:"Up to date"
         });
+        return true;
+    }
+
+    if(delayedWindow){
+        w = await openCCMenu<UpdateProgress_InitData>("update_progress_menu",{iid:arg.iid});
+        if(!w) return errors.failedNewWindow.unwrap();
+        w.webContents.send("updateProgress","main",0,1,"Initializing...");
+    }
+    else if(!w || w.isDestroyed()) return;
+
+    // 
+
+    let resStart = (await semit<Arg_FinishUploadWorld,void>("startUploadWorld",{
+        mpID:inst.meta!.meta.id,
+        wID:arg.wID,
+        uid:acc.profile.id,
+        uname:acc.profile.name
+    }));
+    if(resStart.err){
+        resStart.unwrap();
         return;
     }
-
-    for(const {loc,sloc,name} of files){
-        if(w.isDestroyed()) return;
-        
-        let buf = await util_readBinary(loc);
-        if(!buf){
-            failed.push(sloc);
-            continue;
-        }
-        
-        let fres = (await semit<Arg_UploadWorldFile,boolean>("upload_world_file",{ // file res
-            buf,
-            mpID:inst.meta.meta.id,
-            path:sloc,
+    
+    let finish = async ()=>{
+        return (await semit<Arg_FinishUploadWorld,Res_FinishUploadWorld>("finishUploadWorld",{
+            mpID:inst.meta!.meta.id,
+            wID:arg.wID,
             uid:acc.profile.id,
-            uname:acc.profile.name,
-            wID:arg.wID
+            uname:acc.profile.name
         })).unwrap();
-        if(!fres){
-            failed.push(sloc);
-            continue;
-        }
+    };
 
-        w.webContents.send("updateProgress","main",completed,total,"Upload: "+name);
-        completed++;
-        success.push(sloc);
+    let proms:Promise<void>[] = [];
+    for(const {loc,sloc,name} of files){
+        proms.push(new Promise<void>(async resolve=>{
+            if(w.isDestroyed()){
+                await finish();
+                resolve();
+                return;
+            }
+            
+            let buf = await util_readBinary(loc);
+            if(!buf){
+                failed.push(sloc);
+                resolve();
+                return;
+            }
+            
+            let fres = (await semit<Arg_UploadWorldFile,boolean>("upload_world_file",{ // file res
+                buf,
+                mpID:inst.meta!.meta.id,
+                path:sloc,
+                uid:acc.profile.id,
+                uname:acc.profile.name,
+                wID:arg.wID
+            })).unwrap();
+            if(!fres){
+                failed.push(sloc);
+                resolve();
+                return;
+            }
+    
+            w.webContents.send("updateProgress","main",completed,total,"Upload: "+name);
+            completed++;
+            success.push(sloc);
+
+            resolve();
+        }));
     }
+    await Promise.all(proms);
 
     // 
     w.webContents.send("updateProgress","main",completed,total,"Finished.",{
@@ -827,23 +951,20 @@ export async function uploadWorld(arg:Arg_UploadWorld,useTime=true){
 
     util_note("FINISHED uploading world...");
 
-    let res2 = (await semit<Arg_FinishUploadWorld,Res_FinishUploadWorld>("finishUploadWorld",{
-        mpID:inst.meta.meta.id,
-        wID:arg.wID,
-        uid:acc.profile.id,
-        uname:acc.profile.name
-    })).unwrap();
+    let res2 = await finish();
     if(!res2) return;
     
     wMeta.update = res2.update;
     wMeta.lastSync = Date.now();
     await inst.save();
 
+    if(noUpToDateMsg) if(failed.length == 0) w.close();
+
     windowStack.find(v=>v.title == "Edit Instance")?.webContents.send("updateSearch");
 
     return true;
 }
-export async function downloadWorld(arg:Arg_DownloadWorld,useTime=true){
+export async function downloadWorld(arg:Arg_DownloadWorld,useTime=true,noUpToDateMsg=false){
     if(!arg.iid) return errors.invalid_args.unwrap();
 
     let inst = await getModpackInst(arg.iid);
@@ -888,10 +1009,10 @@ export async function downloadWorld(arg:Arg_DownloadWorld,useTime=true){
 
     if(res.files.length == 0){
         util_note2(wMeta.update,res.update);
-        await dialog.showMessageBox({
+        if(!noUpToDateMsg) await dialog.showMessageBox({
             message:"Up to date"
         });
-        return;
+        return true;
     }
 
     // DONT KNOW OF AN EASY FIX FOR THIS YET
@@ -905,40 +1026,70 @@ export async function downloadWorld(arg:Arg_DownloadWorld,useTime=true){
     let w = await openCCMenu<UpdateProgress_InitData>("update_progress_menu",{iid:arg.iid});
     if(!w) return errors.failedNewWindow.unwrap();
 
+    let finish = async ()=>{
+        let res2 = (await semit<Arg_FinishUploadWorld,void>("finishDownloadWorld",{
+            mpID:inst.meta!.meta.id,
+            wID:arg.wID,
+            uid:acc.profile.id,
+            uname:acc.profile.name
+        })).unwrap();
+    };
+    let resStart = (await semit<Arg_FinishUploadWorld,void>("startDownloadWorld",{
+        mpID:inst.meta.meta.id,
+        wID:arg.wID,
+        uid:acc.profile.id,
+        uname:acc.profile.name
+    }));
+    if(resStart.err){
+        resStart.unwrap();
+        return;
+    }
+
     util_note("STARTED downloading world...");
-    w.webContents.send("updateProgress","main",0,1,"Initializing...");
+    w.webContents.send("updateProgress","main",0,1,"Initializing 'download world'...");
 
     let failed:string[] = [];
     let success:string[] = [];
     let completed = 0;
     let total = res.files.length;
 
+    let proms:Promise<void>[] = [];
     for(const {loc,sloc,n} of res.files){
-        if(w.isDestroyed()) return;
-        
-        let fres = (await semit<Arg_DownloadWorldFile,ModifiedFileData>("download_world_file",{ // file res
-            mpID:inst.meta.meta.id,
-            path:sloc,
-            wID:arg.wID
-        })).unwrap();
-        if(!fres){
-            failed.push(sloc);
-            console.log("FAILED [1] - "+sloc);
-            continue;
-        }
+        proms.push(new Promise<void>(async resolve=>{
+            if(w.isDestroyed()){
+                await finish();
+                resolve();
+                return;
+            }
+            
+            let fres = (await semit<Arg_DownloadWorldFile,ModifiedFileData>("download_world_file",{ // file res
+                mpID:inst.meta!.meta.id,
+                path:sloc,
+                wID:arg.wID
+            })).unwrap();
+            if(!fres){
+                failed.push(sloc);
+                console.log("FAILED [1] - "+sloc);
+                resolve();
+                return;
+            }
+    
+            let folderRes = await util_mkdir(path.dirname(path.join(saveLoc,sloc)),true);
+            if(!folderRes) util_warn("Error creating folder: "+path.dirname(path.join(saveLoc,sloc)));
+            let res = await util_writeBinary(path.join(saveLoc,sloc),Buffer.from(fres.buf));
+            if(!res){
+                failed.push(sloc);
+                console.log("FAILED [2] - "+sloc,path.join(saveLoc,sloc));
+            }
+            else success.push(sloc);
+    
+            w.webContents.send("updateProgress","main",completed,total,"Download: "+n);
+            completed++;
 
-        let folderRes = await util_mkdir(path.dirname(path.join(saveLoc,sloc)),true);
-        if(!folderRes) util_warn("Error creating folder: "+path.dirname(path.join(saveLoc,sloc)));
-        let res = await util_writeBinary(path.join(saveLoc,sloc),Buffer.from(fres.buf));
-        if(!res){
-            failed.push(sloc);
-            console.log("FAILED [2] - "+sloc,path.join(saveLoc,sloc));
-        }
-        else success.push(sloc);
-
-        w.webContents.send("updateProgress","main",completed,total,"Upload: "+n);
-        completed++;
+            resolve();
+        }));
     }
+    await Promise.all(proms);
 
     // 
     w.webContents.send("updateProgress","main",completed,total,"Finished.",{
@@ -960,7 +1111,16 @@ export async function downloadWorld(arg:Arg_DownloadWorld,useTime=true){
 
     util_note("FINISHED downloading world...",failed);
 
-    windowStack.find(v=>v.title == "Edit Instance")?.webContents.send("updateSearch");
+    await finish();
+
+    // windowStack.find(v=>v.title == "Edit Instance")?.webContents.send("updateSearch",{
+    //     mpID:inst.meta.meta.id,
+    //     id:"world",
+    //     data:{
+    //         wID:arg.wID
+    //     }
+    // });
+    // windowStack.find(v=>v.title == "Edit Instance")?.webContents.send("updateSearch");
 
     if(failed.length == 0){
         windowStack.find(v=>v.title == "Add World")?.close();
@@ -1438,9 +1598,10 @@ async function syncMods(w:BrowserWindow,iid:string,noMsg=false): Promise<Result<
         return new Result({upToDate:true});
     }
 
-    let deletedPath = path.join(modsPath,".deleted");
-    await util_mkdir(deletedPath);
-    await util_mkdir(path.join(modsPath,".cache"));
+    // I'VE DISABLED THIS FOR NOW BC I'M NOT SURE WHY IT'S HERE AT THE MOMENT, HOPEFULLY DOESN'T BREAK ANYTHING
+    // let deletedPath = path.join(modsPath,".deleted");
+    // await util_mkdir(deletedPath);
+    // await util_mkdir(path.join(modsPath,".cache"));
 
     // w.webContents.send("msg","hi there!");
     let newW = await openCCMenu("update_progress_menu",{iid});
@@ -1509,7 +1670,10 @@ async function syncMods(w:BrowserWindow,iid:string,noMsg=false): Promise<Result<
         let proms:Promise<void>[] = [];
         for(let i = 0; i < items.length; i++){
             proms.push(new Promise<void>(async resolve=>{
-                if(!sysInst.meta) return;
+                if(!sysInst.meta){
+                    resolve();
+                    return;
+                }
                 
                 let item = items[i];
 
@@ -1547,6 +1711,8 @@ async function syncMods(w:BrowserWindow,iid:string,noMsg=false): Promise<Result<
                 // await wait(1000);
                 
                 newW.webContents.send("updateProgress","main",i+1,total,item.action == ItemAction.add ? `Downloading: ${item.name}` : `Removing: ${item.name}`);
+
+                resolve();
             }));
         }
         await Promise.all(proms);
@@ -1577,7 +1743,8 @@ async function syncMods(w:BrowserWindow,iid:string,noMsg=false): Promise<Result<
             // await wait(1500);
             await wait(500);
             newW.close();
-            w.reload();
+            // w.reload();
+            w.webContents.send("updateSearch");
         }
     }
     
@@ -2429,7 +2596,7 @@ export async function getInstMods_old(arg:Arg_GetInstMods): Promise<Result<Res_G
 }
 
 export async function genAllThePBR(iid:string,inst:ModPackInst|undefined){
-    if(!inst) return;
+    if(!inst || !inst.meta) return;
     
     let res = (await getInstMods_old({iid})).unwrap();
     if(!res) return;
@@ -3200,10 +3367,10 @@ async function alertBox(w:BrowserWindow,message:string,title="Error"){
 // 
 
 import { ETL_Generic, evtTimeline, parseCFGFile, pathTo7zip, searchStringCompare, util_cp, util_lstat, util_mkdir, util_note, util_note2, util_readBinary, util_readdir, util_readdirWithTypes, util_readJSON, util_readText, util_readTOML, util_rename, util_rm, util_utimes, util_warn, util_writeBinary, util_writeJSON, util_writeText, wait } from "./util";
-import { AddRP_InitData, Arg_AddModToFolder, Arg_ChangeFolderType, Arg_CheckModUpdates, Arg_CreateFolder, Arg_DownloadRP, Arg_DownloadRPFile, Arg_DownloadWorld, Arg_DownloadWorldFile, Arg_FinishUploadWorld, Arg_GetAllowedDirs, Arg_GetInstances, Arg_GetInstMods, Arg_GetInstResourcePacks, Arg_GetInstScreenshots, Arg_GetInstWorlds, Arg_GetPrismInstances, Arg_GetRPs, Arg_GetRPVersions, Arg_GetServerWorlds, Arg_GetWorldFiles, Arg_GetWorldInfo, Arg_IID, Arg_PublishWorld, Arg_RemoveRP, Arg_SearchPacks, Arg_SyncMods, Arg_TakeWorldOwnership, Arg_UnpackRP, Arg_UnpublishWorld, Arg_UploadRP, Arg_UploadWorld, Arg_UploadWorldFile, ArgC_GetRPs, CurseForgeUpdate, Data_PrismInstancesMenu, FSTestData, FullModData, InputMenu_InitData, InstGroups, LocalModData, MMCPack, ModData, ModifiedFile, ModifiedFileData, ModIndex, ModInfo, ModrinthModData, ModrinthUpdate, ModsFolder, ModsFolderDef, PackMetaData, RemoteModData, Res_DownloadRP, Res_FinishUploadWorld, Res_GetInstMods, Res_GetInstResourcePacks, Res_GetInstScreenshots, Res_GetModIndexFiles, Res_GetModUpdates, Res_GetPrismInstances, Res_GetRPs, Res_GetRPVersions, Res_GetServerWorlds, Res_GetWorldFiles, Res_GetWorldInfo, Res_InputMenu, Res_SyncMods, RPCache, SArg_GetServerWorlds, SArg_PublishWorld, SArg_TakeWorldOwnership, UpdateProgress_InitData } from "./interface";
+import { AddRP_InitData, Arg_AddModToFolder, Arg_ChangeFolderType, Arg_CheckModUpdates, Arg_CreateFolder, Arg_DownloadRP, Arg_DownloadRPFile, Arg_DownloadWorld, Arg_DownloadWorldFile, Arg_FinishUploadWorld, Arg_GetAllowedDirs, Arg_GetInstances, Arg_GetInstMods, Arg_GetInstResourcePacks, Arg_GetInstScreenshots, Arg_GetInstWorlds, Arg_GetPrismInstances, Arg_GetRPs, Arg_GetRPVersions, Arg_GetServerWorlds, Arg_GetWorldFiles, Arg_GetWorldInfo, Arg_IID, Arg_LaunchInst, Arg_PublishWorld, Arg_RemoveRP, Arg_SearchPacks, Arg_SyncMods, Arg_TakeWorldOwnership, Arg_UnpackRP, Arg_UnpublishWorld, Arg_UploadRP, Arg_UploadWorld, Arg_UploadWorldFile, ArgC_GetRPs, CurseForgeUpdate, Data_PrismInstancesMenu, FSTestData, FullModData, InputMenu_InitData, InstGroups, LocalModData, MMCPack, ModData, ModifiedFile, ModifiedFileData, ModIndex, ModInfo, ModrinthModData, ModrinthUpdate, ModsFolder, ModsFolderDef, PackMetaData, RemoteModData, Res_DownloadRP, Res_FinishUploadWorld, Res_GetInstMods, Res_GetInstResourcePacks, Res_GetInstScreenshots, Res_GetModIndexFiles, Res_GetModUpdates, Res_GetPrismInstances, Res_GetRPs, Res_GetRPVersions, Res_GetServerWorlds, Res_GetWorldFiles, Res_GetWorldInfo, Res_InputMenu, Res_SyncMods, RPCache, SArg_GetServerWorlds, SArg_PublishWorld, SArg_TakeWorldOwnership, ServerWorld, UpdateProgress_InitData } from "./interface";
 import { getModUpdates, getPackMeta, searchPacks, searchPacksMeta, semit, updateSocketURL } from "./network";
 import { ListPrismInstReason, openCCMenu, openCCMenuCB, SearchPacksMenu, ViewInstanceMenu, windowStack } from "./menu_api";
-import { addInstance, appPath, cleanModName, cleanModNameDisabled, dataPath, getMainAccount, getModFolderPath, getModpackInst, getModpackPath, instCache, LocalModInst, ModPackInst, RemoteModInst, slugMap, sysInst } from "./db";
+import { addInstance, appPath, cleanModName, cleanModNameDisabled, dataPath, getMainAccount, getModFolderPath, getModpackInst, getModpackPath, getWorlds, instCache, LocalModInst, ModPackInst, RemoteModInst, slugMap, sysInst } from "./db";
 import { InstanceData } from "./db_types";
 import { errors, Result } from "./errors";
 import { readConfigFile, StringMappingType } from "typescript";

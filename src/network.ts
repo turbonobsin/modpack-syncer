@@ -18,6 +18,37 @@ export function updateSocketURL(){
     if(!url) return;
 
     socket = io(url);
+    // 
+
+    socket.on("updateSearch",(arg:UpdateSearch)=>{
+        let w = windowStack.find(v=>v?.title == "Edit Instance");
+        if(!w){
+            // console.log("No update: couldn't find 'Edit Instance'");
+            return;
+        }
+    
+        let inst:ModPackInst|undefined;
+        for(const [k,v] of instCache.modpack){
+            if(v.meta?.meta.id == arg.mpID){
+                inst = v;
+                break;
+            }
+        }
+        if(!inst){
+            // console.log("No update: couldn't find inst");
+            return;
+        }
+        if(!inst.meta?.meta.id){
+            // console.log("No update: inst not loaded");
+            return;
+        }
+    
+        w.webContents.send("updateSearch",{
+            mpID:inst.meta.meta.id, // this needs to be mpID but idk how to do that from the client yet -> done :D
+            id:arg.id,
+            data:arg.data
+        });
+    });
 }
 
 // socket.emit("msg","hello!");
@@ -26,29 +57,6 @@ console.log("---loaded network.ts");
 
 // 
 
-socket.on("updateSearch",(arg:UpdateSearch)=>{
-    util_note2("GOT UPDATE SEARCH: ",arg);
-    
-    let w = windowStack.find(v=>v.title == "Edit Instance");
-    if(!w) return;
-
-    let inst:ModPackInst|undefined;
-    for(const [k,v] of instCache.modpack){
-        if(v.meta?.meta.id != arg.mpID){
-            inst = v;
-            break;
-        }
-    }
-    if(!inst) return;
-    if(!inst.meta?.meta.id) return;
-
-    w.webContents.send("updateSearch",{
-        iid:inst.meta.meta.id,
-        id:arg.id,
-        data:arg.data
-    });
-});
-
 export type Err<T> = {
     err?:string,
     data?:T
@@ -56,6 +64,10 @@ export type Err<T> = {
 const unknownErr:Err<undefined> = {
     err:"Unknown error"
 };
+
+export function getConnectionStatus(){
+    return socket.connected;
+}
 
 function validate():Err<undefined>|undefined{
     if(!socket.connected){

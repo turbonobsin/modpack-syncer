@@ -2,11 +2,11 @@ import { app, dialog } from "electron";
 import { pathTo7zip, searchStringCompare, util_lstat, util_mkdir, util_note, util_note2, util_readBinary, util_readdir, util_readdirWithTypes, util_readJSON, util_readText, util_readTOML, util_testAccess, util_warn, util_writeJSON, wait } from "./util";
 import path from "path";
 import { DBSys, DBUser, InstanceData as ModPackInstData, TmpFile } from "./db_types";
-import { Arg_AddModToFolder, Arg_ChangeFolderType, Arg_CreateFolder, Arg_EditFolder, Arg_UploadRP, Arg_UploadRPFile, FolderType, LocalModData, ModIndex, ModrinthModData, ModsFolder, ModsFolderDef, PackMetaData, PrismAccount, PrismAccountsData, RemoteModData, Res_GetInstResourcePacks, Res_GetInstWorlds, Res_UploadRP, RP_Data, RPCache, SearchFilter, SlugMapData, UpdateProgress_InitData, World_Data } from "./interface";
+import { Arg_AddModToFolder, Arg_ChangeFolderType, Arg_CreateFolder, Arg_EditFolder, Arg_LaunchInst, Arg_UploadRP, Arg_UploadRPFile, FolderType, LocalModData, ModIndex, ModrinthModData, ModsFolder, ModsFolderDef, PackMetaData, PrismAccount, PrismAccountsData, RemoteModData, Res_GetInstResourcePacks, Res_GetInstWorlds, Res_UploadRP, RP_Data, RPCache, SearchFilter, SlugMapData, UpdateProgress_InitData, World_Data } from "./interface";
 import { errors, Result } from "./errors";
 import express from "express";
 import toml from "toml";
-import { changeServerURL, refreshMainWindow } from "./app";
+import { changeServerURL, refreshMainWindow, uploadWorld } from "./app";
 import { semit, updateSocketURL } from "./network";
 import { openCCMenu, windowStack } from "./menu_api";
 import Seven from "node-7z";
@@ -547,9 +547,6 @@ export class ModPackInst extends Inst<ModPackInstData>{
     async getResourcePacks(filter:SearchFilter){
         return (await getInstResourcePacks(this,filter)).unwrap();
     }
-    async getWorlds(filter:SearchFilter){
-        return (await getInstWorlds(this,filter)).unwrap();
-    }
     async uploadRP(arg:Arg_UploadRP): Promise<boolean | undefined>{
         if(!this.meta) return;
         let prismPath = this.getPrismInstPath();
@@ -793,6 +790,10 @@ export class ModPackInst extends Inst<ModPackInstData>{
 
         return true;
     }
+}
+
+export async function getWorlds(iid:string,filter:SearchFilter){
+    return (await getInstWorlds(iid,filter)).unwrap();
 }
 
 class FItem{
@@ -1045,11 +1046,13 @@ async function getInstResourcePacks(inst:ModPackInst,filter:SearchFilter): Promi
     // 
     return new Result(resData);
 }
-async function getInstWorlds(inst:ModPackInst,filter:SearchFilter): Promise<Result<Res_GetInstWorlds>>{
-    if(!inst.meta) return errors.couldNotFindPack;
+async function getInstWorlds(iid:string,filter:SearchFilter): Promise<Result<Res_GetInstWorlds>>{
+    let inst = await getModpackInst(iid);
+    if(!inst || !inst.meta) return errors.couldNotFindPack;
     
     let resData:Res_GetInstWorlds = {
         worlds:[],
+        // isRunning:inst.meta.isRunning
     };
 
     const prismPath = inst.getPrismInstPath();
@@ -1074,7 +1077,8 @@ async function getInstWorlds(inst:ModPackInst,filter:SearchFilter): Promise<Resu
         let d:World_Data = {
             wID:fi_world.name,
             data:{
-                icon:path.join(worldLoc,"icon.png")
+                icon:path.join(worldLoc,"icon.png"),
+                // isRunning:resData.isRunning
             }
         };
         
@@ -1208,10 +1212,33 @@ async function instanceRunCheck(){
             continue;
         }
         let isRunning = await util_testAccess(loc);
-        if(!isRunning) if((Date.now() - v.meta.lastLaunched) > 120000){ // 2 minutes - 120000
+        if(!isRunning) if((Date.now() - v.meta.lastLaunched) > 60000){ // 2 minutes - 120000 // 1 minute - 60000
             v.meta.isRunning = false;
             await v.save();
             util_warn(">> STOPPED INSTANCE: "+mpID);
+
+            let acc = await getMainAccount();
+            if(!acc) continue;
+
+            let res = (await semit<Arg_LaunchInst,boolean>("finishLaunchInst",{
+                mpID,
+                uid:acc.profile.id,
+                uname:acc.profile.name
+            })).unwrap();
+            if(!res) continue;
+
+            // upload owned worlds on exit
+            let worlds = v.meta.worlds;
+            for(const w of worlds){
+                if(w.lastSync == -1) continue;
+                let res = await uploadWorld({
+                    iid:v.meta.iid,wID:w.wID
+                },undefined,true,true);
+                if(!res) continue;
+            }
+
+            mainWindow.reload();
+
             continue;
         }
         // 

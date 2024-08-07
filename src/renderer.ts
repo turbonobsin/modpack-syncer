@@ -231,9 +231,16 @@ export class CMP_FullInst extends MP_Article {
     }
     declare ops: CMP_FullInst_Ops;
 
+    canEdit(){
+        let inst = this.ops.data;
+        if(inst.linkName == undefined) return false;
+        
+        return true;
+    }
     canLaunch(){
         let inst = this.ops.data;
         if(inst.linkName == undefined) return false;
+        if(inst.isRunning) return false;
         
         return true;
     }
@@ -303,9 +310,9 @@ export class CMP_FullInst extends MP_Article {
                 }).addParts(
                     new MP_Button({
                         label:(inst.isRunning ? "Running" : "Launch"),
+                        icon:(inst.isRunning ? "sports_esports" : "rocket_launch"),
                         className:"b-inst-launch",
                         disabled:!this.canLaunch(),
-                        icon:"rocket_launch",
                         onClick:async e=>{
                             window.gAPI.launchInstance(inst.iid);
                             // let res = await window.gAPI.addInstance(meta);
@@ -318,7 +325,7 @@ export class CMP_FullInst extends MP_Article {
                         label:"Sync",
                         icon:"sync_alt",
                         className:"accent",
-                        disabled:!this.canLaunch(),
+                        disabled:!this.canEdit(),
                         onClick:(e,elm)=>{
                             window.gAPI.checkForInstUpdates(inst.iid);
                         }
@@ -326,7 +333,7 @@ export class CMP_FullInst extends MP_Article {
                     new MP_Button({
                         label:"Edit",
                         icon:"settings",
-                        disabled:!this.canLaunch(),
+                        disabled:!this.canEdit(),
                         onClick:e=>{
                             window.gAPI.showEditInstance(inst.iid);
                         }
@@ -418,8 +425,8 @@ export class CMP_FullInst extends MP_Article {
                         justifyContent:"space-between",
                     }).addParts(
                         new MP_Div({
-                            text: data.meta.name,
-                            className: "l-title"
+                            text: data.meta.name+(this.ops.data.isRunning?" (Running)":""),
+                            className: "l-title"+(this.ops.data.isRunning?" accent-text-extra":"")
                         }),
                         new MP_Div({
                             text: "",
@@ -484,7 +491,7 @@ export class CMP_FullInst extends MP_Article {
         // );
 
         this.e.addEventListener("dblclick",e=>{
-            if(!this.canLaunch()) return;
+            if(!this.canEdit()) return;
             window.gAPI.showEditInstance(this.ops.data.iid);
         });
 

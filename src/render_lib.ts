@@ -4,7 +4,7 @@ import "./styles/menus.css";
 import "./styles/menus_custom.css";
 
 import { addClassToOps, MenuPart, MP_Div, MP_Input, MP_SearchForm, MP_SearchForm_Ops, MP_Text } from "./menu_parts";
-import { deselectItem, reselectItem, SAPI2_Item, SelectedItem, SelectionAPI2 } from "./render_util";
+import { deselectItem, reselectItem, SAPI2_Item, SelectedItem, SelectionAPI2, wait } from "./render_util";
 
 const overlaysCont = new MP_Div({
     overrideDiv:document.body
@@ -28,6 +28,10 @@ export interface MP_SearchStructure_Ops<T> extends MP_SearchForm_Ops{
     onSelect:(data:T,item:SAPI2_Item<T>)=>void;
     onNoSelected?:()=>void;
     // getList:()=>Promise<MenuPart[]>;
+
+    getItemUniqueID?(item:SAPI2_Item<T>): any;
+    getItemByID?(s:MP_SearchStructure<T>,id:any): SAPI2_Item<T> | undefined;
+    getScrollableElm?(): Element | undefined;
 }
 export class MP_SearchStructure<T> extends MP_Div{
     constructor(ops:MP_SearchStructure_Ops<T>){
@@ -92,6 +96,7 @@ export class MP_SearchStructure<T> extends MP_Div{
                 this.sel.deselectAll();
             }
         });
+        // this.form.parCont = this;
 
         this.list = new MP_Div({
             className:"search-structure-list "+this.ops.listId+"-grid-items list"+(this.ops.customListFormat?" "+this.ops.customListFormat:"")
@@ -117,7 +122,25 @@ export class MP_SearchStructure<T> extends MP_Div{
     }
 
     async submit(){
+        this.sel.clear();
         await this.form?.submit();
+    }
+    async refresh(){
+        let scrollElm = this.ops.getScrollableElm ? this.ops.getScrollableElm() : undefined;
+        let scrollTop = (scrollElm ? scrollElm.scrollTop : 0);
+
+        let selected = this.ops.getItemUniqueID ? this.sel.items.filter(v=>v.isSelected()).map(v=>this.ops.getItemUniqueID!(v)).filter(v=>v != undefined) : [];
+        this.sel.clear();
+        await this.form?.submit(true);
+
+        if(this.ops.getItemByID) for(const selId of selected){
+            let item = this.ops.getItemByID(this,selId);
+            if(!item) continue;
+
+            item.select();
+        }
+
+        if(scrollElm) scrollElm.scrollTop = scrollTop;
     }
 }
 

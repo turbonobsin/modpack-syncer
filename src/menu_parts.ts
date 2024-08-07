@@ -1,5 +1,7 @@
 // Menu Components/Parts (Petal Parts? haha Petal Code is crazy)
 
+import { MP_SearchStructure } from "./render_lib";
+
 export enum PartTextStyle{
     normal,
     note,
@@ -189,6 +191,7 @@ export abstract class MenuPart{
             if(ind != -1) this.parent.parts.splice(ind,1);
         }
         this.e?.remove();
+        this.parent = undefined;
     }
     onPostLoad(f:(p:this)=>void){
         // this._onPostLoad = f;
@@ -578,7 +581,13 @@ export class MP_SearchForm extends MP_Generic<HTMLFormElement>{
         this.inp = i_query;
     }
 
-    async submit(){
+    parCont?:MenuPart & {submit:()=>any};
+    async submit(bare=false){
+        if(!bare) if(this.parCont){
+            this.parCont.submit();
+            return;
+        }
+        
         let ev = new SubmitEvent("submit");
         await this.ops.onSubmit(this,ev,this.inp?.getValue());
         // this.e?.submit();

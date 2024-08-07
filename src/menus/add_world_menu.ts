@@ -63,7 +63,7 @@ async function showData(data:ServerWorld,aside:MP_Div){
             text:"State: ",
         }).addParts(
             new MP_Text({
-                text:getWorldStateText(data.state),
+                text:getWorldStateText(data.state,undefined,""),
             }).onPostLoad(p=>{
                 p.e!.style.textTransform = "uppercase";
                 p.e!.style.fontWeight = "bold";

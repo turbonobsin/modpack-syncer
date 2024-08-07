@@ -1,6 +1,7 @@
 # Modpack Syncer Files
 data/
 .tmp/extract/
+.stfolder
 
 # Logs
 logs
