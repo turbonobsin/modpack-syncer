@@ -429,7 +429,7 @@ export async function preInit(){
         let acc = await getMainAccount();
         if(!acc) return;
 
-        let res = (await semit<SArg_PublishWorld,Res_GetWorldInfo>("publishWorld",{
+        let res = (await semit<SArg_PublishWorld,boolean>("publishWorld",{
             mpID:inst.meta.meta.id,
             wID:arg.wID,
             allowedDirs,
@@ -438,7 +438,7 @@ export async function preInit(){
         })).unwrap();
         if(!res) return errors.failedToPublishWorld;
 
-        res.yourName = acc.profile.name;
+        // res.yourName = acc.profile.name;
 
         let w = await openCCMenu<UpdateProgress_InitData>("update_progress_menu",{iid:arg.iid});
         if(!w) return errors.failedNewWindow.unwrap();
@@ -499,7 +499,7 @@ export async function preInit(){
                 continue;
             }
 
-            console.log("Upload: "+sloc);
+            // console.log("Upload: "+sloc);
             w.webContents.send("updateProgress","main",completed,total,"Upload: "+name);
             completed++;
             success.push(sloc);
@@ -735,7 +735,7 @@ export async function launchInstance(iid:string,ev?:Electron.IpcMainInvokeEvent)
     mainWindow.reload();
 }
 
-export async function takeWorldOwnership(arg:Arg_TakeWorldOwnership): Promise<boolean | undefined>{
+export async function takeWorldOwnership(arg:Arg_TakeWorldOwnership): Promise<boolean | undefined>{    
     if(!sysInst.meta) return errors.noSys.unwrap();
         
     let inst = await getModpackInst(arg.iid);
@@ -781,6 +781,7 @@ export async function getWorld(arg:Arg_GetWorldInfo):Promise<Res_GetWorldInfo|un
 
 export async function uploadWorld(arg:Arg_UploadWorld,useTime=true,delayedWindow=false,noUpToDateMsg=false){
     if(!arg.iid) return errors.invalid_args.unwrap();
+    if(!sysInst.meta) return errors.noSys.unwrap();
 
     let inst = await getModpackInst(arg.iid);
     if(!inst || !inst.meta) return errors.couldNotFindPack.unwrap();
@@ -896,47 +897,122 @@ export async function uploadWorld(arg:Arg_UploadWorld,useTime=true,delayedWindow
         })).unwrap();
     };
 
-    let proms:Promise<void>[] = [];
-    for(const {loc,sloc,name} of files){
-        proms.push(new Promise<void>(async resolve=>{
-            if(w.isDestroyed()){
-                await finish();
-                resolve();
-                return;
-            }
-            
-            let buf = await util_readBinary(loc);
-            if(!buf){
-                failed.push(sloc);
-                resolve();
-                return;
-            }
-            
-            let fres = (await semit<Arg_UploadWorldFile,boolean>("upload_world_file",{ // file res
-                buf,
-                mpID:inst.meta!.meta.id,
-                path:sloc,
-                uid:acc.profile.id,
-                uname:acc.profile.name,
-                wID:arg.wID
-            })).unwrap();
-            if(!fres){
-                failed.push(sloc);
-                resolve();
-                return;
-            }
+    // let proms:Promise<void>[] = [];
     
-            w.webContents.send("updateProgress","main",completed,total,"Upload: "+name);
-            completed++;
-            success.push(sloc);
-
-            resolve();
-        }));
+    let uploadMethod = 0;
+    if(uploadMethod == 0){
+        for(const {loc,sloc,name} of files){
+            // proms.push(new Promise<void>(async resolve=>{
+                if(w.isDestroyed()){
+                    await finish();
+                    // resolve();
+                    // return;
+                    continue;
+                }
+                
+                let buf = await util_readBinary(loc);
+                if(!buf){
+                    failed.push(sloc);
+                    // resolve();
+                    // return;
+                    continue;
+                }
+                
+                let fres = (await semit<Arg_UploadWorldFile,boolean>("upload_world_file",{ // file res
+                    buf,
+                    mpID:inst.meta!.meta.id,
+                    path:sloc,
+                    uid:acc.profile.id,
+                    uname:acc.profile.name,
+                    wID:arg.wID
+                })).unwrap();
+                if(!fres){
+                    failed.push(sloc);
+                    // resolve();
+                    // return;
+                    continue;
+                }
+        
+                w.webContents.send("updateProgress","main",completed,total,"Upload: "+name);
+                completed++;
+                success.push(sloc);
+    
+                // resolve();
+            // }));
+        }
+        // await Promise.all(proms);
     }
-    await Promise.all(proms);
+    else if(uploadMethod == 1){
+        await startExtractTMP();
+
+        let start = performance.now();
+        
+        let archLoc = path.join(extractTMP,"world.7z");
+        await util_rm(archLoc);
+        // let stream = Seven.add(archLoc,[],{
+        //     $bin:pathTo7zip
+        // });
+        let stream = Seven.add(archLoc,allowedDirs.map(v=>path.join(saveLoc,v)),{
+            $bin:pathTo7zip,
+            $progress:true,
+            recursive:true
+        });
+
+        stream.on("progress",progress=>{
+            w!.webContents.send("updateProgress","main",progress.percent,100,"Packing: #"+progress.fileCount);
+            // w.webContents.send("updateProgress","main",progress.percent,100,progress.file+"\n\n"+progress.fileCount+" total files.");
+        });
+        
+        let res = await new Promise<boolean>(resolve=>{
+            stream.on("end",()=>{
+                w!.webContents.send("updateProgress","main",100,100,"Finished Packing.");
+                console.log("FINISHED, TIME: ",performance.now()-start);
+                resolve(true);
+            });
+            stream.on("error",err=>{
+                util_warn("Error while zipping: "+err);
+                return errors.zipping.unwrap();
+                resolve(false);
+            });
+        });
+        if(!res){
+            util_warn("Failed to pack world into archive");
+            return;
+        }
+
+        // await endExtractTMP();
+
+        start = performance.now();
+
+        let data = await util_readBinary(archLoc);
+        if(!data){
+            util_warn("Failed to read archive just created");
+            return;
+        }
+        let file1 = new Blob([data]);
+
+        await new Promise<boolean>(resolve=>{
+            axios.post(`${sysInst.meta!.serverURL}/upload_test`,{
+                // params:{
+                //     ids:`[${req.mr_needsUpdate.map(v=>'"'+v+'"').join(",")}]`
+                // }
+                files:{
+                    file1
+                }
+            }).then(res=>{
+                console.log(">> successfully uploaded packed world",performance.now()-start);
+                console.log(res);
+                resolve(true);
+            }).catch(reason=>{
+                // err = errors.responseErr;
+                util_warn("HTTP Error (upload packed world): "+reason);
+                resolve(false);
+            });
+        });
+    }
 
     // 
-    w.webContents.send("updateProgress","main",completed,total,"Finished.",{
+    if(true) w!.webContents.send("updateProgress","main",completed,total,"Finished.",{
         sections:[
             {
                 header:`Failed: (${failed.length})`,

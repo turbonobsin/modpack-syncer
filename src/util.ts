@@ -3,11 +3,20 @@ import fs from "fs";
 import path from "path";
 import toml from "toml";
 
-export let pathTo7zip = path.join(app.getAppPath(),"node_modules","7zip-bin","win","x64","7za.exe");
+export let pathTo7zip = path.join(app.getAppPath(),"node_modules","7zip-bin","win",process.arch,"7za.exe");
 if(process.platform == "darwin"){
-    pathTo7zip = path.join(app.getAppPath(),"node_modules","7zip-bin","mac","arm64","7za");
+    if(process.arch == "arm64") pathTo7zip = path.join(app.getAppPath(),"node_modules","7zip-bin","mac","arm64","7za");
+    else pathTo7zip = path.join(app.getAppPath(),"node_modules","7zip-bin","mac","x64","7za");
     util_note2("DETECTED MACOS: set 7zip path to: "+pathTo7zip);
 }
+else if(process.platform == "linux"){
+    pathTo7zip = path.join(app.getAppPath(),"node_modules","7zip-bin","linux",process.arch,"7za");
+    util_note2("DETECTED LINUX: set 7zip path to: "+pathTo7zip);
+}
+else if(process.platform == "win32"){
+    util_note2("DETECTED WINDOWS: set 7zip path to: "+pathTo7zip);
+}
+console.log("PLATFORM: ",process.platform,process.arch);
 
 export async function wait(delay:number){
     return new Promise<void>(resolve=>{
