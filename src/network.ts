@@ -12,6 +12,9 @@ import { windowStack } from "./menu_api";
 // export let remoteServerURL = "http://localhost:3001";
 
 let socket = io("");
+export function getSocketId(){
+    return socket.id;
+}
 
 export function updateSocketURL(){
     let url = sysInst.meta?.serverURL;

@@ -1,9 +1,13 @@
 {
 	"name": "modpack-syncer",
 	"productName": "modpack-syncer",
-	"version": "1.0.0",
+	"version": "0.27.0",
 	"description": "My Electron application description",
 	"main": ".vite/build/main.js",
+	"repository": {
+		"type": "github",
+		"url": "https://github.com/turbonobsin/modpack-syncer.git"
+	},
 	"scripts": {
 		"start": "electron-forge start",
 		"package": "electron-forge package",
@@ -47,6 +51,7 @@
 		"node-7z": "^3.0.0",
 		"node-curseforge": "^1.3.3",
 		"socket.io-client": "^4.7.5",
-		"toml": "^3.0.0"
+		"toml": "^3.0.0",
+		"update-electron-app": "^3.0.0"
 	}
 }

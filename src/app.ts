@@ -899,8 +899,9 @@ export async function uploadWorld(arg:Arg_UploadWorld,useTime=true,delayedWindow
 
     // let proms:Promise<void>[] = [];
     
-    let uploadMethod = 0;
+    let uploadMethod = 0; //4 
     if(uploadMethod == 0){
+        let start = performance.now();
         for(const {loc,sloc,name} of files){
             // proms.push(new Promise<void>(async resolve=>{
                 if(w.isDestroyed()){
@@ -941,6 +942,8 @@ export async function uploadWorld(arg:Arg_UploadWorld,useTime=true,delayedWindow
             // }));
         }
         // await Promise.all(proms);
+
+        console.log("TIME: ",performance.now()-start);
     }
     else if(uploadMethod == 1){
         await startExtractTMP();
@@ -1009,6 +1012,263 @@ export async function uploadWorld(arg:Arg_UploadWorld,useTime=true,delayedWindow
                 resolve(false);
             });
         });
+    }
+    else if(uploadMethod == 2){
+        // upload all files in one http request
+
+        console.log("> START FULL UPLOAD");
+        
+        let res = await new Promise<boolean>(async resolve=>{
+            if(!inst.meta) return;
+            
+            let data = {
+                files:await Promise.all(files.map(async v=>{
+                    if(w?.isDestroyed()){
+                        failed.push(v.sloc);
+                        return;
+                    }
+
+                    let buf = await util_readBinary(v.loc);
+                    if(!buf){
+                        failed.push(v.sloc);
+                        return;
+                    }
+                    
+                    return {
+                        buf:Array.from(buf),
+                        path:v.sloc
+                    };
+                })),
+                mpID:inst.meta.meta.id,
+                wID:arg.wID,
+                uid:acc.profile.id,
+                uname:acc.profile.name
+            };
+
+            if(w?.isDestroyed()){
+                resolve(false);
+                return;
+            }
+
+            let start = performance.now();
+
+            axios.post(`${sysInst.meta!.serverURL}/world/upload_full`,data,{
+                headers:{
+                    "Content-Type":"application/json",
+                    "Socket-Id":getSocketId()
+                }
+            }).then(res=>{
+                console.log(">> success: res",res);
+                console.log("TIME:",performance.now()-start);
+                resolve(true);
+            }).catch(err=>{
+                console.log("$ err occured while uploading:",err);
+                resolve(false);
+            });
+        });
+        if(!res){
+            util_note("Failed uploading full world");
+            return;
+        }
+    }
+    else if(uploadMethod == 3){
+        console.log("> START FULL UPLOAD [3]");
+        
+        let maxSizePerReq = 1024 * 1000; // 1mb // 10mb
+        let curTotalSize = 0;
+        let fullTotalUploadSize = 0;
+        let filesList:{
+            buf:Uint8Array;
+            path:string;
+        }[] = [];
+
+        let start = performance.now();
+
+        let i = 0;
+        let chunk = 0;
+        for(const v of files){
+            i++;
+            if(w?.isDestroyed()){
+                failed.push(v.sloc);
+                return;
+            }
+
+            let buf = await util_readBinary(v.loc);
+            if(!buf){
+                failed.push(v.sloc);
+                continue;
+            }
+            
+            filesList.push({
+                // buf:Array.from(buf),
+                buf,
+                path:v.sloc
+            });
+
+            // 
+            // curTotalSize++; // only doing amt for now so I don't have to do lstat everytime
+            curTotalSize += buf.byteLength;
+            fullTotalUploadSize += buf.byteLength;
+
+            if(curTotalSize >= maxSizePerReq || i == files.length){
+                let res = await new Promise<boolean>(async resolve=>{
+                    if(!inst.meta) return;
+                    if(!sysInst.meta) return;
+                    
+                    let data = {
+                        files:filesList,
+                        mpID:inst.meta.meta.id,
+                        wID:arg.wID,
+                        uid:acc.profile.id,
+                        uname:acc.profile.name
+                    };
+        
+                    if(w?.isDestroyed()){
+                        resolve(false);
+                        return;
+                    }
+        
+                    axios.post(`${sysInst.meta.serverURL}/world/upload_full`,data,{
+                        headers:{
+                            "Content-Type":"application/json",
+                            "Socket-Id":getSocketId()
+                        },
+                        onUploadProgress:(ev)=>{
+                            if(!ev) return;
+                            console.log("PROG:",ev.progress,ev.total);
+                        }
+                    }).then(res=>{
+                        resolve(true);
+                    }).catch(err=>{
+                        console.log("$ err occured while uploading [3]:",err);
+                        resolve(false);
+                    });
+                });
+                if(!res){
+                    util_note("Failed uploading full world [3]");
+                    return;
+                }
+
+                chunk++;
+                completed += filesList.length;
+                w?.webContents.send("updateProgress","main",completed,total,"Chunk: "+chunk);
+                
+                // 
+                curTotalSize = 0;
+                filesList = [];
+            }
+        }
+
+        console.log(">> success [3]: ",{
+            fullTotalUploadSize
+        });
+        console.log("TIME:",performance.now()-start);
+    }
+    else if(uploadMethod == 4){ // chunk parallel version
+        console.log("> START FULL UPLOAD [4]");
+        
+        let maxSizePerReq = 1024 * 1000; // 1mb // 10mb
+        let curTotalSize = 0;
+        let fullTotalUploadSize = 0;
+        let filesList:{
+            buf:Uint8Array;
+            path:string;
+        }[] = [];
+
+        let start = performance.now();
+
+        let uploadProms:Promise<boolean>[] = [];
+
+        let i = 0;
+        let chunk = 0;
+
+        let chunks:{
+            files:{
+                buf:Uint8Array;
+                path:string;
+            }[];
+            mpID:string;
+            wID:string;
+            uid:string;
+            uname:string;
+        }[] = [];
+
+        for(const v of files){
+            i++;
+            if(w?.isDestroyed()){
+                failed.push(v.sloc);
+                return;
+            }
+
+            let buf = await util_readBinary(v.loc);
+            if(!buf){
+                failed.push(v.sloc);
+                continue;
+            }
+            
+            filesList.push({
+                buf,
+                path:v.sloc
+            });
+
+            // 
+            curTotalSize += buf.byteLength;
+            fullTotalUploadSize += buf.byteLength;
+
+            if(curTotalSize >= maxSizePerReq || i == files.length){
+                let data = {
+                    files:filesList,
+                    mpID:inst.meta.meta.id,
+                    wID:arg.wID,
+                    uid:acc.profile.id,
+                    uname:acc.profile.name
+                };
+                chunks.push(data);
+
+                chunk++;
+                completed += filesList.length;
+                w?.webContents.send("updateProgress","main",completed,total,"Init: #"+chunk);
+                
+                // 
+                curTotalSize = 0;
+                filesList = [];
+
+                uploadProms.push(new Promise<boolean>(async function(resolve){
+                    if(!inst.meta) return;
+                    if(!sysInst.meta) return;
+        
+                    if(w?.isDestroyed()){
+                        resolve(false);
+                        return;
+                    }
+
+                    let data = chunks[chunk-1];
+        
+                    axios.post(`${sysInst.meta.serverURL}/world/upload_full`,data,{
+                        headers:{
+                            "Content-Type":"application/json",
+                            "Socket-Id":getSocketId()
+                        },
+                        onUploadProgress:(ev)=>{
+                            if(!ev) return;
+                            console.log("PROG:",ev.progress,ev.total);
+                        }
+                    }).then(res=>{
+                        w?.webContents.send("updateProgress","main",completed,total,"Upload: #"+chunk);
+                        resolve(true);
+                    }).catch(err=>{
+                        console.log("$ failed uploading world [4]:",err);
+                        resolve(false);
+                    });
+                }));
+            }
+        }
+        await Promise.all(uploadProms);
+
+        console.log(">> success [4]: ",{
+            fullTotalUploadSize
+        });
+        console.log("TIME:",performance.now()-start);
     }
 
     // 
@@ -3444,7 +3704,7 @@ async function alertBox(w:BrowserWindow,message:string,title="Error"){
 
 import { ETL_Generic, evtTimeline, parseCFGFile, pathTo7zip, searchStringCompare, util_cp, util_lstat, util_mkdir, util_note, util_note2, util_readBinary, util_readdir, util_readdirWithTypes, util_readJSON, util_readText, util_readTOML, util_rename, util_rm, util_utimes, util_warn, util_writeBinary, util_writeJSON, util_writeText, wait } from "./util";
 import { AddRP_InitData, Arg_AddModToFolder, Arg_ChangeFolderType, Arg_CheckModUpdates, Arg_CreateFolder, Arg_DownloadRP, Arg_DownloadRPFile, Arg_DownloadWorld, Arg_DownloadWorldFile, Arg_FinishUploadWorld, Arg_GetAllowedDirs, Arg_GetInstances, Arg_GetInstMods, Arg_GetInstResourcePacks, Arg_GetInstScreenshots, Arg_GetInstWorlds, Arg_GetPrismInstances, Arg_GetRPs, Arg_GetRPVersions, Arg_GetServerWorlds, Arg_GetWorldFiles, Arg_GetWorldInfo, Arg_IID, Arg_LaunchInst, Arg_PublishWorld, Arg_RemoveRP, Arg_SearchPacks, Arg_SyncMods, Arg_TakeWorldOwnership, Arg_UnpackRP, Arg_UnpublishWorld, Arg_UploadRP, Arg_UploadWorld, Arg_UploadWorldFile, ArgC_GetRPs, CurseForgeUpdate, Data_PrismInstancesMenu, FSTestData, FullModData, InputMenu_InitData, InstGroups, LocalModData, MMCPack, ModData, ModifiedFile, ModifiedFileData, ModIndex, ModInfo, ModrinthModData, ModrinthUpdate, ModsFolder, ModsFolderDef, PackMetaData, RemoteModData, Res_DownloadRP, Res_FinishUploadWorld, Res_GetInstMods, Res_GetInstResourcePacks, Res_GetInstScreenshots, Res_GetModIndexFiles, Res_GetModUpdates, Res_GetPrismInstances, Res_GetRPs, Res_GetRPVersions, Res_GetServerWorlds, Res_GetWorldFiles, Res_GetWorldInfo, Res_InputMenu, Res_SyncMods, RPCache, SArg_GetServerWorlds, SArg_PublishWorld, SArg_TakeWorldOwnership, ServerWorld, UpdateProgress_InitData } from "./interface";
-import { getModUpdates, getPackMeta, searchPacks, searchPacksMeta, semit, updateSocketURL } from "./network";
+import { getModUpdates, getPackMeta, getSocketId, searchPacks, searchPacksMeta, semit, updateSocketURL } from "./network";
 import { ListPrismInstReason, openCCMenu, openCCMenuCB, SearchPacksMenu, ViewInstanceMenu, windowStack } from "./menu_api";
 import { addInstance, appPath, cleanModName, cleanModNameDisabled, dataPath, getMainAccount, getModFolderPath, getModpackInst, getModpackPath, getWorlds, instCache, LocalModInst, ModPackInst, RemoteModInst, slugMap, sysInst } from "./db";
 import { InstanceData } from "./db_types";

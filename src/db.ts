@@ -18,6 +18,16 @@ export let appPath = app.getAppPath();
 export const dataPath = path.join(appPath,"data");
 const folderPath = path.join(dataPath,"folders");
 
+if(app.isPackaged) setTimeout(()=>{
+    dialog.showMessageBox({
+        message:[
+            appPath,
+            process.resourcesPath,
+            __dirname
+        ].join("\n")
+    });
+},3500);
+
 // 
 let userData:DBUser;
 // let sysData:DBSys;
