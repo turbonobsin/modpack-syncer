@@ -1,9 +1,9 @@
 import { dialog } from "electron";
 import { mainWindow } from "./main";
-import { windowStack } from "./menu_api";
+import { getWindowStack } from "./menu_api";
 
 async function showError(msg:string){
-    await dialog.showMessageBox(windowStack[windowStack.length-1] ?? mainWindow,{
+    await dialog.showMessageBox(getWindowStack()[getWindowStack().length-1] ?? mainWindow,{
         message:msg,
         title:"Error"
     });

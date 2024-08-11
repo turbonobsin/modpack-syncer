@@ -20,6 +20,20 @@ export function getBuildConfig(env: ConfigEnv<'build'>): UserConfig {
       outDir: '.vite/build',
       watch: command === 'serve' ? {} : null,
       minify: command === 'build',
+
+      // rollupOptions:{
+      //   input:{
+      //     "main":"index.html",
+      //     // "add_rp_menu":"menus/add_rp_menu.html",
+      //     // "add_world_menu":"menus/add_world_menu.html",
+      //     // "edit_instance_menu":"menus/edit_instance_menu.html",
+      //     // "input_menu":"menus/input_menu.html",
+      //     // "prism_instances":"menus/prism_instances.html",
+      //     // "search_packs":"menus/search_packs.html",
+      //     // "update_progress_menu":"menus/update_progress_menu.html",
+      //     // "view_instance":"menus/view_instance.html",
+      //   }
+      // }
     },
     clearScreen: false,
   };

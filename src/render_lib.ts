@@ -4,7 +4,7 @@ import "./styles/menus.css";
 import "./styles/menus_custom.css";
 
 import { addClassToOps, MenuPart, MP_Div, MP_Input, MP_SearchForm, MP_SearchForm_Ops, MP_Text } from "./menu_parts";
-import { deselectItem, reselectItem, SAPI2_Item, SelectedItem, SelectionAPI2, wait } from "./render_util";
+import { deselectItem, reselectItem, SAPI2_Item, SelectedItem, SelectionAPI2, setTheme, wait } from "./render_util";
 
 const overlaysCont = new MP_Div({
     overrideDiv:document.body
@@ -18,6 +18,30 @@ const overlaysBack = overlaysCont.addPart(new MP_Div({
 
 window.gAPI.refresh(()=>{
     window.location.reload();
+});
+window.gAPI.onSetClientTheme(theme=>{
+    console.log("SET THEME:",theme);
+    // localStorage.setItem("theme",theme ?? "dark");
+    // document.body.parentElement?.classList.add("themestyle-"+(theme ?? localStorage.getItem("theme") ?? "dark"));
+    setTheme(theme);
+});
+
+window.gAPI.onMsg(msg=>{
+    console.log("MSG: ",msg);
+});
+window.addEventListener("DOMContentLoaded",e=>{
+    // document.body.parentElement?.classList.add("themestyle-clean-dark");
+    // document.body.parentElement?.classList.add("themestyle-dark");
+    // document.body.parentElement?.classList.add("themestyle-clean-light");
+    // document.body.parentElement?.classList.add("themestyle-light","theme-light2");
+
+    // let url = new URL(location.href);
+    // let theme = url.searchParams.get("theme") ?? "dark";
+    // document.body.parentElement?.classList.add("themestyle-"+theme);
+    // url.searchParams.delete("theme");
+
+    let storedTheme = localStorage.getItem("theme");
+    if(storedTheme) setTheme(storedTheme);
 });
 
 // 

@@ -53,7 +53,7 @@ export async function preInit(){
         return (await addInstance(meta)).unwrap();
     });
     ipcMain.handle("getInstances",async (ev,arg:Arg_GetInstances)=>{
-        let root = path.join(app.getAppPath(),"data","instances");
+        let root = path.join(dataPath,"instances");
         if(arg.folder) root = path.join(root,arg.folder);
 
         let instanceIds = await util_readdir(root);
@@ -530,7 +530,7 @@ export async function preInit(){
             return;
         }
 
-        let w2 = windowStack.find(v=>v.title == "Edit Instance");
+        let w2 = getWindowStack().find(v=>v.title == "Edit Instance");
         if(w2) w2.webContents.send("updateSearch");
 
         return new Result(true);
@@ -592,8 +592,8 @@ export async function checkForInstUpdates(iid:string,ev?:Electron.IpcMainInvokeE
     let window:BrowserWindow|undefined = mainWindow;
     if(ev){
         window = getWindow(ev);
-        if(!window) return;
     }
+    if(!window) return;
 
     let inst = await getModpackInst(iid);
     if(!inst || !inst.meta) return errors.couldNotFindPack.unwrap();
@@ -725,7 +725,7 @@ export async function launchInstance(iid:string,ev?:Electron.IpcMainInvokeEvent)
     util_note("EXEC:",cmd);
     exec(cmd);
 
-    windowStack.find(v=>v.title == "Edit Instance")?.webContents.send("updateSearch",{
+    getWindowStack().find(v=>v.title == "Edit Instance")?.webContents.send("updateSearch",{
         mpID:pack.meta.meta.id,
         id:"world",
         data:{
@@ -899,7 +899,7 @@ export async function uploadWorld(arg:Arg_UploadWorld,useTime=true,delayedWindow
 
     // let proms:Promise<void>[] = [];
     
-    let uploadMethod = 0; //4 
+    let uploadMethod = 1; //4 
     if(uploadMethod == 0){
         let start = performance.now();
         for(const {loc,sloc,name} of files){
@@ -1254,6 +1254,7 @@ export async function uploadWorld(arg:Arg_UploadWorld,useTime=true,delayedWindow
                             console.log("PROG:",ev.progress,ev.total);
                         }
                     }).then(res=>{
+                        console.log("FINISH");
                         w?.webContents.send("updateProgress","main",completed,total,"Upload: #"+chunk);
                         resolve(true);
                     }).catch(err=>{
@@ -1296,7 +1297,7 @@ export async function uploadWorld(arg:Arg_UploadWorld,useTime=true,delayedWindow
 
     if(noUpToDateMsg) if(failed.length == 0) w.close();
 
-    windowStack.find(v=>v.title == "Edit Instance")?.webContents.send("updateSearch");
+    getWindowStack().find(v=>v.title == "Edit Instance")?.webContents.send("updateSearch");
 
     return true;
 }
@@ -1459,7 +1460,7 @@ export async function downloadWorld(arg:Arg_DownloadWorld,useTime=true,noUpToDat
     // windowStack.find(v=>v.title == "Edit Instance")?.webContents.send("updateSearch");
 
     if(failed.length == 0){
-        windowStack.find(v=>v.title == "Add World")?.close();
+        getWindowStack().find(v=>v.title == "Add World")?.close();
         w.close();
     }
 
@@ -1484,7 +1485,7 @@ export async function unpublishWorld(arg:{
     })).unwrap();
     if(!res1) return errors.failedToUnpublishWorld;
 
-    let w2 = windowStack.find(v=>v.title == "Edit Instance");
+    let w2 = getWindowStack().find(v=>v.title == "Edit Instance");
     if(w2) w2.webContents.send("updateSearch");
 
     return new Result(true);
@@ -1736,11 +1737,11 @@ export async function downloadRP(arg:Arg_DownloadRP){
     });
     if(failed.length == 0) w.close();
 
-    if(windowStack.some(v=>v.title == "Add Resource Pack")){ // may need to fix this later because it's no future proof if the title gets changed
-        let rpW = windowStack.findIndex(v=>v.title == "Add Resource Pack");
+    if(getWindowStack().some(v=>v.title == "Add Resource Pack")){ // may need to fix this later because it's no future proof if the title gets changed
+        let rpW = getWindowStack().findIndex(v=>v.title == "Add Resource Pack");
         if(rpW != -1){
-            windowStack[rpW].close();
-            windowStack.splice(rpW,1);
+            getWindowStack()[rpW].close();
+            getWindowStack().splice(rpW,1);
         }
 
         // let rpW = windowStack.findIndex(v=>v.title == "Add Resource Pack");
@@ -1749,7 +1750,7 @@ export async function downloadRP(arg:Arg_DownloadRP){
         //     windowStack.splice(rpW,1);
         // }
 
-        let last = windowStack[windowStack.length-1];
+        let last = getWindowStack()[getWindowStack().length-1];
         if(last?.title == "Edit Instance"){
             last.webContents.send("updateSearch");
         }
@@ -3098,7 +3099,7 @@ export async function genAllThePBR(iid:string,inst:ModPackInst|undefined){
     w.close();
     util_note("FINISHED",completed,total);
 
-    let last = windowStack.find(v=>v.title == "Edit Instance");
+    let last = getWindowStack().find(v=>v.title == "Edit Instance");
     if(last){
         last.webContents.send("updateSearch");
     }
@@ -3705,7 +3706,7 @@ async function alertBox(w:BrowserWindow,message:string,title="Error"){
 import { ETL_Generic, evtTimeline, parseCFGFile, pathTo7zip, searchStringCompare, util_cp, util_lstat, util_mkdir, util_note, util_note2, util_readBinary, util_readdir, util_readdirWithTypes, util_readJSON, util_readText, util_readTOML, util_rename, util_rm, util_utimes, util_warn, util_writeBinary, util_writeJSON, util_writeText, wait } from "./util";
 import { AddRP_InitData, Arg_AddModToFolder, Arg_ChangeFolderType, Arg_CheckModUpdates, Arg_CreateFolder, Arg_DownloadRP, Arg_DownloadRPFile, Arg_DownloadWorld, Arg_DownloadWorldFile, Arg_FinishUploadWorld, Arg_GetAllowedDirs, Arg_GetInstances, Arg_GetInstMods, Arg_GetInstResourcePacks, Arg_GetInstScreenshots, Arg_GetInstWorlds, Arg_GetPrismInstances, Arg_GetRPs, Arg_GetRPVersions, Arg_GetServerWorlds, Arg_GetWorldFiles, Arg_GetWorldInfo, Arg_IID, Arg_LaunchInst, Arg_PublishWorld, Arg_RemoveRP, Arg_SearchPacks, Arg_SyncMods, Arg_TakeWorldOwnership, Arg_UnpackRP, Arg_UnpublishWorld, Arg_UploadRP, Arg_UploadWorld, Arg_UploadWorldFile, ArgC_GetRPs, CurseForgeUpdate, Data_PrismInstancesMenu, FSTestData, FullModData, InputMenu_InitData, InstGroups, LocalModData, MMCPack, ModData, ModifiedFile, ModifiedFileData, ModIndex, ModInfo, ModrinthModData, ModrinthUpdate, ModsFolder, ModsFolderDef, PackMetaData, RemoteModData, Res_DownloadRP, Res_FinishUploadWorld, Res_GetInstMods, Res_GetInstResourcePacks, Res_GetInstScreenshots, Res_GetModIndexFiles, Res_GetModUpdates, Res_GetPrismInstances, Res_GetRPs, Res_GetRPVersions, Res_GetServerWorlds, Res_GetWorldFiles, Res_GetWorldInfo, Res_InputMenu, Res_SyncMods, RPCache, SArg_GetServerWorlds, SArg_PublishWorld, SArg_TakeWorldOwnership, ServerWorld, UpdateProgress_InitData } from "./interface";
 import { getModUpdates, getPackMeta, getSocketId, searchPacks, searchPacksMeta, semit, updateSocketURL } from "./network";
-import { ListPrismInstReason, openCCMenu, openCCMenuCB, SearchPacksMenu, ViewInstanceMenu, windowStack } from "./menu_api";
+import { getWindowStack, ListPrismInstReason, openCCMenu, openCCMenuCB, SearchPacksMenu, ViewInstanceMenu } from "./menu_api";
 import { addInstance, appPath, cleanModName, cleanModNameDisabled, dataPath, getMainAccount, getModFolderPath, getModpackInst, getModpackPath, getWorlds, instCache, LocalModInst, ModPackInst, RemoteModInst, slugMap, sysInst } from "./db";
 import { InstanceData } from "./db_types";
 import { errors, Result } from "./errors";

@@ -2,14 +2,32 @@
  * Claeb Code Menu API
  */
 
-import { BrowserWindow, ipcRenderer, Menu } from "electron";
+import { BrowserWindow, dialog, ipcRenderer, Menu } from "electron";
 import path from "path";
 import { InitMenuData } from "src/interface";
-import { util_warn } from "./util";
+import { util_readdir, util_warn } from "./util";
 import { mainWindow } from "./main";
 import { sysInst } from "./db";
 
-export let windowStack:BrowserWindow[] = [];
+let windowStack:BrowserWindow[] = [];
+export function getWindowStack(){
+    // console.log("---GET WINDOW STACK---");
+    windowStack = windowStack.filter(v=>{
+        let res = false;
+        try{
+            res = v ? !v.isDestroyed() : false;
+        }
+        catch(e){
+            res = false;
+        }
+        // if(res) console.log(v?.title);
+        // else console.log("--deleted");
+        
+        return res;
+    });
+    // console.log("----------");
+    return windowStack;
+}
 
 abstract class CCMenu{
     constructor(startScript:string,w=800,h=600){
@@ -60,7 +78,13 @@ abstract class CCMenu{
         // Menu.setApplicationMenu(menu);
 
         // await w.loadURL(path.join(MAIN_WINDOW_VITE_DEV_SERVER_URL,"menus/search_packs.html"));
+        if(false) setTimeout(async()=>{
+            dialog.showMessageBox({
+                message:("DIRNAME:\n"+__dirname+"\n"+(await util_readdir(__dirname)).join("\n"))
+            });
+        },1500);
         await w.loadURL(path.join(MAIN_WINDOW_VITE_DEV_SERVER_URL,"menus/"+this.startScript+`.html?theme=${sysInst.meta?.theme ?? "dark"}`));
+        // await w.loadURL(path.join(__dirname,"../../src/menus/"+this.startScript+`.html?theme=${sysInst.meta?.theme ?? "dark"}`));
         // w.webContents.send("setTheme",);
         w.webContents.send("setClientTheme",sysInst.meta?.theme);
         

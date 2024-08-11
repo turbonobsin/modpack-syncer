@@ -29,10 +29,15 @@ const config: ForgeConfig = {
 				},
 			],
 			renderer: [
-				{
-					name: 'main_window',
-					config: 'vite.renderer.config.ts',
-				},
+				{ name: 'main_window', config: 'vite.renderer.config.ts' },
+				// { name: 'add_rp_menu', config: 'vite.renderer.config.ts' },
+				// { name: 'add_world_menu', config: 'vite.renderer.config.ts' },
+				// { name: 'edit_instance_menu', config: 'vite.renderer.config.ts' },
+				// { name: 'input_menu', config: 'vite.renderer.config.ts' },
+				// { name: 'prism_instances', config: 'vite.renderer.config.ts' },
+				// { name: 'search_packs', config: 'vite.renderer.config.ts' },
+				// { name: 'update_progress_menu', config: 'vite.renderer.config.ts' },
+				// { name: 'view_instance', config: 'vite.renderer.config.ts' },
 			],
 		}),
 		// Fuses are used to enable/disable various Electron functionality

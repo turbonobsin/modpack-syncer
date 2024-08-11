@@ -8,25 +8,25 @@ import express from "express";
 import toml from "toml";
 import { changeServerURL, refreshMainWindow, uploadWorld } from "./app";
 import { semit, updateSocketURL } from "./network";
-import { openCCMenu, windowStack } from "./menu_api";
+import { getWindowStack, openCCMenu } from "./menu_api";
 import Seven from "node-7z";
 import axios from "axios";
 import { mainWindow } from "./main";
 import { i } from "vite/dist/node/types.d-aGj9QkWt";
 
-export let appPath = app.getAppPath();
+export let appPath = app.isPackaged ? path.join(process.resourcesPath,"..","data") : app.getAppPath();
 export const dataPath = path.join(appPath,"data");
 const folderPath = path.join(dataPath,"folders");
 
-if(app.isPackaged) setTimeout(()=>{
-    dialog.showMessageBox({
-        message:[
-            appPath,
-            process.resourcesPath,
-            __dirname
-        ].join("\n")
-    });
-},3500);
+// if(!app.isPackaged) setTimeout(()=>{
+//     dialog.showMessageBox({
+//         message:[
+//             appPath,
+//             process.resourcesPath,
+//             __dirname
+//         ].join("\n")
+//     });
+// },3500);
 
 // 
 let userData:DBUser;
@@ -350,7 +350,8 @@ export class SysInst extends Inst<DBSys>{
         this.meta.theme = theme;
         await this.save();
 
-        let ws = windowStack.concat(mainWindow);
+        let ws = getWindowStack().concat(mainWindow);
+        console.log("NEW ARR: ",ws.map(v=>v?.title));
         for(const w of ws){
             w.webContents.send("setClientTheme",theme);
         }
@@ -385,7 +386,7 @@ export const themes:Record<string,any> = {
 
 export function reloadAllWindows(){
     mainWindow.reload();
-    for(const w of windowStack){
+    for(const w of getWindowStack()){
         w.reload();
     }
 }

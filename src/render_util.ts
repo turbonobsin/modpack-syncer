@@ -284,12 +284,6 @@ export class InitData<T>{
         
             this.init();
         });
-        window.gAPI.onSetClientTheme(theme=>{
-            console.log("SET THEME:",theme);
-            // localStorage.setItem("theme",theme ?? "dark");
-            // document.body.parentElement?.classList.add("themestyle-"+(theme ?? localStorage.getItem("theme") ?? "dark"));
-            setTheme(theme);
-        });
         
         setTimeout(()=>{
             if(this.hasLoadedPage) return;
@@ -305,10 +299,6 @@ export class InitData<T>{
         },this.timeoutDelay);
     }
 }
-
-window.gAPI.onMsg(msg=>{
-    console.log("MSG: ",msg);
-});
 
 export function searchStringCompare(s1?:string,s2?:string){
     if(!s1 || !s2) return true;
@@ -329,20 +319,6 @@ export function getImageURL(path?:string){
 }
 
 // 
-window.addEventListener("DOMContentLoaded",e=>{
-    // document.body.parentElement?.classList.add("themestyle-clean-dark");
-    // document.body.parentElement?.classList.add("themestyle-dark");
-    // document.body.parentElement?.classList.add("themestyle-clean-light");
-    // document.body.parentElement?.classList.add("themestyle-light","theme-light2");
-
-    // let url = new URL(location.href);
-    // let theme = url.searchParams.get("theme") ?? "dark";
-    // document.body.parentElement?.classList.add("themestyle-"+theme);
-    // url.searchParams.delete("theme");
-
-    let storedTheme = localStorage.getItem("theme");
-    if(storedTheme) setTheme(storedTheme);
-});
 export function setTheme(theme?:string){
     if(!theme) theme = "dark";
     

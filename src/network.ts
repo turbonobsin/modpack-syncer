@@ -4,7 +4,7 @@ import { util_note2, util_warn } from "./util";
 import { errors, Result } from "./errors";
 import { instCache, ModPackInst, sysInst } from "./db";
 import { Socket } from "socket.io";
-import { windowStack } from "./menu_api";
+import { getWindowStack } from "./menu_api";
 // const socket = io({
 //     host:"http://localhost:3000"
 // });
@@ -24,7 +24,7 @@ export function updateSocketURL(){
     // 
 
     socket.on("updateSearch",(arg:UpdateSearch)=>{
-        let w = windowStack.find(v=>v?.title == "Edit Instance");
+        let w = getWindowStack().find(v=>v?.title == "Edit Instance");
         if(!w){
             // console.log("No update: couldn't find 'Edit Instance'");
             return;
