@@ -899,7 +899,7 @@ export async function uploadWorld(arg:Arg_UploadWorld,useTime=true,delayedWindow
 
     // let proms:Promise<void>[] = [];
     
-    let uploadMethod = 1; //4 
+    let uploadMethod = 0; //4 
     if(uploadMethod == 0){
         let start = performance.now();
         for(const {loc,sloc,name} of files){
