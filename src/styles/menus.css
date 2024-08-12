@@ -19,6 +19,10 @@ body > .main{
 .flex-dir-column{
     flex-direction:column;
 }
+.body-grid-1{
+    display:grid;
+    grid-template-columns:1fr auto;
+}
 
 hr{
     border-color:var(--table-border);

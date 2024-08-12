@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, autoUpdater } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Menu, autoUpdater, shell } from "electron";
 import path from "path";
 import {updateElectronApp} from "update-electron-app";
 updateElectronApp();
@@ -26,24 +26,42 @@ const createWindow = async () => {
 	} else {
 		mainWindow.loadFile(path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`));
 	}
-	mainWindow.webContents.send("setClientTheme",sysInst.meta?.theme);
+	// dialog.showMessageBox({
+	// 	message:"First theme: "+sysInst.meta?.theme
+	// });
+	// mainWindow.webContents.send("setClientTheme",sysInst.meta?.theme);
 	mainWindow.webContents.send("initMenu",<InitMenuData<any>>{
 		data:undefined
 	});
 
+	if(false) setTimeout(async ()=>{
+		let ar = (await util_readdir(path.join(__dirname,"../renderer")));
+		ar.push("-----");
+		ar.push(...(await util_readdir(path.join(__dirname,"../renderer",MAIN_WINDOW_VITE_NAME))));
+		ar.push("-----");
+		ar.push(...(await util_readdir(path.join(__dirname,"../renderer",MAIN_WINDOW_VITE_NAME,"assets"))));
+		dialog.showMessageBox({
+			message:ar.join("\n")
+		});
+	},1500);
+
 	// Open the DevTools.
 	// mainWindow.webContents.openDevTools();
-
-	await initDB();
-
-	// init icpMain
-	preInit();
 };
 
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
-app.on("ready", createWindow);
+async function mainInit(){
+	// init icpMain
+	preInit();
+	await preInitDB();
+
+	await createWindow();
+
+	await initDB();
+}
+app.on("ready", mainInit);
 
 // Quit when all windows are closed, except on macOS. There, it's common
 // for applications and their menu bar to stay active until the user quits
@@ -67,10 +85,11 @@ app.on("activate", () => {
 
 import "./app";
 import { changeServerURL, preInit } from "./app";
-import { initDB, sysInst, themes } from "./db";
+import { dataPath, initDB, preInitDB, sysInst, themes } from "./db";
 import "./network";
 import { InitMenuData } from "./interface";
 import { getConnectionStatus } from "./network";
+import { util_readdir } from "./util";
 
 const appMenu = Menu.buildFromTemplate([
 	{
@@ -139,29 +158,44 @@ const appMenu = Menu.buildFromTemplate([
 					sysInst.meta.prismExe = path.join(newLoc.filePaths[0],"..");
 					await sysInst.save();
 				}
-			}
+			},
+			{
+				label:"Open Program Data Folder",
+				click:()=>{
+					shell.showItemInFolder(dataPath);
+				}
+			},
+			{
+				label:"Open Prism Instances Folder",
+				// enabled:sysInst.meta?.prismRoot != undefined,
+				click:()=>{
+					if(!sysInst.meta?.prismRoot) return;
+					shell.showItemInFolder(path.join(sysInst.meta.prismRoot,"instances"));
+				}
+			},
 		]
 	},
 	{
 		label:"View",
 		submenu:[
 			{
-				role:"toggleDevTools"
-			},
-			{
 				label:"Change Theme",
 				submenu:(()=>{
 					let ok = Object.keys(themes);
 					return ok.map(k=>{
 						let v = themes[k];
+						if(v._disabled) return;
 						return {
 							label:v.name ?? k,
 							click:()=>{
 								sysInst.setTheme(k);
 							}
 						};
-					})
+					}).filter(v=>!!v);
 				})()
+			},
+			{
+				role:"toggleDevTools"
 			}
 		]
 	},

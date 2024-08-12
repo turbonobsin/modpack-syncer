@@ -109,8 +109,27 @@ export function getPackMeta(id:string){
 export function searchPacks(arg:Arg_SearchPacks){
     return semit<Arg_SearchPacks,Res_SearchPacks>("searchPacks",arg);
 }
-export function searchPacksMeta(arg:Arg_SearchPacks){
-    return semit<Arg_SearchPacks,Res_SearchPacksMeta>("searchPacksMeta",arg);
+export async function searchPacksMeta(arg:Arg_SearchPacks){
+    if(!sysInst.meta) return;
+
+    let res = (await semit<Arg_SearchPacks,Res_SearchPacksMeta>("searchPacksMeta",arg)).unwrap();
+    if(!res) return;
+
+    for(const item of res.similar){
+        let url = new URL(sysInst.meta.serverURL);
+        url.pathname = "modpack_image";
+        url.searchParams.set("mpID",item.id);
+        item.img = url.href;
+
+        // if(item.mmcPackFile instanceof Buffer){
+        //     util_note2("was buf");
+        //     item.mmcPackFile = item.mmcPackFile.buffer.slice(0);
+        // }
+        // else util_note2("wasn't buf: ",item.mmcPackFile);
+        // if(item.instanceCfgFile) item.instanceCfgFile = Array.fr`om(item.instanceCfgFile);
+    }
+
+    return res;
 }
 
 // sync

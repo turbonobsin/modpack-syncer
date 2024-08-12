@@ -2,7 +2,7 @@
  * Claeb Code Menu API
  */
 
-import { BrowserWindow, dialog, ipcRenderer, Menu } from "electron";
+import { app, BrowserWindow, dialog, ipcRenderer, Menu } from "electron";
 import path from "path";
 import { InitMenuData } from "src/interface";
 import { util_readdir, util_warn } from "./util";
@@ -51,6 +51,7 @@ abstract class CCMenu{
             // parent:mainWindow,
             // parent:windowStack[windowStack.length-1] ?? mainWindow,
             center:true,
+            // show:false,
             // modal:true
         });
         windowStack.push(w);
@@ -83,14 +84,24 @@ abstract class CCMenu{
                 message:("DIRNAME:\n"+__dirname+"\n"+(await util_readdir(__dirname)).join("\n"))
             });
         },1500);
-        await w.loadURL(path.join(MAIN_WINDOW_VITE_DEV_SERVER_URL,"menus/"+this.startScript+`.html?theme=${sysInst.meta?.theme ?? "dark"}`));
+
+        if(app.isPackaged){
+            // await w.loadURL(path.join(__dirname,"../renderer",MAIN_WINDOW_VITE_NAME,"src/menus",this.startScript+`.html?theme=${sysInst.meta?.theme ?? "dark"}`));
+            await w.loadURL(path.join(__dirname,"../renderer",MAIN_WINDOW_VITE_NAME,"src/menus",this.startScript+".html"));
+        }
+        else await w.loadURL(path.join(MAIN_WINDOW_VITE_DEV_SERVER_URL,"src/menus/"+this.startScript+".html"));
         // await w.loadURL(path.join(__dirname,"../../src/menus/"+this.startScript+`.html?theme=${sysInst.meta?.theme ?? "dark"}`));
         // w.webContents.send("setTheme",);
-        w.webContents.send("setClientTheme",sysInst.meta?.theme);
+
+        // w.once("ready-to-show",()=>{
+            // w.show();
+
+            w.webContents.send("setClientTheme",sysInst.meta?.theme);
         
-        if(data) w.webContents.send("initMenu",<InitMenuData<T>>{
-            data
-        });
+            if(data) w.webContents.send("initMenu",<InitMenuData<T>>{
+                data
+            });
+        // });
         // w.webContents.send("initMenu",<InitMenuData<T>>{
         //     data
         // });
@@ -101,7 +112,7 @@ abstract class CCMenu{
 
 export class SearchPacksMenu extends CCMenu{
     constructor(){
-        super("search_packs",800,600);
+        super("search_packs",1100,800);
     }
     getId(): string {
         return "search_packs";

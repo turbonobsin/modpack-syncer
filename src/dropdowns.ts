@@ -499,7 +499,7 @@ export const allDropdowns = {
 
         const menu = Menu.buildFromTemplate([
             {
-                label:"Generate Auto PBR",
+                label:"Generate Auto PBR (Experimental)",
                 click:()=>{
                     genAllThePBR(inst.meta!.iid,inst);
                 }

@@ -9,7 +9,9 @@ import { FuseV1Options, FuseVersion } from '@electron/fuses';
 
 const config: ForgeConfig = {
 	packagerConfig: {
-		asar: true
+		asar: true,
+		// icon:"src/icons/gears_icon"
+		// icon:"src/icons/gears_icon"
 	},
 	rebuildConfig: {},
 	makers: [new MakerSquirrel({}), new MakerZIP({}, ['darwin']), new MakerRpm({}), new MakerDeb({})],
@@ -33,7 +35,7 @@ const config: ForgeConfig = {
 				// { name: 'add_rp_menu', config: 'vite.renderer.config.ts' },
 				// { name: 'add_world_menu', config: 'vite.renderer.config.ts' },
 				// { name: 'edit_instance_menu', config: 'vite.renderer.config.ts' },
-				// { name: 'input_menu', config: 'vite.renderer.config.ts' },
+				// { name: 'input_menu', config: 'vite.input_menu.config.ts' },
 				// { name: 'prism_instances', config: 'vite.renderer.config.ts' },
 				// { name: 'search_packs', config: 'vite.renderer.config.ts' },
 				// { name: 'update_progress_menu', config: 'vite.renderer.config.ts' },

@@ -1,5 +1,6 @@
 # Modpack Syncer Files
 data/
+data_old/
 .tmp/extract/
 .stfolder
 

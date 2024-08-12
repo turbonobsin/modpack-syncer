@@ -55,7 +55,10 @@ async function init(){
             if(op.type == "title"){
                 item = new MP_Div({});
                 if(op.title) item.addPart(new MP_Header({textContent:op.title}));
-                if(op.desc) item.addPart(new MP_P({className:"l-details",textContent:op.desc}));
+                if(op.desc){
+                    let lines = op.desc.split("\n");
+                    for(const line of lines) item.addPart(new MP_P({className:"l-details",textContent:line}));
+                }
             }
             if(op.type == "input"){
                 const input = new MP_Input({

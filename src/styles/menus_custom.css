@@ -2,6 +2,7 @@
     color:var(--t2);
     font-size:12px;
     user-select:none;
+    margin-bottom:3px;
 }
 .mod-row-content{
     line-height:25px;

@@ -1,4 +1,4 @@
-import { MenuPart, MP_Button, MP_Div, MP_Header, MP_P, MP_Text } from "./menu_parts";
+import { MenuPart, MP_Button, MP_Div, MP_Header, MP_HR, MP_Input, MP_Label, MP_OutlinedBox, MP_P, MP_Text } from "./menu_parts";
 import { InitMenuData, PackMetaData, WorldState } from "./interface";
 
 export function loadDefaultAside(aside:MenuPart,ops:{
@@ -72,19 +72,40 @@ export async function loadModPackMetaPanel(meta:PackMetaData,panel?:HTMLElement|
         new MP_P({
             text:meta.desc,
             className:"l-desc"
+        }),
+
+        new MP_OutlinedBox({
+            marginTop:"50px",
+            padding:"5px 5px"
+        }).addParts(
+            new MP_Input({
+                type:"checkbox",
+                id:"cb-auto-create-inst",
+                checked:true
+            }),
+            new MP_Label({
+                for:"cb-auto-create-inst",
+                text:"Auto Create Instance"
+            })
+        ),
+
+        new MP_HR(),
+        new MP_Button({
+            label:"Add Modpack",
+            className:"b-add-mod-pack",
+            onClick:async e=>{
+                let res = await window.gAPI.addInstance({
+                    meta,
+                    autoCreate:document.querySelector<HTMLInputElement>("#cb-auto-create-inst")?.checked ?? false
+                });
+                window.close();
+            }
+        }).onPostLoad(p=>{
+            // p.e!.style.float = "right";
         })
     )
 
-    footer.addParts(
-        new MP_Button({
-            label:"Add Mod Pack",
-            className:"b-add-mod-pack",
-            onClick:async e=>{
-                let res = await window.gAPI.addInstance(meta);
-                window.close();
-            }
-        })
-    )
+    footer.addParts();
 }
 
 // Selection API 2

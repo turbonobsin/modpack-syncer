@@ -44,13 +44,25 @@ export async function preInit(){
     });
 
     ipcMain.handle("searchPacks",async (ev,arg:Arg_SearchPacks)=>{
+        let acc = await getMainAccount();
+        if(!acc) return;
+        
+        arg.uid = acc.profile.id;
+        arg.uname = acc.profile.name;
+        
         return (await searchPacks(arg)).unwrap();
     });
     ipcMain.handle("searchPacksMeta",async (ev,arg:Arg_SearchPacks)=>{
-        return (await searchPacksMeta(arg)).unwrap();
+        let acc = await getMainAccount();
+        if(!acc) return;
+        
+        arg.uid = acc.profile.id;
+        arg.uname = acc.profile.name;
+        
+        return await searchPacksMeta(arg);
     });
-    ipcMain.handle("addInstance",async (ev,meta:PackMetaData)=>{
-        return (await addInstance(meta)).unwrap();
+    ipcMain.handle("addInstance",async (ev,arg:Arg_AddInstance)=>{
+        return (await addInstance(arg)).unwrap();
     });
     ipcMain.handle("getInstances",async (ev,arg:Arg_GetInstances)=>{
         let root = path.join(dataPath,"instances");
@@ -369,6 +381,9 @@ export async function preInit(){
         if(res){
             res = await util_rm(loc,true);
         }
+        if(res){
+            instCache.modpack.delete(inst.filePath);
+        }
 
         refreshMainWindow();
 
@@ -598,11 +613,7 @@ export async function checkForInstUpdates(iid:string,ev?:Electron.IpcMainInvokeE
     let inst = await getModpackInst(iid);
     if(!inst || !inst.meta) return errors.couldNotFindPack.unwrap();
 
-    console.log(11);
-
     // if(!inst.meta.meta.id) return errors.failedToGetPackLink.unwrap();
-
-    console.log(22);
     
     let res = (await semit<Arg_GetRPVersions,Res_GetRPVersions>("getRPVersions",{
         mpID:inst.meta.meta.id,
@@ -620,6 +631,9 @@ export async function checkForInstUpdates(iid:string,ev?:Electron.IpcMainInvokeE
     // sync mods
     let res1 = (await syncMods(window,iid,true)).unwrap();
     let modsUpToDate = res1?.upToDate;
+
+    // get mod info
+    await getInstMods_old({iid});
 
     // sync rps
     let proms:Promise<any>[] = [];
@@ -1464,6 +1478,8 @@ export async function downloadWorld(arg:Arg_DownloadWorld,useTime=true,noUpToDat
         w.close();
     }
 
+    getWindowStack().find(v=>v.title == "Edit Instance")?.webContents.send("updateSearch");
+
     return true;
 }
 export async function unpublishWorld(arg:{
@@ -1775,7 +1791,7 @@ export async function changeServerURL(url?:string){
                     {
                         type:"title",
                         title:"Set Server URL",
-                        desc:"This is the URL or IP Address of the server where your mod packs will be synced from."
+                        desc:`This is the URL or IP Address of the "Modpack Sync Server" where your packs will be synced from.\n\n(You can always change this by going to: Data -> Set Server URL)`
                     }
                 ]},
                 {options:[
@@ -1994,6 +2010,7 @@ async function syncMods(w:BrowserWindow,iid:string,noMsg=false): Promise<Result<
         // }
         // 
 
+        let completed = 0;
         let total = items.length;
 
         let fails:{
@@ -2015,7 +2032,7 @@ async function syncMods(w:BrowserWindow,iid:string,noMsg=false): Promise<Result<
                 let item = items[i];
 
                 if(item.action == ItemAction.add){ // add
-                    console.log("add: ",item.path);
+                    // console.log("add: ",item.path);
 
                     let url = new URL((sysInst.meta.serverURL+"/"+item.ep).replaceAll("\\","/").replaceAll("//","/"));
                     url.searchParams.set("id",inst!.meta!.meta.id);
@@ -2034,7 +2051,7 @@ async function syncMods(w:BrowserWindow,iid:string,noMsg=false): Promise<Result<
                     }
                 }
                 else{ // remove
-                    console.log("remove: ",item.path);
+                    // console.log("remove: ",item.path);
 
                     let response = await util_rename(item.path,path.join(path.dirname(item.path),".deleted",item.name));
                     // let response = await util_rm(item.path);
@@ -2047,7 +2064,8 @@ async function syncMods(w:BrowserWindow,iid:string,noMsg=false): Promise<Result<
                 // await wait(1);
                 // await wait(1000);
                 
-                newW.webContents.send("updateProgress","main",i+1,total,item.action == ItemAction.add ? `Downloading: ${item.name}` : `Removing: ${item.name}`);
+                completed++;
+                newW.webContents.send("updateProgress","main",completed,total,item.action == ItemAction.add ? `Downloading: ${item.name}` : `Removing: ${item.name}`);
 
                 resolve();
             }));
@@ -3704,7 +3722,7 @@ async function alertBox(w:BrowserWindow,message:string,title="Error"){
 // 
 
 import { ETL_Generic, evtTimeline, parseCFGFile, pathTo7zip, searchStringCompare, util_cp, util_lstat, util_mkdir, util_note, util_note2, util_readBinary, util_readdir, util_readdirWithTypes, util_readJSON, util_readText, util_readTOML, util_rename, util_rm, util_utimes, util_warn, util_writeBinary, util_writeJSON, util_writeText, wait } from "./util";
-import { AddRP_InitData, Arg_AddModToFolder, Arg_ChangeFolderType, Arg_CheckModUpdates, Arg_CreateFolder, Arg_DownloadRP, Arg_DownloadRPFile, Arg_DownloadWorld, Arg_DownloadWorldFile, Arg_FinishUploadWorld, Arg_GetAllowedDirs, Arg_GetInstances, Arg_GetInstMods, Arg_GetInstResourcePacks, Arg_GetInstScreenshots, Arg_GetInstWorlds, Arg_GetPrismInstances, Arg_GetRPs, Arg_GetRPVersions, Arg_GetServerWorlds, Arg_GetWorldFiles, Arg_GetWorldInfo, Arg_IID, Arg_LaunchInst, Arg_PublishWorld, Arg_RemoveRP, Arg_SearchPacks, Arg_SyncMods, Arg_TakeWorldOwnership, Arg_UnpackRP, Arg_UnpublishWorld, Arg_UploadRP, Arg_UploadWorld, Arg_UploadWorldFile, ArgC_GetRPs, CurseForgeUpdate, Data_PrismInstancesMenu, FSTestData, FullModData, InputMenu_InitData, InstGroups, LocalModData, MMCPack, ModData, ModifiedFile, ModifiedFileData, ModIndex, ModInfo, ModrinthModData, ModrinthUpdate, ModsFolder, ModsFolderDef, PackMetaData, RemoteModData, Res_DownloadRP, Res_FinishUploadWorld, Res_GetInstMods, Res_GetInstResourcePacks, Res_GetInstScreenshots, Res_GetModIndexFiles, Res_GetModUpdates, Res_GetPrismInstances, Res_GetRPs, Res_GetRPVersions, Res_GetServerWorlds, Res_GetWorldFiles, Res_GetWorldInfo, Res_InputMenu, Res_SyncMods, RPCache, SArg_GetServerWorlds, SArg_PublishWorld, SArg_TakeWorldOwnership, ServerWorld, UpdateProgress_InitData } from "./interface";
+import { AddRP_InitData, Arg_AddInstance, Arg_AddModToFolder, Arg_ChangeFolderType, Arg_CheckModUpdates, Arg_CreateFolder, Arg_DownloadRP, Arg_DownloadRPFile, Arg_DownloadWorld, Arg_DownloadWorldFile, Arg_FinishUploadWorld, Arg_GetAllowedDirs, Arg_GetInstances, Arg_GetInstMods, Arg_GetInstResourcePacks, Arg_GetInstScreenshots, Arg_GetInstWorlds, Arg_GetPrismInstances, Arg_GetRPs, Arg_GetRPVersions, Arg_GetServerWorlds, Arg_GetWorldFiles, Arg_GetWorldInfo, Arg_IID, Arg_LaunchInst, Arg_PublishWorld, Arg_RemoveRP, Arg_SearchPacks, Arg_SyncMods, Arg_TakeWorldOwnership, Arg_UnpackRP, Arg_UnpublishWorld, Arg_UploadRP, Arg_UploadWorld, Arg_UploadWorldFile, ArgC_GetRPs, CurseForgeUpdate, Data_PrismInstancesMenu, FSTestData, FullModData, InputMenu_InitData, InstGroups, LocalModData, MMCPack, ModData, ModifiedFile, ModifiedFileData, ModIndex, ModInfo, ModrinthModData, ModrinthUpdate, ModsFolder, ModsFolderDef, PackMetaData, RemoteModData, Res_DownloadRP, Res_FinishUploadWorld, Res_GetInstMods, Res_GetInstResourcePacks, Res_GetInstScreenshots, Res_GetModIndexFiles, Res_GetModUpdates, Res_GetPrismInstances, Res_GetRPs, Res_GetRPVersions, Res_GetServerWorlds, Res_GetWorldFiles, Res_GetWorldInfo, Res_InputMenu, Res_SyncMods, RPCache, SArg_GetServerWorlds, SArg_PublishWorld, SArg_TakeWorldOwnership, ServerWorld, UpdateProgress_InitData } from "./interface";
 import { getModUpdates, getPackMeta, getSocketId, searchPacks, searchPacksMeta, semit, updateSocketURL } from "./network";
 import { getWindowStack, ListPrismInstReason, openCCMenu, openCCMenuCB, SearchPacksMenu, ViewInstanceMenu } from "./menu_api";
 import { addInstance, appPath, cleanModName, cleanModNameDisabled, dataPath, getMainAccount, getModFolderPath, getModpackInst, getModpackPath, getWorlds, instCache, LocalModInst, ModPackInst, RemoteModInst, slugMap, sysInst } from "./db";

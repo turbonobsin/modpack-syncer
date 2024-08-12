@@ -167,7 +167,11 @@ export function util_mkdir(path:fs.PathLike,recursive=false){
     return new Promise<boolean>(resolve=>{
         fs.mkdir(path,{recursive},(err)=>{
             if(err){
-                // console.log("Err:",err);
+                if(err.code == "EEXIST"){
+                    resolve(true);
+                    return;
+                }
+                console.log("Err:",err);
                 resolve(false);
             }
             else resolve(true);

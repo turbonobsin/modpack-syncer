@@ -1,8 +1,8 @@
 import "../render_lib";
 import "../styles/search_packs_menu.css";
-import { MenuPart, MP_Any, MP_Article, MP_Div, MP_Header, MP_Ops, MP_P, MP_SearchForm, MP_Text, MP_Text_Ops } from "../menu_parts";
+import { MenuPart, MP_Any, MP_Article, MP_Div, MP_Flexbox, MP_Header, MP_Ops, MP_P, MP_SearchForm, MP_Text, MP_Text_Ops } from "../menu_parts";
 import { PackMetaData } from "../../src/interface";
-import { loadModPackMetaPanel, reselectItem as reselectItem, SelectedItem, selectItem, SelectedItemOptions } from "../render_util";
+import { loadModPackMetaPanel, reselectItem as reselectItem, SelectedItem, selectItem, SelectedItemOptions, getImageURL } from "../render_util";
 import { MP_SearchStructure } from "../render_lib";
 
 const main = document.querySelector("main");
@@ -28,10 +28,76 @@ class CMP_Result extends MP_Article{
     load(): void {
         super.load();
         if(!this.e) return;
+        this.e.style.display = "grid";
+        this.e.style.gridTemplateColumns = "auto 1fr";
         
         let data = this.ops.data;
 
         this.addParts(
+            new MP_Flexbox({
+                width:"80px",
+                height:"80px",
+                justifyContent:"center",
+                alignItems:"center"
+            }).addParts(
+                new MP_Div({}).onPostLoad(p=>{
+                    let src = data.img ?? "";
+                    p.e!.style.backgroundImage = `url(${src})`;
+                    p.e!.style.backgroundSize = "contain";
+                    p.e!.style.width = "100%";
+                    p.e!.style.height = "100%";
+                    p.e!.style.backgroundPosition = "center";
+                    p.e!.style.margin = "10px";
+                    p.e!.style.backgroundRepeat = "no-repeat";
+
+                    let img = document.createElement("img");
+                    img.src = src;
+                    img.onload = ()=>{
+                        if(img.width <= 32 || img.height <= 32) p.e!.style.imageRendering = "pixelated";
+                    };
+                })
+            ),
+            new MP_Flexbox({
+                direction:"column",
+                margin:"10px",
+                marginLeft:"0px"
+            }).addParts(
+                new MP_Header({
+
+                }).addParts(
+                    new MP_Flexbox({
+                        justifyContent:"space-between",
+                    }).addParts(
+                        new MP_Div({
+                            text:data.name,
+                            className:"l-title"
+                        }),
+                        new MP_Div({
+                            text: "",
+                            className: "l-version"
+                        }).addParts(
+                            new MP_Text({
+                                text: data.version,
+                                marginRight:"5px"
+                            }),
+                            // new MP_Text({ text: data.meta.loader.toWel })
+                            new MP_Div({
+                                text:data.loader,
+                                className:"l-loader",
+                            }).onPostLoad(p=>{
+                                p.e!.style.display = "inline-block";
+                            })
+                        ),
+                    )
+                ),
+                new MP_Div({
+                    className:"details l-desc",
+                    text:data.desc
+                })
+            )
+        );
+
+        if(false) this.addParts(
             new MP_Header({
                 textContent:data.name,
                 className:"l-title"
@@ -112,19 +178,24 @@ async function initPage(){
     }));
 
     search = new MP_SearchStructure({
-        listId:"instance",
+        // listId:"instance",
+        listId:"full-inst",
         onSubmit:async (t,e,q)=>{
             if(!search) return;
             if(!search.list) return;
      
             let res = await window.gAPI.searchPacksMeta({
-                query:q
+                query:q,
+                uid:"",
+                uname:"",
             });
             if(!res) return;
+            console.log("RES:",res);
             for(const m of res.similar){
                 let p = search.list.addPart(
                     new CMP_Result({
-                        data:m
+                        data:m,
+                        marginBottom:"5px"
                     })
                 ) as CMP_Result;
             }

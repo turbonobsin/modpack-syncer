@@ -15,6 +15,13 @@ interface PackMetaData{
     desc:string;
     loader:string;
     version:string;
+    img:string;
+
+    RAM?:number;
+    javaCodeName?:string; // delta (v21), gamma (v17), beta (v1.8)
+    
+    mmcPackFile?:any;
+    instanceCfgFile?:any;
 
     update:number;
 
@@ -23,9 +30,15 @@ interface PackMetaData{
 type InitMenuData<T> = {
     data:T
 };
+interface Arg_AddInstance{
+    meta:PackMetaData;
+    autoCreate:boolean;
+}
 
 type Arg_SearchPacks = {
     query?:string
+    uid:string;
+    uname:string;
 };
 interface Res_SearchPacks{
     similar:string[];
@@ -841,7 +854,7 @@ export interface IGlobalAPI{
     searchPacks:(arg:Arg_SearchPacks)=>Promise<Res_SearchPacks>;
     searchPacksMeta:(arg:Arg_SearchPacks)=>Promise<Res_SearchPacksMeta>;
 
-    addInstance:(meta:PackMetaData)=>Promise<ModPackInst|undefined>;
+    addInstance:(arg:Arg_AddInstance)=>Promise<ModPackInst|undefined>;
     getInstances:(arg:Arg_GetInstances)=>Promise<InstanceData[]|undefined>;
     showLinkInstance:(iid:string,instName:string)=>Promise<string|undefined>;
     linkInstance:(iid:string,pInstName:string)=>Promise<void>;

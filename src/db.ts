@@ -1,12 +1,12 @@
 import { app, dialog } from "electron";
-import { pathTo7zip, searchStringCompare, util_lstat, util_mkdir, util_note, util_note2, util_readBinary, util_readdir, util_readdirWithTypes, util_readJSON, util_readText, util_readTOML, util_testAccess, util_warn, util_writeJSON, wait } from "./util";
+import { pathTo7zip, searchStringCompare, util_lstat, util_mkdir, util_note, util_note2, util_readBinary, util_readdir, util_readdirWithTypes, util_readJSON, util_readText, util_readTOML, util_testAccess, util_warn, util_writeBinary, util_writeJSON, util_writeText, wait } from "./util";
 import path from "path";
 import { DBSys, DBUser, InstanceData as ModPackInstData, TmpFile } from "./db_types";
-import { Arg_AddModToFolder, Arg_ChangeFolderType, Arg_CreateFolder, Arg_EditFolder, Arg_LaunchInst, Arg_UploadRP, Arg_UploadRPFile, FolderType, LocalModData, ModIndex, ModrinthModData, ModsFolder, ModsFolderDef, PackMetaData, PrismAccount, PrismAccountsData, RemoteModData, Res_GetInstResourcePacks, Res_GetInstWorlds, Res_UploadRP, RP_Data, RPCache, SearchFilter, SlugMapData, UpdateProgress_InitData, World_Data } from "./interface";
+import { Arg_AddInstance, Arg_AddModToFolder, Arg_ChangeFolderType, Arg_CreateFolder, Arg_EditFolder, Arg_LaunchInst, Arg_UploadRP, Arg_UploadRPFile, FolderType, LocalModData, ModIndex, ModrinthModData, ModsFolder, ModsFolderDef, PackMetaData, PrismAccount, PrismAccountsData, RemoteModData, Res_GetInstResourcePacks, Res_GetInstWorlds, Res_UploadRP, RP_Data, RPCache, SearchFilter, SlugMapData, UpdateProgress_InitData, World_Data } from "./interface";
 import { errors, Result } from "./errors";
 import express from "express";
 import toml from "toml";
-import { changeServerURL, refreshMainWindow, uploadWorld } from "./app";
+import { changeServerURL, checkForInstUpdates, refreshMainWindow, uploadWorld } from "./app";
 import { semit, updateSocketURL } from "./network";
 import { getWindowStack, openCCMenu } from "./menu_api";
 import Seven from "node-7z";
@@ -14,19 +14,20 @@ import axios from "axios";
 import { mainWindow } from "./main";
 import { i } from "vite/dist/node/types.d-aGj9QkWt";
 
-export let appPath = app.isPackaged ? path.join(process.resourcesPath,"..","data") : app.getAppPath();
+// export let appPath = app.isPackaged ? path.join(process.resourcesPath,"..","data") : app.getAppPath();
+export let appPath = app.isPackaged ? path.join(process.resourcesPath) : app.getAppPath();
 export const dataPath = path.join(appPath,"data");
 const folderPath = path.join(dataPath,"folders");
 
-// if(!app.isPackaged) setTimeout(()=>{
-//     dialog.showMessageBox({
-//         message:[
-//             appPath,
-//             process.resourcesPath,
-//             __dirname
-//         ].join("\n")
-//     });
-// },3500);
+if(false) if(app.isPackaged) setTimeout(()=>{
+    dialog.showMessageBox({
+        message:[
+            appPath,
+            process.resourcesPath,
+            __dirname
+        ].join("\n")
+    });
+},1500);
 
 // 
 let userData:DBUser;
@@ -80,6 +81,12 @@ async function createFolder(name:string,parentPath=folderPath){
 //     return "folder_"+sysData.fid;
 // }
 
+export async function preInitDB(){
+    await util_mkdir(appPath);
+
+    sysInst = await sysInst.load();
+    slugMap = await slugMap.load();
+}
 export async function initDB(){
     // if(!await util_lstat(path.join(dataPath,"sys.json"))){
     //     sysData = {
@@ -98,9 +105,6 @@ export async function initDB(){
     //     }
     //     sysData = res;
     // }
-
-    sysInst = await sysInst.load();
-    slugMap = await slugMap.load();
     
     // 
     if(!sysInst.meta?.serverURL) changeServerURL();
@@ -365,15 +369,18 @@ export const themes:Record<string,any> = {
         name:"Dark"
     },
     "clean-dark":{
+        _disabled:true,
         name:"Soft Dark"
     },
     "light":{
         name:"Light"
     },
     "clean-light":{
+        _disabled:true,
         name:"Soft Light"
     },
     "light2":{
+        _disabled:true,
         name:"Light Alt"
     },
     "mint":{
@@ -463,6 +470,25 @@ export class ModPackInst extends Inst<ModPackInstData>{
         if(!this.meta) return;
         
         return path.join(dataPath,"instances",this.meta.iid,"rp");
+    }
+
+    async save(){ // not sure if I want to do save now or add it to a queue
+        if(!this.meta){
+            // util_warn("Couldn't save, meta doesn't exist for: "+this.filePath);
+            return;
+        }
+
+        let tmpMMC = this.meta.meta.mmcPackFile;
+        let tmpCfg = this.meta.meta.instanceCfgFile;
+
+        // this.meta.meta.mmcPackFile = undefined;
+        this.meta.meta.instanceCfgFile = undefined;
+
+        if(!await util_lstat(this.filePath)) await util_mkdir(path.join(this.filePath,".."));
+        await util_writeJSON(this.filePath,this.meta);
+
+        // this.meta.meta.mmcPackFile = tmpMMC;
+        // this.meta.meta.instanceCfgFile = tmpCfg;
     }
 
     getPrismInstPath(): string|undefined{
@@ -949,8 +975,8 @@ export async function getModFolderPath(iid:string){
     return path.join(prismPath,".minecraft","mods");
 }
 
-function makeInstanceData(meta:PackMetaData){
-    let iid = genId(IDType.instance);
+function makeInstanceData(meta:PackMetaData,overrideIID?:string){
+    let iid = overrideIID ?? genId(IDType.instance);
     if(iid == null) return;
     
     let data:ModPackInstData = {
@@ -966,16 +992,92 @@ function makeInstanceData(meta:PackMetaData){
     };
     return data;
 }
-export async function addInstance(meta:PackMetaData):Promise<Result<ModPackInst>>{
-    let instanceData = makeInstanceData(meta);
+export async function addInstance(arg:Arg_AddInstance):Promise<Result<ModPackInst>>{
+    if(!sysInst.meta?.prismRoot) return errors.noPrismRoot;
+
+    let iid:string|undefined;
+    if(arg.autoCreate){
+        console.log("> Auto Creating Instance [1]");
+        let num = 0;
+        iid = `${arg.meta.id}_pack_${num}`;
+        while(await util_lstat(path.join(sysInst.meta.prismRoot,"instances",iid))){
+            num++;
+            iid = `${arg.meta.id}_pack_${num}`;
+        }
+    }
+    
+    let meta = arg.meta;
+    if(!meta){
+        util_note2("Critical error: no meta was found to create instance, aborting.");
+        return errors.unknown;
+    }
+    let instanceData = makeInstanceData(meta,iid);
     if(!instanceData){
         return errors.instDataConvert;
     }
 
-    if(!await util_mkdir(path.join(fspath_modPacks,instanceData.iid))) return errors.addInstFolder;
+    if(!await util_mkdir(path.join(fspath_modPacks,instanceData.iid))){
+        util_warn("Failed to add inst folder: ",path.join(fspath_modPacks,instanceData.iid));
+        return errors.addInstFolder;
+    }
+
+    if(arg.autoCreate && !meta.mmcPackFile) util_warn("Auto Create was selected but this pack doesn't have the REQUIRED mmc-pack.json file. Aborting the auto create!");
+    if(arg.autoCreate && iid && meta.mmcPackFile){
+        console.log("> Auto Creating Instance [2]");
+        let instPath = path.join(sysInst.meta.prismRoot,"instances",iid);
+        await util_mkdir(instPath,true);
+        await util_mkdir(path.join(instPath,".minecraft","mods"),true);
+        await util_mkdir(path.join(instPath,".minecraft","resourcepacks"),true);
+        await util_mkdir(path.join(instPath,".minecraft","shaderpacks"),true);
+        await util_mkdir(path.join(instPath,".minecraft","saves"),true);
+
+        let javaPath = "";
+        if(process.platform == "win32"){
+            if(meta.javaCodeName){
+                javaPath = path.join(process.env.LOCALAPPDATA??"","Packages/Microsoft.4297127D64EC6_8wekyb3d8bbwe/LocalCache/Local/runtime/java-runtime-"+meta.javaCodeName,"bin/javaw.exe");
+                if(!await util_lstat(javaPath)){
+                    javaPath = path.join(process.env["ProgramFiles(x86)"]??"","Minecraft Launcher/runtime/java-runtime-"+meta.javaCodeName,"windows-x64","java-runtime-"+meta.javaCodeName,"bin/javaw.exe");
+                    if(!await util_lstat(javaPath)){
+                        meta.javaCodeName = undefined; // can't find it so don't override their defaults
+                    }
+                }
+                // C:\Users\user\AppData\Local\Packages\Microsoft.4297127D64EC6_8wekyb3d8bbwe\LocalCache\Local\runtime
+            }
+        }
+        else meta.javaCodeName = undefined;
+        if(javaPath) javaPath = javaPath.replaceAll("\\","/");
+
+        if(javaPath) util_note2("JAVA PATH: "+meta.javaCodeName+" "+javaPath);
+        
+        if(meta.mmcPackFile) await util_writeBinary(path.join(instPath,"mmc-pack.json"),Buffer.from(meta.mmcPackFile));
+        if(meta.instanceCfgFile) await util_writeBinary(path.join(instPath,"instance.cfg"),Buffer.from(meta.instanceCfgFile));
+        else await util_writeText(path.join(instPath,"instance.cfg"),
+`[General]
+iconKey=${iid}
+name=${meta.name}
+${meta.RAM ?
+`OverrideMemory=true
+MaxMemAlloc=${meta.RAM}
+MinMemAlloc=512`:""}${meta.javaCodeName ?
+`OverrideJavaLocation=true
+JavaPath=${javaPath}`:""}
+`
+);
+
+        instanceData.linkName = instanceData.iid;
+
+        util_note2("Pack img url: ",meta.img);
+        if(meta.img){
+            let img = await (await (await fetch(meta.img)).blob()).arrayBuffer();
+            if(img){
+                await util_writeBinary(path.join(instPath,".minecraft","icon.png"),Buffer.from(img));
+                await util_writeBinary(path.join(sysInst.meta.prismRoot,"icons",iid+".png"),Buffer.from(img));
+            }
+        }
+    }
 
     let inst = await new ModPackInst(path.join(fspath_modPacks,instanceData.iid,"meta.json")).load(instanceData);
-    if(!inst){
+    if(!inst || !inst.meta){
         util_warn("Failed to add instance:");
         console.log(meta);
         return errors.addInstance;
@@ -983,6 +1085,8 @@ export async function addInstance(meta:PackMetaData):Promise<Result<ModPackInst>
     console.log("ADDED INSTANCE:",inst);
 
     refreshMainWindow();
+
+    await checkForInstUpdates(inst.meta.iid,undefined,true);
 
     return new Result(inst);
 }
@@ -1210,7 +1314,7 @@ async function instanceRunCheck(){
         };
 
         let mpID = v.meta.meta.id;
-        util_note("Checking for running... : "+mpID);
+        // util_note("Checking for running... : "+mpID);
 
         let prismLoc = v.getRoot();
         if(!prismLoc){
@@ -1257,7 +1361,8 @@ async function instanceRunCheck(){
         util_note2("Instance is running: "+mpID);
     }
     
-    await wait(500);
+    // await wait(500);
+    await wait(1000);
     instanceRunCheck();
 }
 instanceRunCheck();

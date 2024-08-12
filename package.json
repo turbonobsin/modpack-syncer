@@ -1,7 +1,7 @@
 {
 	"name": "modpack-syncer",
 	"productName": "modpack-syncer",
-	"version": "0.27.0",
+	"version": "0.28.0",
 	"description": "My Electron application description",
 	"main": ".vite/build/main.js",
 	"repository": {

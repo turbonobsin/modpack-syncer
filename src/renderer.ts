@@ -68,7 +68,9 @@ query?.addEventListener("submit",async e=>{
     // }
 
     let res = await window.gAPI.searchPacks({
-        query:i_query?.value
+        query:i_query?.value,
+        uid:"",
+        uname:""
     });
     console.log("RES:",res);
     if(!res) return;
@@ -311,7 +313,7 @@ export class CMP_FullInst extends MP_Article {
                     new MP_Button({
                         label:(inst.isRunning ? "Running" : "Launch"),
                         icon:(inst.isRunning ? "sports_esports" : "rocket_launch"),
-                        className:"b-inst-launch",
+                        className:"b-inst-launch accent",
                         disabled:!this.canLaunch(),
                         onClick:async e=>{
                             window.gAPI.launchInstance(inst.iid);
@@ -324,7 +326,6 @@ export class CMP_FullInst extends MP_Article {
                     new MP_Button({
                         label:"Sync",
                         icon:"sync_alt",
-                        className:"accent",
                         disabled:!this.canEdit(),
                         onClick:(e,elm)=>{
                             window.gAPI.checkForInstUpdates(inst.iid);
