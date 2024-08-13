@@ -6,7 +6,7 @@ import { Arg_AddInstance, Arg_AddModToFolder, Arg_ChangeFolderType, Arg_CreateFo
 import { errors, Result } from "./errors";
 import express from "express";
 import toml from "toml";
-import { changeServerURL, checkForInstUpdates, refreshMainWindow, uploadWorld } from "./app";
+import { alertBox, changeServerURL, checkForInstUpdates, ensurePrismLinked, refreshMainWindow, uploadWorld } from "./app";
 import { semit, updateSocketURL } from "./network";
 import { getWindowStack, openCCMenu } from "./menu_api";
 import Seven from "node-7z";
@@ -105,6 +105,76 @@ export async function initDB(){
     //     }
     //     sysData = res;
     // }
+
+    if(!sysInst?.meta) return;
+
+    let w = mainWindow;
+    
+    if(process.platform == "win32") if(!sysInst.meta.prismRoot){
+        if(await util_lstat(path.join(process.env.APPDATA!,"PrismLauncher","instances"))){
+            sysInst.meta.prismRoot = path.join(process.env.APPDATA!,"PrismLauncher");
+            await sysInst.save();
+        }
+        else{
+            await dialog.showMessageBox({
+                message:"Prism Launcher path not set.\nPlease select your prism launcher folder."
+            });
+
+            let res = await dialog.showOpenDialog(w,{
+                properties:[
+                    "openDirectory",
+                    "showHiddenFiles",
+                ],
+                filters:[],
+                title:"Please select your prism launcher folder",
+                defaultPath:path.join(process.env.APPDATA!,"PrismLauncher"),
+            });
+            if(!res) return false;
+            let filePath = res.filePaths[0];
+            if(!filePath) return false;
+    
+            sysInst.meta.prismRoot = filePath;
+            await sysInst.save();
+    
+            await alertBox(w,"Prism Launcher folder path set to:\n"+filePath,"Success");
+        }
+    }
+    // process.env.HOME!, process.env.APPDATA!
+
+    if(process.platform == "win32") if(!sysInst.meta.prismExe){
+        // if(await util_lstat(path.join(process.env.APPDATA!,"..","local","programs","prismlauncher","prismlauncher.exe"))){
+        if(await util_lstat(path.join(process.env.APPDATA!,"..","Local","Programs","PrismLauncher","prismlauncher.exe"))){
+            sysInst.meta.prismExe = path.join(process.env.APPDATA!,"..","Local","Programs","PrismLauncher");
+            await sysInst.save();
+        }
+        else{
+            await alertBox(w,"Prism Launcher executable not set.\nPlease select your prismlauncher executable.");
+            
+            let res = await dialog.showOpenDialog(w,{
+                properties:["openFile"],
+                filters:[
+                    {
+                        // extensions:["exe"],
+                        extensions:[],
+                        name:"prismlauncher"
+                    }
+                ],
+                title:"Please select your prismlauncher executable",
+                defaultPath:path.join(process.env.APPDATA!,"..","Local","Programs","PrismLauncher"),
+            });
+            if(!res) return false;
+            let filePath = res.filePaths[0];
+            if(!filePath) return false;
+
+            filePath = path.join(filePath,"..");
+            sysInst.meta.prismExe = filePath;
+            await sysInst.save();
+
+            await alertBox(w,"Prism Launcher executable path set to:\n"+filePath,"Success");
+        }
+    }
+    
+    /////////////////////
     
     // 
     if(!sysInst.meta?.serverURL) changeServerURL();
@@ -1263,6 +1333,7 @@ async function getInstWorlds(iid:string,filter:SearchFilter): Promise<Result<Res
 export async function getMainAccount(): Promise<PrismAccount | undefined>{
     if(!sysInst.meta) return errors.noSys.unwrap();
     let prismRoot = sysInst.meta.prismRoot;
+    await ensurePrismLinked();
     if(!prismRoot) return errors.noPrismRoot.unwrap();
 
     let accountsFile = await util_readJSON<PrismAccountsData>(path.join(prismRoot,"accounts.json"));

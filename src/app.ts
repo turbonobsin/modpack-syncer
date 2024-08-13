@@ -3639,15 +3639,15 @@ async function getPrismInstances(w=mainWindow,arg:Arg_GetPrismInstances):Promise
     return new Result(data);
 }
 
-async function ensurePrismLinked(w?:BrowserWindow|null){
+export async function ensurePrismLinked(w?:BrowserWindow|null){
     if(!w) w = mainWindow;
 
     if(!sysInst) return false;
     if(!sysInst.meta) return false;
     
-    if(!sysInst.meta.prismRoot){        
-        if(await util_lstat(path.join(process.env.APPDATA!,"prismlauncher","instances"))){
-            sysInst.meta.prismRoot = path.join(process.env.APPDATA!,"prismlauncher");
+    if(!sysInst.meta.prismRoot){
+        if(await util_lstat(path.join(process.env.APPDATA!,"PrismLauncher","instances"))){
+            sysInst.meta.prismRoot = path.join(process.env.APPDATA!,"PrismLauncher");
             await sysInst.save();
         }
         else{
@@ -3660,7 +3660,7 @@ async function ensurePrismLinked(w?:BrowserWindow|null){
                 ],
                 filters:[],
                 title:"Please select your prism launcher folder",
-                defaultPath:path.join(process.env.APPDATA!,"prismlauncher"),
+                defaultPath:path.join(process.env.APPDATA!,"PrismLauncher"),
             });
             if(!res) return false;
             let filePath = res.filePaths[0];
@@ -3675,8 +3675,9 @@ async function ensurePrismLinked(w?:BrowserWindow|null){
     // process.env.HOME!, process.env.APPDATA!
 
     if(!sysInst.meta.prismExe){
-        if(await util_lstat(path.join(process.env.APPDATA!,"..","local","programs","prismlauncher","prismlauncher.exe"))){
-            sysInst.meta.prismExe = path.join(process.env.APPDATA!,"..","local","programs","prismlauncher");
+        // if(await util_lstat(path.join(process.env.APPDATA!,"..","local","programs","prismlauncher","prismlauncher.exe"))){
+        if(await util_lstat(path.join(process.env.APPDATA!,"..","Local","Programs","PrismLauncher","prismlauncher.exe"))){
+            sysInst.meta.prismExe = path.join(process.env.APPDATA!,"..","Local","Programs","PrismLauncher");
             await sysInst.save();
         }
         else{
@@ -3692,7 +3693,7 @@ async function ensurePrismLinked(w?:BrowserWindow|null){
                     }
                 ],
                 title:"Please select your prismlauncher executable",
-                defaultPath:path.join(process.env.APPDATA!,"..","local","programs","prismlauncher"),
+                defaultPath:path.join(process.env.APPDATA!,"..","Local","Programs","PrismLauncher"),
             });
             if(!res) return false;
             let filePath = res.filePaths[0];
@@ -3712,7 +3713,7 @@ async function ensurePrismLinked(w?:BrowserWindow|null){
 function getWindow(ev:Electron.IpcMainInvokeEvent){
     return BrowserWindow.fromWebContents(ev.sender) ?? undefined;
 }
-async function alertBox(w:BrowserWindow,message:string,title="Error"){
+export async function alertBox(w:BrowserWindow,message:string,title="Error"){
     return await dialog.showMessageBox(w,{
         message,
         title
