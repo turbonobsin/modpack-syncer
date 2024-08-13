@@ -674,7 +674,7 @@ async function loadSection(index:number,menu:MP_TabbedMenu){
                     main.addParts(
                         new MP_P({
                             className:"l-desc",
-                            text:data.local.description
+                            text:data.remote?.modrinth?.description ?? data.remote?.curseforge?.summary ?? data.local.description
                         }),
                     );
                     footer.addParts(
