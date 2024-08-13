@@ -1517,10 +1517,15 @@ function endExtractTMP(){
 }
 
 export async function downloadRP(arg:Arg_DownloadRP){
+    console.log("---starting RP download: ",arg.rpID);
+    
     let inst = await getModpackInst(arg.iid);
+    console.log("- 1");
     if(!inst || !inst.meta) return errors.couldNotFindPack.unwrap();
 
     // if(!inst.meta.linkName) return errors.failedToGetPackLink.unwrap();
+
+    console.log("- 2");
     
     let meta = inst.meta.resourcepacks.find(v=>v.rpID == arg.rpID);
     if(!meta){
@@ -1536,6 +1541,8 @@ export async function downloadRP(arg:Arg_DownloadRP){
         // return errors.couldNotFindRPMeta.unwrap();
     }
     // 
+
+    console.log("- 3");
 
     // let cachePath = path.join(inst.getRPCachePath()!,arg.rpID+".json");
     // let cache = await util_readJSON<Record<string,RPCache>>(cachePath);
@@ -1575,6 +1582,8 @@ export async function downloadRP(arg:Arg_DownloadRP){
 
     let res = resPacked.unwrap();
     if(!res){
+        util_warn("---- error failed to get rp info from server for download");
+        console.log(resPacked.err);
         w.close();
         return;
     }

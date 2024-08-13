@@ -1,12 +1,12 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, autoUpdater, shell } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Menu, shell, AutoUpdater } from "electron";
 import path from "path";
 import {updateElectronApp} from "update-electron-app";
 updateElectronApp();
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
-if (require("electron-squirrel-startup")) {
-	app.quit();
-}
+// if (require("electron-squirrel-startup")) {
+// 	app.quit();
+// }
 
 export let mainWindow:BrowserWindow;
 
@@ -59,15 +59,59 @@ const createWindow = async () => {
 	await initDB();
 };
 
+// const log = require('electron-log');
+// const path = require('path');
+
+import {autoUpdater} from "electron-updater";
+
+autoUpdater.autoDownload = false;
+autoUpdater.autoInstallOnAppQuit = true;
+
+autoUpdater.on('update-available', (info) => {
+	dialog.showMessageBox({
+		type: 'info',
+		title: 'Update available',
+		message: `A new version is available. Do you want to update now?\n\nYour Version: ${app.getVersion()}\nNew Version: ${info.version}`,
+		buttons: ['Update', 'Later']
+	}).then(result => {
+		if (result.response === 0) {
+			autoUpdater.downloadUpdate();
+		}
+	});
+});
+
+autoUpdater.on('update-downloaded', (info) => {
+	dialog.showMessageBox({
+		type: 'info',
+		title: 'Update ready',
+		message: 'Install & restart now?',
+		buttons: ['Yes', 'Later']
+	}).then(result => {
+		if (result.response === 0) {
+			autoUpdater.quitAndInstall();
+		}
+	});
+});
+
+autoUpdater.on("error",(err,msg)=>{
+	dialog.showMessageBox({
+		type:"error",
+		title:"Error Updating",
+		message:err.message
+	});
+});
+
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
-async function mainInit(){
+async function mainInit(){	
 	// init icpMain
 	preInit();
 	await preInitDB();
 
 	await createWindow();
+
+	autoUpdater.checkForUpdates();
 }
 app.on("ready", mainInit);
 
@@ -115,7 +159,7 @@ const appMenu = Menu.buildFromTemplate([
 				label:"Test Connection",
 				click:()=>{
 					dialog.showMessageBox({
-						message:"Server URL: "+sysInst.meta?.serverURL+"\n\nConnected: "+getConnectionStatus()+"\n\nInternal Server Status: "+!!sysInst.eApp
+						message:"Server URL: "+sysInst.meta?.serverURL+"\n\nConnected: "+getConnectionStatus()+"\n\nApp Version: "+app.getVersion()
 					});
 				}
 			},
