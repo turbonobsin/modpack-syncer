@@ -1,7 +1,7 @@
 {
 	"name": "modpack-syncer",
 	"productName": "Modpack Syncer",
-	"version": "0.28.5",
+	"version": "0.28.6",
 	"description": "A program to use in conjunction with Prism Launcher to better manage global resources shared between instances and easier updates to custom modpacks through a self hosted solution.",
 	"main": ".vite/build/main.js",
 	"repository": "https://github.com/turbonobsin/modpack-syncer",
@@ -14,8 +14,7 @@
 		"package": "electron-forge package",
 		"make": "electron-forge make",
 		"publish": "electron-forge publish",
-		"lint": "eslint --ext .ts,.tsx .",
-		"dist": "electron-builder"
+		"lint": "eslint --ext .ts,.tsx ."
 	},
 	"devDependencies": {
 		"@electron-forge/cli": "^7.4.0",
@@ -26,6 +25,7 @@
 		"@electron-forge/plugin-auto-unpack-natives": "^7.4.0",
 		"@electron-forge/plugin-fuses": "^7.4.0",
 		"@electron-forge/plugin-vite": "^7.4.0",
+		"@electron-forge/publisher-github": "^7.4.0",
 		"@electron/fuses": "^1.8.0",
 		"@types/node-7z": "^2.1.8",
 		"@types/ps-node": "^0.1.3",
