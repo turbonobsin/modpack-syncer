@@ -55,6 +55,8 @@ const createWindow = async () => {
 
 	// Open the DevTools.
 	// mainWindow.webContents.openDevTools();
+
+	await initDB();
 };
 
 // This method will be called when Electron has finished
@@ -66,8 +68,6 @@ async function mainInit(){
 	await preInitDB();
 
 	await createWindow();
-
-	await initDB();
 }
 app.on("ready", mainInit);
 
@@ -115,7 +115,7 @@ const appMenu = Menu.buildFromTemplate([
 				label:"Test Connection",
 				click:()=>{
 					dialog.showMessageBox({
-						message:"Server URL: "+sysInst.meta?.serverURL+"\n\nConnected: "+getConnectionStatus()
+						message:"Server URL: "+sysInst.meta?.serverURL+"\n\nConnected: "+getConnectionStatus()+"\n\nInternal Server Status: "+!!sysInst.eApp
 					});
 				}
 			},

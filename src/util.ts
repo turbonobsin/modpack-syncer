@@ -18,6 +18,9 @@ else if(process.platform == "win32"){
 }
 console.log("PLATFORM: ",process.platform,process.arch);
 
+// @ts-ignore
+if(app.isPackaged) pathTo7zip = undefined;
+
 export async function wait(delay:number){
     return new Promise<void>(resolve=>{
         setTimeout(()=>{

@@ -67,7 +67,7 @@ async function openModDropdown(w:BrowserWindow,iid:string,files:string[]){
                     }
                     ar.push({
                         label:folder.name,
-                        icon:folderIcon,
+                        // icon:folderIcon,
                         click:async ()=>{
                             for(const file_name of files){
                                 let name = cleanModName(file_name);
@@ -82,7 +82,8 @@ async function openModDropdown(w:BrowserWindow,iid:string,files:string[]){
                             }
                             await inst.save();
 
-                            w.reload(); // temp for now
+                            // w.reload(); // temp for now
+                            w.webContents.send("updateSearch");
                         }
                     });
                 }
@@ -214,7 +215,8 @@ async function openEditModsAdditional(_w:BrowserWindow,iid:string){
                             let res = inst.createFolder({iid,name,type,tags}).unwrap();
                             if(res){
                                 await inst.save();
-                                _w.reload();
+                                // _w.reload();
+                                _w.webContents.send("updateSearch");
                             }
                             // if(res){
                             //     await inst.save();
@@ -249,6 +251,7 @@ async function openEditModsAdditional(_w:BrowserWindow,iid:string){
                 await getInstMods_old({iid:inst.meta.iid});
                 w?.close();
                 _w.reload();
+                // _w.webContents.send("updateSearch");
             }
         },
         {
@@ -401,7 +404,8 @@ export const allDropdowns = {
                         let res = inst.editFolder({iid,folderName,name,type,tags}).unwrap();
                         if(res){
                             await inst.save();
-                            _w.reload();
+                            // _w.reload();
+                            _w.webContents.send("updateSearch");
                         }
                     }
                 }
@@ -418,7 +422,8 @@ export const allDropdowns = {
                         let res = inst.removeFolder(folderName).unwrap();
                         if(res){
                             await inst.save();
-                            _w.reload();
+                            // _w.reload();
+                            _w.webContents.send("updateSearch");
                         }
                     }
                 }

@@ -82,7 +82,14 @@ async function createFolder(name:string,parentPath=folderPath){
 // }
 
 export async function preInitDB(){
-    await util_mkdir(appPath);
+    // first, init paths
+    
+    await util_mkdir(appPath,true);
+    
+    await util_mkdir(path.join(dataPath,"instances_deleted"),true);
+    await util_mkdir(path.join(dataPath,"cache"),true);
+    await util_mkdir(path.join(dataPath,"cache","mods"),true);
+    await util_mkdir(path.join(dataPath,"cache","remote"),true);
 
     sysInst = await sysInst.load();
     slugMap = await slugMap.load();
@@ -191,8 +198,6 @@ export async function initDB(){
 
         await createFolder("instances",dataPath);
     }
-
-    await util_mkdir(path.join(dataPath,"instances_deleted"));
 
     let res = await util_readJSON<DBUser>(userPath);
     if(!res){
@@ -310,6 +315,8 @@ abstract class Inst<T>{
             this.meta = def;
             await this.save();
 
+            await this.postLoad();
+
             return this;
         }
         let res:T|undefined;
@@ -366,6 +373,7 @@ export class SysInst extends Inst<DBSys>{
     useDefaultIfDNE(): boolean {
         return true;
     }
+    eApp:any;
     async getDefault(): Promise<DBSys | undefined> {
         return {
             fid:0,
@@ -381,14 +389,19 @@ export class SysInst extends Inst<DBSys>{
     async postLoad() {
         if(!this.meta){
             util_warn("Failed to start internal server, system info not found/loaded");
+            dialog.showMessageBox({
+                message:"Failed to start internal server, system info not found/loaded"
+            });
             return;
         }
         
-        const eApp = express();
+        let eApp = express();
+        this.eApp = eApp;
 
         eApp.get("/image",(req,res)=>{
             // let filePath = req.params.path;
             let filePath = req.query.path as string;
+
             if(!filePath){
                 res.sendStatus(403);
                 return;

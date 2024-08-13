@@ -1,6 +1,7 @@
 import { dialog } from "electron";
 import { mainWindow } from "./main";
 import { getWindowStack } from "./menu_api";
+import { sysInst } from "./db";
 
 async function showError(msg:string){
     await dialog.showMessageBox(getWindowStack()[getWindowStack().length-1] ?? mainWindow,{
@@ -29,6 +30,12 @@ export class Result<T>{
 
     unwrap(errCall?:(...args:any[])=>any){
         if(this.err){
+            if(this.err == "Failed to get Prism Instance's path"){
+                dialog.showMessageBox({
+                    message:"ERR: "+sysInst.meta?.prismRoot
+                });
+            }
+            
             showError(this.err);
             if(errCall) errCall(this.err ? this : errors.unknown);
             return;

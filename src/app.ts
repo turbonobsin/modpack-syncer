@@ -2110,7 +2110,7 @@ enum ItemAction{
     remove
 }
 
-async function cacheMods(iid:string): Promise<Result<any>>{
+async function cacheMods(iid:string): Promise<Result<any>>{    
     let res = await cacheModsLocal(iid);
     if(res.err) return res;
     // res = await cacheModsRemote(iid);
@@ -2121,6 +2121,8 @@ async function cacheMods(iid:string): Promise<Result<any>>{
 
 async function cacheModsLocal(iid:string): Promise<Result<LocalModData[]>>{
     if(!slugMap.meta) return errors.noSlug;
+
+    // if(w) w.webContents.send("updateProgress","main",0,1,"Initializing local mod cache...");
     
     let time2 = performance.now();
     
@@ -2155,6 +2157,10 @@ async function cacheModsLocal(iid:string): Promise<Result<LocalModData[]>>{
 
     // scan
     let localMods = await util_readdirWithTypes(modsPath,false);
+    
+    // let total = localMods.length*2;
+    // w?.webContents.send("updateProgress","main",0,total,"Starting local mod cache...");
+
     let proms:{
         prom:Promise<LocalModInst>;
         name:string;
@@ -2755,15 +2761,27 @@ export async function getInstMods_old(arg:Arg_GetInstMods): Promise<Result<Res_G
     if(!prismPath) return errors.failedToGetPrismInstPath;
     // 
 
+    let total = 4;
+
+    let w = await openCCMenu<UpdateProgress_InitData>("update_progress_menu",{iid:arg.iid});
+    let finish = ()=>{
+        w?.close();
+    };
+    w?.webContents.send("updateProgress","main",0,total,"Initializing mod cache...");
+
     util_warn("TIME [1] - "+(performance.now()-time2));
     time2 = performance.now();
 
+    w?.webContents.send("updateProgress","main",1,total,"Caching local mods...");
     let localList = (await cacheModsLocal(arg.iid)).unwrap();
     util_warn("TIME [2] - "+(performance.now()-time2));
     time2 = performance.now();
+    w?.webContents.send("updateProgress","main",2,total,"Caching remote mods...");
     let remoteList = (await cacheModsRemote(arg.iid)).unwrap();
     util_warn("TIME [3] - "+(performance.now()-time2));
     time2 = performance.now();
+
+    w?.webContents.send("updateProgress","main",3,total,"Associating mod slugs...");
     
     // 
     let data:Res_GetInstMods = {
@@ -2869,13 +2887,18 @@ export async function getInstMods_old(arg:Arg_GetInstMods): Promise<Result<Res_G
     }
 
     for(const folder of data.folders){
-        folder.mods = folder.mods.sort((a,b)=>a.local.name.localeCompare(b.local.name));
+        folder.mods = folder.mods.sort((a,b)=>(a.local.name??"").localeCompare(b.local.name??""));
     }
+
+    w?.webContents.send("updateProgress","main",4,total,"Finished.");
 
     util_warn("TIME [8] - "+(performance.now()-time2));
     time2 = performance.now();
 
+
     // data.mods.global.sort((a,b)=>a.local.name.localeCompare(b.local.name));
+
+    finish();
 
     return new Result(data);
 
@@ -3239,6 +3262,7 @@ async function getMod(modPath:string,filename:string,update=0):Promise<LocalModD
     let cleanName = cleanModName(filename);
 
     let cachePath = path.join(dataPath,"cache","mods",cleanName);
+    // await util_mkdir(cachePath,true);
 
     // LOAD CACHE
     if(true) if((await util_lstat(cachePath))?.isDirectory()){
@@ -3252,7 +3276,7 @@ async function getMod(modPath:string,filename:string,update=0):Promise<LocalModD
     }
 
     const jarStream = Seven.extract(path.join(modPath,filename),cachePath,{
-        $bin:pathTo7zip,
+        // $bin:pathTo7zip,
         recursive:true,
         $cherryPick:[
             // fabric/forge
