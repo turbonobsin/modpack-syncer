@@ -15,7 +15,9 @@ import { mainWindow } from "./main";
 import { i } from "vite/dist/node/types.d-aGj9QkWt";
 
 // export let appPath = app.isPackaged ? path.join(process.resourcesPath,"..","data") : app.getAppPath();
-export let appPath = app.isPackaged ? path.join(process.resourcesPath) : app.getAppPath();
+// export let appPath = app.isPackaged ? path.join(process.resourcesPath) : app.getAppPath();
+// export let appPath = app.isPackaged ? path.join(process.env.APPDATA!,".modpack-syncer") : app.getAppPath();
+export let appPath = path.join(process.env.APPDATA!,".modpack-syncer");
 export const dataPath = path.join(appPath,"data");
 const folderPath = path.join(dataPath,"folders");
 

@@ -1,14 +1,14 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, shell, AutoUpdater } from "electron";
 import path from "path";
-// import {updateElectronApp} from "update-electron-app";
-// updateElectronApp();
+import {updateElectronApp} from "update-electron-app";
+updateElectronApp();
 
-require('update-electron-app')();
+// require('update-electron-app')();
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
-// if (require("electron-squirrel-startup")) {
-// 	app.quit();
-// }
+if (require("electron-squirrel-startup")) {
+	app.quit();
+}
 
 export let mainWindow:BrowserWindow;
 
