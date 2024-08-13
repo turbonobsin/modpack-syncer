@@ -367,3 +367,13 @@ export function getWorldStateText(state:WorldState,ownerName:string|undefined,yo
         "downloading":"Downloading..."
     }[state];
 }
+
+setTimeout(()=>{
+    if(document.body.parentElement?.classList.length == 0){
+        let theme = localStorage.getItem("theme");
+        // console.warn("Detected white window with no theme, applying...",theme);
+        console.warn("Detected white window with no theme, reloading");
+        // if(theme) setTheme(theme);
+        location.reload();
+    }
+},3000);

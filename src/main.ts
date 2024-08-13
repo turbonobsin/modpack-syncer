@@ -17,7 +17,8 @@ const createWindow = async () => {
 		height: 1000,
 		webPreferences: {
 			preload: path.join(__dirname, "preload.js"),
-		}
+		},
+		// show:false
 	});
 
 	// and load the index.html of the app.
@@ -26,6 +27,13 @@ const createWindow = async () => {
 	} else {
 		mainWindow.loadFile(path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`));
 	}
+	// await new Promise<void>(resolve=>{
+	// 	mainWindow.once("ready-to-show",()=>{
+	// 		mainWindow.show();
+	// 		resolve();
+	// 	});
+	// });
+
 	// dialog.showMessageBox({
 	// 	message:"First theme: "+sysInst.meta?.theme
 	// });

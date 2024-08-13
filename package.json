@@ -1,8 +1,8 @@
 {
 	"name": "modpack-syncer",
-	"productName": "modpack-syncer",
-	"version": "0.28.0",
-	"description": "My Electron application description",
+	"productName": "Modpack Syncer",
+	"version": "0.28.1",
+	"description": "A program to use in conjunction with Prism Launcher to better manage global resources shared between instances and easier updates to custom modpacks through a self hosted solution.",
 	"main": ".vite/build/main.js",
 	"repository": {
 		"type": "github",
@@ -38,7 +38,7 @@
 	},
 	"keywords": [],
 	"author": {
-		"name": "turbonobsin",
+		"name": "Claeb Code",
 		"email": "87375599+turbonobsin@users.noreply.github.com"
 	},
 	"license": "MIT",
