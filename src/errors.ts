@@ -82,6 +82,9 @@ export const errors = {
     couldNotFindRPCache: Result.err("Could not find resource pack cache file"),
     failedToRemoveRP: Result.err("Failed to remove resource pack"),
 
+    // modpacks (new)
+    failedToPublishModpack: Result.err("Failed to publish modpack"),
+
     // prism
     instgroupsRead: Result.err("Failed to read instance group data"),
     noPrismRoot: Result.err("No path for Prism Launcher has been set"),

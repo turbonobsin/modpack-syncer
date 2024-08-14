@@ -85,7 +85,7 @@ export async function loadModPackMetaPanel(meta:PackMetaData,panel?:HTMLElement|
             }),
             new MP_Label({
                 for:"cb-auto-create-inst",
-                text:"Auto Create Instance"
+                text:"Auto Create Prism Instance"
             })
         ),
 

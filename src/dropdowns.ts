@@ -1,5 +1,5 @@
 import { BrowserWindow, dialog, ipcMain, Menu, MenuItemConstructorOptions, nativeImage, shell } from "electron";
-import { appPath, cleanModName, cleanModNameDisabled, dataPath, getMainAccount, getModpackInst, getStandardInstData, initDB } from "./db";
+import { appPath, cleanModName, cleanModNameDisabled, dataPath, getMainAccount, getModpackInst, getStandardInstData, initDB, toggleWorldEnabled, uploadModpack } from "./db";
 import { errors, Result } from "./errors";
 import { ETL_Generic, evtTimeline, util_cp, util_lstat, util_mkdir, util_note, util_readJSON, util_readText, util_readTOML, util_rename, util_rm, util_warn, util_writeJSON, util_writeText } from "./util";
 import path from "path";
@@ -305,6 +305,15 @@ async function openEditModsAdditional(_w:BrowserWindow,iid:string){
                     ]
                 });
             }
+        },
+        {
+            type:"separator"
+        },
+        {
+            label:"Upload",
+            click:async ()=>{
+                uploadModpack(iid);
+            }
         }
     ]);
     menu.addListener("menu-will-close",e=>{
@@ -563,6 +572,14 @@ export const allDropdowns = {
         let loc1 = loc;
 
         let menu = Menu.buildFromTemplate([
+            {
+                label:"Disable / Enable",
+                click:()=>{
+                    toggleWorldEnabled({
+                        iid,wID
+                    },_w);
+                }
+            },
             {
                 label:"Show in Explorer",
                 click:()=>{

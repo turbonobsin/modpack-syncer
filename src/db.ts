@@ -1,8 +1,8 @@
-import { app, dialog } from "electron";
-import { pathTo7zip, searchStringCompare, set7zipPath, util_lstat, util_mkdir, util_note, util_note2, util_readBinary, util_readdir, util_readdirWithTypes, util_readJSON, util_readText, util_readTOML, util_testAccess, util_warn, util_writeBinary, util_writeJSON, util_writeText, wait } from "./util";
+import { app, BrowserWindow, dialog, systemPreferences } from "electron";
+import { ETL_Generic, evtTimeline, pathTo7zip, searchStringCompare, set7zipPath, util_lstat, util_mkdir, util_note, util_note2, util_readBinary, util_readdir, util_readdirWithTypes, util_readJSON, util_readText, util_readTOML, util_rename, util_testAccess, util_warn, util_writeBinary, util_writeJSON, util_writeText, wait } from "./util";
 import path from "path";
 import { DBSys, DBUser, InstanceData as ModPackInstData, TmpFile } from "./db_types";
-import { Arg_AddInstance, Arg_AddModToFolder, Arg_ChangeFolderType, Arg_CreateFolder, Arg_EditFolder, Arg_LaunchInst, Arg_UploadRP, Arg_UploadRPFile, FolderType, LocalModData, ModIndex, ModrinthModData, ModsFolder, ModsFolderDef, PackMetaData, PrismAccount, PrismAccountsData, RemoteModData, Res_GetInstResourcePacks, Res_GetInstWorlds, Res_UploadRP, RP_Data, RPCache, SearchFilter, SlugMapData, UpdateProgress_InitData, World_Data } from "./interface";
+import { Arg_AddInstance, Arg_AddModToFolder, Arg_ChangeFolderType, Arg_CreateFolder, Arg_EditFolder, Arg_LaunchInst, Arg_PublishModpack, Arg_ToggleWorldEnabled, Arg_UploadModpack, Arg_UploadModpackFile, Arg_UploadRP, Arg_UploadRPFile, FolderType, IMO_Combobox, IMO_Input, IMO_MultiSelect, InputMenu_InitData, LocalModData, ModIndex, ModrinthModData, ModsFolder, ModsFolderDef, PackMetaData, PrismAccount, PrismAccountsData, RemoteModData, Res_GetInstResourcePacks, Res_GetInstWorlds, Res_InputMenu, Res_UploadModpack, Res_UploadRP, RP_Data, RPCache, SearchFilter, SlugMapData, UpdateProgress_InitData, World_Data } from "./interface";
 import { errors, Result } from "./errors";
 import express from "express";
 import toml from "toml";
@@ -1469,3 +1469,233 @@ async function instanceRunCheck(){
     instanceRunCheck();
 }
 instanceRunCheck();
+
+export async function toggleWorldEnabled(arg:Arg_ToggleWorldEnabled,_w?:BrowserWindow){
+    let inst = await getModpackInst(arg.iid);
+    if(!inst?.meta) return;
+    let wID = arg.wID;
+
+    let dataInd = inst.meta.worlds.findIndex(v=>v.wID == wID);
+    let data = inst.meta.worlds[dataInd];
+    let newName = (wID.endsWith(".disabled") ? wID.substring(0,wID.length-".disabled".length) : wID+".disabled");
+    
+    if((loc.endsWith(".disabled") || arg.enable == true) && arg.enable != false){
+        // enable
+        await util_rename(path.join(loc,"level.dat.disabled"),path.join(loc,"level.dat"));
+        await util_rename(loc,loc.substring(0,loc.length-".disabled".length));
+    }
+    else{
+        // disable
+        await util_rename(path.join(loc,"level.dat"),path.join(loc,"level.dat.disabled"));
+        await util_rename(loc,loc+".disabled");
+    }
+    
+    if(dataInd != -1){
+        inst.meta.worlds.splice(dataInd,1);
+        data.wID = newName;
+        inst.meta.worlds.push(data);
+        await inst.save();
+    }
+    
+    if(_w) _w.webContents.send("updateSearch");
+    else getWindowStack().find(v=>v.title == "Edit Instance")?.webContents.send("updateSearch");
+}
+
+export async function openPublishModpackMenu(){
+    let evt = evtTimeline.subEvt(new ETL_Generic<Res_InputMenu|undefined>("input_editFolder"));
+    let finished = false;
+
+    let w = await openCCMenu<InputMenu_InitData>("input_menu",{
+        cmd:"triggerEvt",args:[evt.getId()],
+        title:"Publish Modpack",
+        height:500,
+        sections:[
+            {
+                options:[
+                    {
+                        type:"title",
+                        title:"Publish Modpack"
+                    }
+                ]
+            },
+            {
+                options:[
+                    {
+                        type:"input",
+                        inputType:"text",
+                        id:"name",
+                        label:"Name"
+                    } as IMO_Input,
+                    {
+                        type:"input",
+                        inputType:"text",
+                        id:"desc",
+                        label:"Description"
+                    } as IMO_Input,
+                    {
+                        type:"input",
+                        inputType:"text",
+                        id:"loader",
+                        label:"Mod Loader"
+                    } as IMO_Input,
+                    {
+                        type:"input",
+                        inputType:"text",
+                        id:"version",
+                        label:"Game Version"
+                    } as IMO_Input,
+                    // {
+                    //     type:"input",
+                    //     id:"name",
+                    //     label:"Name",
+                    //     inputType:"text",
+                    //     value:folder.name
+                    // } as IMO_Input,
+                    // {
+                    //     type:"combobox",
+                    //     id:"type",
+                    //     label:"Type",
+                    //     default:0,
+                    //     options:[
+                    //         { label:"Custom", value:"custom" },
+                    //     ],
+                    //     selected:[folder.type]
+                    // } as IMO_Combobox,
+                    // {
+                    //     type:"multi_select",
+                    //     id:"tags",
+                    //     label:"Tags",
+                    //     options:[
+                    //         { label:"Local", value:"local" },
+                    //         // { label:"Global", value:"global" },
+                    //     ],
+                    //     selected:folder.tags
+                    // } as IMO_MultiSelect,
+                ]
+            }
+        ]
+    });
+    if(w) w.addListener("close",e=>{
+        if(finished) return;
+        if(!evt._end) return;
+        evt._end(undefined);
+    });
+
+    let resData = await evtTimeline.waitFor(evt);
+    if(!resData) return errors.failedToPublishModpack.unwrap();
+    let data = resData.data;
+    
+    let arg:Arg_PublishModpack = {
+        meta:{
+            id:data.name,
+            name:data.name,
+            desc:data.desc,
+            loader:data.loader,
+            version:data.version,
+            img:"",
+
+            resourcepacks:[],
+            update:0,
+        }
+    };
+
+    return await publishModpack(arg);
+}
+export async function publishModpack(arg:Arg_PublishModpack){
+    let res = (await semit<Arg_PublishModpack,boolean>("publishModpack",arg)).unwrap();
+    await dialog.showMessageBox({
+        message:"Publish Modpack: "+res?"Success":"Failed"
+    });
+    return res;
+}
+export async function uploadModpack(iid:string){
+    if(!iid) return;
+    if(!sysInst || !sysInst.meta) return;
+    
+    let inst = await getModpackInst(iid);
+    if(!inst || !inst.meta) return;
+    
+    let prismPath = inst.getPrismInstPath();
+    if(!prismPath) return errors.failedToGetPrismInstPath.unwrap();
+    
+    let arg:Arg_UploadModpack = {
+        files:[],
+        mpID:inst.meta.meta.id
+    };
+
+    let w = await openCCMenu<UpdateProgress_InitData>("update_progress_menu",{iid});
+    if(!w) return errors.failedNewWindow.unwrap();
+
+    w.webContents.send("updateProgress","main",0,1,"Initializing mod upload...");
+
+    let modLoc = path.join(prismPath,".minecraft","mods");
+    let mods = await util_readdirWithTypes(modLoc);
+    for(const mod of mods){
+        if(!mod.isFile()) continue;
+        if(mod.name.endsWith(".disabled")) continue;
+
+        let stat = await util_lstat(path.join(modLoc,mod.name));
+        if(!stat) continue;
+        
+        let meta = inst.meta.folders.find(v=>v.mods.includes(cleanModName(mod.name)));
+        if(meta?.tags.includes("local")) continue;
+
+        arg.files.push({
+            mTime:Math.max(stat.mtimeMs,stat.birthtimeMs),
+            sloc:mod.name
+        });
+    }
+
+    let res = (await semit<Arg_UploadModpack,Res_UploadModpack>("uploadModpack",arg)).unwrap();
+    if(!res) return;
+    // 
+
+    let total = res.files.length;
+    let completed = 0;
+    let failed:string[] = [];
+    let success:string[] = [];
+    
+    let proms:Promise<void>[] = [];
+    for(const file of res.files){
+        proms.push(new Promise<void>(async resolve=>{
+            if(w?.isDestroyed()) return;
+            w.webContents.send("updateProgress","main",completed,total,"Upload: "+file);
+            
+            let buf = await util_readBinary(path.join(modLoc,file));
+            if(!buf){
+                failed.push(file);
+                completed++;
+                return;
+            }
+            let res = await semit<Arg_UploadModpackFile,boolean>("upload_modpack_file",{
+                buf,
+                mpID:inst.meta!.meta.id,
+                sloc:file
+            });
+            if(!res){
+                failed.push(file);
+                completed++;
+            }
+            else{
+                success.push(file);
+                completed++;
+            }
+        }));
+    }
+
+    await Promise.all(proms);
+    // 
+
+    w.webContents.send("updateProgress","main",total,total,"Finished.",{
+        sections:[
+            {
+                header:`Failed: (${failed.length})`,
+                text:failed
+            },
+            {
+                header:`Uploaded: (${success.length})`,
+                text:success
+            }
+        ]
+    });
+}

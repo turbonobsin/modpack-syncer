@@ -5,6 +5,11 @@ import { InstanceData, RP_Meta } from "./db_types";
 import type { Mod as Mod2 } from "node-curseforge";
 import { allDropdowns } from "./dropdowns";
 
+interface Arg_Connection{
+    uid:string;
+    uname:string;
+}
+
 type FSTestData = {
     instancePath:string;
     modList:string[];
@@ -17,6 +22,9 @@ interface PackMetaData{
     version:string;
     img:string;
 
+    publisherUID?:string;
+    publisherName?:string;
+
     RAM?:number;
     javaCodeName?:string; // delta (v21), gamma (v17), beta (v1.8)
     
@@ -27,6 +35,30 @@ interface PackMetaData{
 
     resourcepacks:RP_Meta[];
 };
+
+// modpacks (new)
+interface Arg_PublishModpack{
+    meta:PackMetaData;
+    icon?:Uint8Array;
+    mmcPackFile?:Uint8Array;
+}
+interface Arg_UploadModpack{
+    files:{
+        sloc:string;
+        mTime:number;
+    }[];
+    mpID:string;
+}
+interface Res_UploadModpack{
+    files:string[];
+}
+interface Arg_UploadModpackFile{
+    buf:Uint8Array;
+    sloc:string;
+    mpID:string;
+}
+// 
+
 type InitMenuData<T> = {
     data:T
 };
@@ -834,6 +866,12 @@ interface Arg_GenericWorld{
     uid:string;
     uname:string;
 }
+interface Arg_ToggleWorldEnabled{
+    iid:string;
+    wID:string;
+    enable?:booelean;
+}
+
 interface Arg_LaunchInst{
     mpID:string;
     uid:string;
@@ -882,6 +920,7 @@ export interface IGlobalAPI{
     getServerWorlds:(arg:Arg_GetServerWorlds)=>Promise<Res_GetServerWorlds>;
     getWorldImg:(iid:string,wID:string)=>Promise<string>;
     takeWorldOwnership:(arg:Arg_TakeWorldOwnership)=>Promise<boolean>;
+    toggleWorldEnabled:(arg:Arg_ToggleWorldEnabled)=>Promise<boolean>;
     
     getModIndexFiles:(arg:Arg_IID)=>Promise<Res_GetModIndexFiles>;
     cacheMods:(iid:string)=>Promise<void>;

@@ -1,8 +1,8 @@
 import { io } from "socket.io-client";
-import { Arg_CheckModUpdates, Arg_GetModUpdates, Arg_SearchPacks, PackMetaData, Res_GetModUpdates, Res_SearchPacks, Res_SearchPacksMeta, UpdateSearch } from "./interface";
-import { util_note2, util_warn } from "./util";
+import { Arg_CheckModUpdates, Arg_Connection, Arg_GetModUpdates, Arg_SearchPacks, PackMetaData, Res_GetModUpdates, Res_SearchPacks, Res_SearchPacksMeta, UpdateSearch } from "./interface";
+import { util_note, util_note2, util_warn } from "./util";
 import { errors, Result } from "./errors";
-import { instCache, ModPackInst, sysInst } from "./db";
+import { getMainAccount, instCache, ModPackInst, sysInst } from "./db";
 import { Socket } from "socket.io";
 import { getWindowStack } from "./menu_api";
 // const socket = io({
@@ -22,6 +22,23 @@ export function updateSocketURL(){
 
     socket = io(url);
     // 
+
+    socket.on("connect",()=>{
+        getMainAccount().then(acc=>{
+            if(!acc){
+                util_warn("Failed to get account data to login");
+                return;
+            }
+    
+            semit<Arg_Connection,boolean>("connectUser",{
+                uid:acc.profile.id,
+                uname:acc.profile.name
+            }).then(v=>{
+                let res = v.unwrap();
+                console.log("Logged in: "+(res?"SUCCESS":"FAILED"));
+            });
+        });
+    });
 
     socket.on("updateSearch",(arg:UpdateSearch)=>{
         let w = getWindowStack().find(v=>v?.title == "Edit Instance");

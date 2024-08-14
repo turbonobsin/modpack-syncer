@@ -139,7 +139,7 @@ app.on("activate", () => {
 
 import "./app";
 import { changeServerURL, preInit } from "./app";
-import { dataPath, initDB, preInitDB, sysInst, themes } from "./db";
+import { dataPath, initDB, openPublishModpackMenu, preInitDB, sysInst, themes } from "./db";
 import "./network";
 import { InitMenuData } from "./interface";
 import { getConnectionStatus } from "./network";
@@ -253,10 +253,19 @@ const appMenu = Menu.buildFromTemplate([
 					changeServerURL();
 				}
 			},
+			{
+				type:"separator"
+			},
+			{
+				label:"Publish a Modpack",
+				click:()=>{
+					openPublishModpackMenu();
+				}
+			}
 		]
 	},
 	{
-		label:"Themes",
+		label:"Theme",
 		submenu:[
 			{
 				label:"Change Theme",

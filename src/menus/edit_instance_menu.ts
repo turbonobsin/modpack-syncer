@@ -416,6 +416,8 @@ class CMP_World extends MP_Flexbox{
             text:d.wID,
             marginRight:"auto"
         }).addTo(cont);
+
+        if(d.wID.endsWith(".disabled")) this.e?.classList.add("disabled");
     }
 
     static async showData(data:World_Data,aside:MP_Div){
@@ -515,33 +517,62 @@ class CMP_World extends MP_Flexbox{
         );
 
         if(!w.isPublished){ // it's unpublished
-            body.addParts(
-                new MP_Img({
-                    src:getImageURL(d.data?.icon),
-                    width:"50%"
-                }).autoJustify("start","center"),
-                new MP_P({
-                    text:"The current world is unpublished.",
-                    className:"l-details"
-                }),
-                new MP_P({
-                    text:"Once published, anyone who has access to this modpack will be able to download the world.",
-                    className:"l-details"
-                }),
-                new MP_Button({
-                    label:"Publish",
-                    marginTop:"20px",
-                    onClick:async (e,elm)=>{
-                        let res = await window.gAPI.publishWorld({
-                            iid:initData.d.iid,
-                            wID:w.wID
-                        });
-                        console.log("RES:",res);
-                        // let res = await window.gAPI.unpackRP({iid:initData.d.iid,rpID:data.wID});
-                        // if(res) currentSearch?.submit();
-                    }
-                }).autoJustify("center","center"),
-            );
+            if(w.wID.endsWith(".disabled")){
+                body.addParts(
+                    new MP_Img({
+                        src:getImageURL(d.data?.icon),
+                        width:"50%"
+                    }).autoJustify("start","center"),
+                    new MP_P({
+                        text:"The current world is unpublished.",
+                        className:"l-details"
+                    }),
+                    new MP_P({
+                        text:"Once published, anyone who has access to this modpack will be able to download the world.",
+                        className:"l-details"
+                    }),
+                    new MP_Button({
+                        label:"Enable",
+                        marginTop:"20px",
+                        onClick:async (e,elm)=>{
+                            let res = await window.gAPI.toggleWorldEnabled({
+                                iid:initData.d.iid,
+                                wID:w.wID,
+                                enable:true
+                            });
+                        }
+                    }).autoJustify("center","center"),
+                );
+            }
+            else{
+                body.addParts(
+                    new MP_Img({
+                        src:getImageURL(d.data?.icon),
+                        width:"50%"
+                    }).autoJustify("start","center"),
+                    new MP_P({
+                        text:"The current world is unpublished.",
+                        className:"l-details"
+                    }),
+                    new MP_P({
+                        text:"Once published, anyone who has access to this modpack will be able to download the world.",
+                        className:"l-details"
+                    }),
+                    new MP_Button({
+                        label:"Publish",
+                        marginTop:"20px",
+                        onClick:async (e,elm)=>{
+                            let res = await window.gAPI.publishWorld({
+                                iid:initData.d.iid,
+                                wID:w.wID
+                            });
+                            console.log("RES:",res);
+                            // let res = await window.gAPI.unpackRP({iid:initData.d.iid,rpID:data.wID});
+                            // if(res) currentSearch?.submit();
+                        }
+                    }).autoJustify("center","center"),
+                );
+            }
         }
         else{
             head.e!.style.height = "unset";

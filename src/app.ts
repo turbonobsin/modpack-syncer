@@ -599,6 +599,9 @@ export async function preInit(){
     ipcMain.handle("takeWorldOwnership",async (ev,arg:Arg_TakeWorldOwnership)=>{
         return await takeWorldOwnership(arg);
     });
+    ipcMain.handle("toggleWorldEnabled",async (ev,arg:Arg_ToggleWorldEnabled)=>{
+        return await toggleWorldEnabled(arg);
+    });
 }
 
 export async function checkForInstUpdates(iid:string,ev?:Electron.IpcMainInvokeEvent,ignoreWorlds=false){
@@ -708,6 +711,7 @@ export async function launchInstance(iid:string,ev?:Electron.IpcMainInvokeEvent)
     let worlds = pack.meta.worlds;
     for(const w of worlds){
         if(!await util_lstat(path.join(sysInst.meta.prismRoot,".minecraft/saves",w.wID))) continue;
+        if(w.wID.endsWith(".disabled")) continue;
 
         if(w.lastSync == -1) continue;
 
@@ -3289,7 +3293,7 @@ async function getMod(modPath:string,filename:string,update=0):Promise<LocalModD
     }
 
     const jarStream = Seven.extract(path.join(modPath,filename),cachePath,{
-        // $bin:pathTo7zip,
+        $bin:pathTo7zip,
         recursive:true,
         $cherryPick:[
             // fabric/forge
@@ -3760,10 +3764,10 @@ export async function alertBox(w:BrowserWindow,message:string,title="Error"){
 // 
 
 import { ETL_Generic, evtTimeline, parseCFGFile, pathTo7zip, searchStringCompare, util_cp, util_lstat, util_mkdir, util_note, util_note2, util_readBinary, util_readdir, util_readdirWithTypes, util_readJSON, util_readText, util_readTOML, util_rename, util_rm, util_utimes, util_warn, util_writeBinary, util_writeJSON, util_writeText, wait } from "./util";
-import { AddRP_InitData, Arg_AddInstance, Arg_AddModToFolder, Arg_ChangeFolderType, Arg_CheckModUpdates, Arg_CreateFolder, Arg_DownloadRP, Arg_DownloadRPFile, Arg_DownloadWorld, Arg_DownloadWorldFile, Arg_FinishUploadWorld, Arg_GetAllowedDirs, Arg_GetInstances, Arg_GetInstMods, Arg_GetInstResourcePacks, Arg_GetInstScreenshots, Arg_GetInstWorlds, Arg_GetPrismInstances, Arg_GetRPs, Arg_GetRPVersions, Arg_GetServerWorlds, Arg_GetWorldFiles, Arg_GetWorldInfo, Arg_IID, Arg_LaunchInst, Arg_PublishWorld, Arg_RemoveRP, Arg_SearchPacks, Arg_SyncMods, Arg_TakeWorldOwnership, Arg_UnpackRP, Arg_UnpublishWorld, Arg_UploadRP, Arg_UploadWorld, Arg_UploadWorldFile, ArgC_GetRPs, CurseForgeUpdate, Data_PrismInstancesMenu, FSTestData, FullModData, InputMenu_InitData, InstGroups, LocalModData, MMCPack, ModData, ModifiedFile, ModifiedFileData, ModIndex, ModInfo, ModrinthModData, ModrinthUpdate, ModsFolder, ModsFolderDef, PackMetaData, RemoteModData, Res_DownloadRP, Res_FinishUploadWorld, Res_GetInstMods, Res_GetInstResourcePacks, Res_GetInstScreenshots, Res_GetModIndexFiles, Res_GetModUpdates, Res_GetPrismInstances, Res_GetRPs, Res_GetRPVersions, Res_GetServerWorlds, Res_GetWorldFiles, Res_GetWorldInfo, Res_InputMenu, Res_SyncMods, RPCache, SArg_GetServerWorlds, SArg_PublishWorld, SArg_TakeWorldOwnership, ServerWorld, UpdateProgress_InitData } from "./interface";
+import { AddRP_InitData, Arg_AddInstance, Arg_AddModToFolder, Arg_ChangeFolderType, Arg_CheckModUpdates, Arg_CreateFolder, Arg_DownloadRP, Arg_DownloadRPFile, Arg_DownloadWorld, Arg_DownloadWorldFile, Arg_FinishUploadWorld, Arg_GetAllowedDirs, Arg_GetInstances, Arg_GetInstMods, Arg_GetInstResourcePacks, Arg_GetInstScreenshots, Arg_GetInstWorlds, Arg_GetPrismInstances, Arg_GetRPs, Arg_GetRPVersions, Arg_GetServerWorlds, Arg_GetWorldFiles, Arg_GetWorldInfo, Arg_IID, Arg_LaunchInst, Arg_PublishWorld, Arg_RemoveRP, Arg_SearchPacks, Arg_SyncMods, Arg_TakeWorldOwnership, Arg_ToggleWorldEnabled, Arg_UnpackRP, Arg_UnpublishWorld, Arg_UploadRP, Arg_UploadWorld, Arg_UploadWorldFile, ArgC_GetRPs, CurseForgeUpdate, Data_PrismInstancesMenu, FSTestData, FullModData, InputMenu_InitData, InstGroups, LocalModData, MMCPack, ModData, ModifiedFile, ModifiedFileData, ModIndex, ModInfo, ModrinthModData, ModrinthUpdate, ModsFolder, ModsFolderDef, PackMetaData, RemoteModData, Res_DownloadRP, Res_FinishUploadWorld, Res_GetInstMods, Res_GetInstResourcePacks, Res_GetInstScreenshots, Res_GetModIndexFiles, Res_GetModUpdates, Res_GetPrismInstances, Res_GetRPs, Res_GetRPVersions, Res_GetServerWorlds, Res_GetWorldFiles, Res_GetWorldInfo, Res_InputMenu, Res_SyncMods, RPCache, SArg_GetServerWorlds, SArg_PublishWorld, SArg_TakeWorldOwnership, ServerWorld, UpdateProgress_InitData } from "./interface";
 import { getModUpdates, getPackMeta, getSocketId, searchPacks, searchPacksMeta, semit, updateSocketURL } from "./network";
 import { getWindowStack, ListPrismInstReason, openCCMenu, openCCMenuCB, SearchPacksMenu, ViewInstanceMenu } from "./menu_api";
-import { addInstance, appPath, cleanModName, cleanModNameDisabled, dataPath, getMainAccount, getModFolderPath, getModpackInst, getModpackPath, getWorlds, instCache, LocalModInst, ModPackInst, RemoteModInst, slugMap, sysInst } from "./db";
+import { addInstance, appPath, cleanModName, cleanModNameDisabled, dataPath, getMainAccount, getModFolderPath, getModpackInst, getModpackPath, getWorlds, instCache, LocalModInst, ModPackInst, RemoteModInst, slugMap, sysInst, toggleWorldEnabled } from "./db";
 import { InstanceData } from "./db_types";
 import { errors, Result } from "./errors";
 import { readConfigFile, StringMappingType } from "typescript";

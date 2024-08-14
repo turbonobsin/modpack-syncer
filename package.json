@@ -1,7 +1,7 @@
 {
 	"name": "modpack-syncer",
 	"productName": "Modpack Syncer",
-	"version": "0.29.0",
+	"version": "0.29.1",
 	"description": "A program to use in conjunction with Prism Launcher to better manage global resources shared between instances and easier updates to custom modpacks through a self hosted solution.",
 	"main": ".vite/build/main.js",
 	"repository": "https://github.com/turbonobsin/modpack-syncer",
