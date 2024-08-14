@@ -91,6 +91,7 @@
 	--accent-t1:var(--input-focus);
 	--hover-filter:brightness(0.95);
 
+	--contrast-invert-filter:invert(1) hue-rotate(180deg);
 	color-scheme:light;
 
 	/* light theme 2 */
@@ -237,6 +238,9 @@
 	--btn-bg:rgb(239, 239, 245, 0.5);
 	--btn-hover:#e1e1e1;
 	--btn-border:var(--input-border);
+
+	--contrast-invert-filter:invert(1) hue-rotate(180deg);
+	color-scheme:light;
 }
 :root.themestyle-soft-colors{
 	--c2:#212733;

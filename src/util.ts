@@ -29,6 +29,13 @@ export async function wait(delay:number){
     });
 }
 
+/**
+ * This is the path to the executable
+ */
+export async function set7zipPath(path:string){
+    pathTo7zip = path;
+}
+
 export class CFGFile{
     constructor(){
         this.properties = new Map();
@@ -99,9 +106,10 @@ export function util_readText(path:fs.PathOrFileDescriptor){
         });
     });
 }
-export function util_readJSON<T>(path:fs.PathOrFileDescriptor){
+export function util_readJSON<T>(path:fs.PathOrFileDescriptor,preTextTransform?:(text:string)=>string){
     return new Promise<T | undefined>(resolve=>{
         fs.readFile(path,{encoding:"utf8"},(err,data)=>{
+            if(preTextTransform) data = preTextTransform(data);
             if(err){
                 // console.log("Err: ",err);
                 resolve(undefined);

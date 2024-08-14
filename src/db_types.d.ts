@@ -36,6 +36,8 @@ interface DBSys{
 
     prismRoot?:string;
     prismExe?:string;
+
+    sevenZipExe?:string;
 };
 
 // 

@@ -377,3 +377,16 @@ aside{
         opacity:1;
     }
 }
+
+/*  */
+.formatted-text-cont{
+    /* background-color:rgba(0,0,0,0.8); */
+    /* border-radius:3px; */
+    /* padding:3px 5px; */
+    filter:var(--contrast-invert-filter,"none");
+}
+
+.formatted-text-darken{
+    /* background-color:rgba(0,0,0,0.8); */
+    /* border-radius:3px; */
+}

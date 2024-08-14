@@ -685,7 +685,7 @@ export async function checkForInstUpdates(iid:string,ev?:Electron.IpcMainInvokeE
 export async function launchInstance(iid:string,ev?:Electron.IpcMainInvokeEvent){
     // exec("notepad");
     if(!sysInst.meta) return;
-    if(!sysInst.meta.prismExe) return;
+    if(!sysInst.meta.prismExe || !sysInst.meta.prismRoot) return;
 
     if(ev) if(!await ensurePrismLinked(getWindow(ev))) return;
 
@@ -707,6 +707,8 @@ export async function launchInstance(iid:string,ev?:Electron.IpcMainInvokeEvent)
 
     let worlds = pack.meta.worlds;
     for(const w of worlds){
+        if(!await util_lstat(path.join(sysInst.meta.prismRoot,".minecraft/saves",w.wID))) continue;
+
         if(w.lastSync == -1) continue;
 
         let res1 = await takeWorldOwnership({
@@ -1322,6 +1324,8 @@ export async function downloadWorld(arg:Arg_DownloadWorld,useTime=true,noUpToDat
     if(!inst || !inst.meta) return errors.couldNotFindPack.unwrap();
     // 
 
+    if(inst.meta.isRunning) return errors.downloadWorldWhileRunning.unwrap();
+
     let prismLoc = inst.getRoot();
     if(!prismLoc) return errors.failedToGetPrismInstPath.unwrap();
 
@@ -1800,7 +1804,7 @@ export async function changeServerURL(url?:string){
                     {
                         type:"title",
                         title:"Set Server URL",
-                        desc:`This is the URL or IP Address of the "Modpack Sync Server" where your packs will be synced from.\n\n(You can always change this by going to: Data -> Set Server URL)`
+                        desc:`This is the URL or IP Address of the "Modpack Sync Server" where your packs will be synced from.\n\n(You can always change this by going to: Network -> Set Server URL)`
                     }
                 ]},
                 {options:[

@@ -6,7 +6,7 @@ import path from "path";
 import { electron } from "process";
 import { checkForModUpdates, downloadRP, downloadWorld, genAllThePBR, getInstMods_old, getModIndexFiles, getWorld, launchInstance, takeWorldOwnership, unpublishWorld, uploadWorld } from "./app";
 import { openCCMenu } from "./menu_api";
-import { Arg_FinishUploadWorld, IMO_Combobox, IMO_Input, IMO_MultiSelect, InputMenu_InitData, ModsFolderDef, Res_InputMenu, UpdateProgress_InitData } from "./interface";
+import { Arg_FinishUploadWorld, Arg_UnpublishRP, IMO_Combobox, IMO_Input, IMO_MultiSelect, InputMenu_InitData, ModsFolderDef, Res_InputMenu, UpdateProgress_InitData } from "./interface";
 import { semit } from "./network";
 
 // const folderIcon = nativeImage.createFromPath(path.join(appPath,"icons","folder.svg"));
@@ -454,6 +454,19 @@ export const allDropdowns = {
                     downloadRP({
                         iid,mpID:inst.meta!.meta.id,
                         rpID,lastDownloaded:-1,force:true
+                    });
+                }
+            },
+            {
+                label:"Unpublish",
+                click:async ()=>{
+                    let res = (await semit<Arg_UnpublishRP,boolean>("unpublishRP",{
+                        mpID:inst.meta!.meta.id,
+                        rpID,
+                        uid:user.profile.id
+                    })).unwrap();
+                    dialog.showMessageBox({
+                        message:res ? "Unpublish Success" : "Unpublish Failed"
                     });
                 }
             }

@@ -158,20 +158,6 @@ const appMenu = Menu.buildFromTemplate([
 		label:"Data",
 		submenu:[
 			{
-				label:"Test Connection",
-				click:()=>{
-					dialog.showMessageBox({
-						message:"Server URL: "+sysInst.meta?.serverURL+"\n\nConnected: "+getConnectionStatus()+"\n\nApp Version: "+app.getVersion()
-					});
-				}
-			},
-			{
-				label:"Set Server URL",
-				click:()=>{
-					changeServerURL();
-				}
-			},
-			{
 				label:"Set Prism Folder",
 				click:async ()=>{
 					if(!sysInst.meta) return;
@@ -214,6 +200,27 @@ const appMenu = Menu.buildFromTemplate([
 				}
 			},
 			{
+				label:"Set 7zip Executable",
+				click:async ()=>{
+					if(!sysInst.meta) return;
+					
+					let loc = sysInst.meta.sevenZipExe ?? "";
+					let newLoc = await dialog.showOpenDialog(mainWindow,{
+						properties:[
+							"openFile"
+						],
+						defaultPath:loc
+					});
+					if(newLoc.canceled) return;
+
+					sysInst.meta.sevenZipExe = path.join(newLoc.filePaths[0],"..");
+					await sysInst.save();
+				}
+			},
+			{
+				type:"separator"
+			},
+			{
 				label:"Open Program Data Folder",
 				click:()=>{
 					shell.showItemInFolder(dataPath);
@@ -230,7 +237,26 @@ const appMenu = Menu.buildFromTemplate([
 		]
 	},
 	{
-		label:"View",
+		label:"Network",
+		submenu:[
+			{
+				label:"Test Connection",
+				click:()=>{
+					dialog.showMessageBox({
+						message:"Server URL: "+sysInst.meta?.serverURL+"\n\nConnected: "+getConnectionStatus()+"\n\nApp Version: "+app.getVersion()
+					});
+				}
+			},
+			{
+				label:"Set Server URL",
+				click:()=>{
+					changeServerURL();
+				}
+			},
+		]
+	},
+	{
+		label:"Themes",
 		submenu:[
 			{
 				label:"Change Theme",
@@ -247,7 +273,12 @@ const appMenu = Menu.buildFromTemplate([
 						};
 					}).filter(v=>!!v);
 				})()
-			},
+			}
+		]
+	},
+	{
+		label:"View",
+		submenu:[
 			{
 				role:"toggleDevTools"
 			}

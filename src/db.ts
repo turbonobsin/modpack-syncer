@@ -1,5 +1,5 @@
 import { app, dialog } from "electron";
-import { pathTo7zip, searchStringCompare, util_lstat, util_mkdir, util_note, util_note2, util_readBinary, util_readdir, util_readdirWithTypes, util_readJSON, util_readText, util_readTOML, util_testAccess, util_warn, util_writeBinary, util_writeJSON, util_writeText, wait } from "./util";
+import { pathTo7zip, searchStringCompare, set7zipPath, util_lstat, util_mkdir, util_note, util_note2, util_readBinary, util_readdir, util_readdirWithTypes, util_readJSON, util_readText, util_readTOML, util_testAccess, util_warn, util_writeBinary, util_writeJSON, util_writeText, wait } from "./util";
 import path from "path";
 import { DBSys, DBUser, InstanceData as ModPackInstData, TmpFile } from "./db_types";
 import { Arg_AddInstance, Arg_AddModToFolder, Arg_ChangeFolderType, Arg_CreateFolder, Arg_EditFolder, Arg_LaunchInst, Arg_UploadRP, Arg_UploadRPFile, FolderType, LocalModData, ModIndex, ModrinthModData, ModsFolder, ModsFolderDef, PackMetaData, PrismAccount, PrismAccountsData, RemoteModData, Res_GetInstResourcePacks, Res_GetInstWorlds, Res_UploadRP, RP_Data, RPCache, SearchFilter, SlugMapData, UpdateProgress_InitData, World_Data } from "./interface";
@@ -95,6 +95,21 @@ export async function preInitDB(){
 
     sysInst = await sysInst.load();
     slugMap = await slugMap.load();
+
+    // 
+    if(!sysInst.meta) return;
+
+    let wasSysChanged = false;
+    if(sysInst.meta.sevenZipExe) set7zipPath(sysInst.meta.sevenZipExe);
+    else{
+        if(process.platform == "win32" && process.env.programFiles){
+            sysInst.meta.sevenZipExe = path.join(process.env.programFiles,"7-Zip","7z.exe");
+            set7zipPath(sysInst.meta.sevenZipExe);
+            wasSysChanged = true;
+        }
+    }
+
+    if(wasSysChanged) await sysInst.save();
 }
 export async function initDB(){
     // if(!await util_lstat(path.join(dataPath,"sys.json"))){
@@ -1210,7 +1225,9 @@ async function getInstResourcePacks(inst:ModPackInst,filter:SearchFilter): Promi
             }
         };
         
-        let packMCMeta = await util_readJSON<any>(path.join(packLoc,"pack.mcmeta"));
+        let packMCMeta = await util_readJSON<any>(path.join(packLoc,"pack.mcmeta"),(text)=>{
+            return text.split("\n").filter(v=>!v.startsWith("//")).join("\n");
+        });
         if(packMCMeta) d.data!.meta = packMCMeta;
         
         resData.packs.push(d);

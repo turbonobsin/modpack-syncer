@@ -377,3 +377,147 @@ setTimeout(()=>{
         location.reload();
     }
 },3000);
+
+// 
+
+// From Jaredcheeda, https://stackoverflow.com/questions/7381974/which-characters-need-to-be-escaped-in-html
+export function escapeMarkup (dangerousInput:string) {
+    const dangerousString = String(dangerousInput);
+    const matchHtmlRegExp = /["'&<>]/;
+    const match = matchHtmlRegExp.exec(dangerousString);
+    if (!match) {
+        return dangerousInput;
+    }
+  
+    const encodedSymbolMap:Record<string,string> = {
+      '"': '&quot;',
+      '\'': '&#39;',
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;'
+    };
+    const dangerousCharacters = dangerousString.split('');
+    const safeCharacters = dangerousCharacters.map(function (character) {
+        return encodedSymbolMap[character] || character;
+    });
+    const safeString = safeCharacters.join('');
+    return safeString;
+}
+
+export const abc = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+export function parseDescription(desc?:string){
+    if(!desc) return "No description.";
+    desc = escapeMarkup(desc);
+
+    let defColor = "#eee";
+
+    let sections:HTMLSpanElement[] = [];
+    let curProps = {
+        text:"",
+        color:defColor,
+        bold:false,
+        italic:false,
+        underline:false,
+        strikethrough:false,
+        obfuscated:false,
+        colorCode:""
+    };
+    function resetProps(){
+        curProps = {
+            text:"",
+            color:defColor,
+            bold:false,
+            italic:false,
+            underline:false,
+            strikethrough:false,
+            obfuscated:false,
+            colorCode:"",
+        };
+    }
+    function finish(){
+        if(!curProps.text.length) return;
+        let span = document.createElement("span");
+        span.style.color = curProps.color;
+        if(curProps.italic) span.style.fontStyle = "italic";
+        if(curProps.bold) span.style.fontWeight = "bold";
+        let decorList:string[] = [];
+        if(curProps.strikethrough) decorList.push("line-through");
+        if(curProps.underline) decorList.push("underline");
+        if(decorList.length) span.style.textDecoration = decorList.join(", ");
+        if(curProps.obfuscated){
+            (async ()=>{
+                for(let i = 0; i < 4; i++){
+                    span.textContent = curProps.text.split("").map(v=>abc[Math.floor(Math.random()*abc.length)]).join("");
+                    await wait(300);
+                }
+            })();
+        }
+        else span.textContent = curProps.text;
+        
+        // finalText += `<span style="color:${curProps.color};${curProps.italic?"font-style:italic;":""}${curProps.bold?"font-weight:bold;":""}>${curProps.text}</span>`;
+
+        if(["c","d","e","f"].includes(curProps.colorCode)){
+            span.classList.add("formatted-text-darken");
+        }
+        
+        sections.push(span);
+        resetProps();
+    }
+
+    // 
+
+    for(let i = 0; i < desc.length; i++){
+        let c = desc[i];
+        if(c == "§"){
+            finish();
+            i++;
+            let code = desc[i];
+            if(code == undefined) continue;
+
+            if(code == "l") curProps.bold = true;
+            else if(code == "o") curProps.italic = true;
+            else if(code == "k") curProps.obfuscated = true;
+            else if(code == "m") curProps.strikethrough = true;
+            else if(code == "n") curProps.underline = true;
+            else if(code == "r"){
+                finish(); // I'm not sure if this is a full reset or just a color reset. (CURRENTLY USED AS FULL RESET)
+                continue;
+            }
+            else{
+                // from: https://wiki.sportskeeda.com/minecraft/color-codes
+                curProps.color = {
+                    "0":"#000",
+                    "1":"#0000AA",
+                    "2":"#00AA00",
+                    "3":"#00AAAA",
+                    // "4":"#AA0000",
+                    // "4":"#CC3333",
+                    "4":"#DD5555",
+                    "5":"#AA00AA",
+                    "6":"#FFAA00",
+                    "7":"#AAAAAA",
+                    "8":"#555555",
+                    "9":"#5555FF",
+                    "a":"#55FF55",
+                    "b":"#55FFFF",
+                    "c":"#FF5555",
+                    "d":"#FF55FF",
+                    "e":"#FFFF55",
+                    "f":defColor,
+                }[code] ?? defColor;
+                curProps.colorCode = code;
+            }
+
+
+            continue;
+        }
+
+        // 
+        curProps.text += c;
+    }
+    finish();
+
+    // 
+
+    return sections.map(v=>v.outerHTML).join("");
+}

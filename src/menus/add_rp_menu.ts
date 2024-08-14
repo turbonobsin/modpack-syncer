@@ -2,7 +2,7 @@ import "../render_lib";
 import "../render_util";
 import { AddRP_InitData, RP_Data } from "../interface";
 import { MP_SearchStructure, qElm } from "../render_lib";
-import { getImageURL, InitData, loadDefaultAside, searchStringCompare } from "../render_util";
+import { getImageURL, InitData, loadDefaultAside, parseDescription, searchStringCompare, wait } from "../render_util";
 import { makeDivPart, MP_Article, MP_Aside, MP_Button, MP_Div, MP_Flexbox, MP_Grid, MP_Header, MP_HR, MP_Img, MP_P, MP_TD, MP_Text } from "../menu_parts";
 import "../styles/menus_custom.css";
 
@@ -109,13 +109,13 @@ async function showData(data:RP_Data,aside:MP_Div){
             )
         );
         body.addParts(
-            
             new MP_Img({
                 src:await window.gAPI.getRPImg(initData.d.iid,rpID!),
                 width:"50%"
             }).autoJustify("start","center"),
             new MP_P({
-                text:data.data.meta?.pack.description ?? "No description."
+                className:"formatted-text-cont",
+                innerHTML:parseDescription(data.data.meta?.pack.description)
             })
         );
     }

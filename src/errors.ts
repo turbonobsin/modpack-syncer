@@ -101,4 +101,5 @@ export const errors = {
     failedToUnpublishWorld: Result.err("Failed to unpublish world"),
     failedToRemoveWorld: Result.err("Failed to remove world"),
     couldNotFindWorldMeta: Result.err("Could not find world meta"),
+    downloadWorldWhileRunning: Result.err("You can't download a syncable world while the game is running"),
 };

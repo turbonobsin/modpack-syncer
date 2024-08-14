@@ -3,7 +3,7 @@ import "../styles/edit_instance_menu.css";
 import { addClassToOps, makeDivPart, MP_ActivityBarItem, MP_Button, MP_Combobox, MP_Div, MP_Flexbox, MP_Flexbox_Ops, MP_Generic, MP_Grid, MP_Header, MP_HR, MP_Img, MP_Section, MP_TabbedMenu, MP_TableList, MP_P, MP_Text, MP_TR, PartTextStyle } from "../menu_parts";
 import { MP_SearchStructure, qElm } from "../render_lib";
 import { EditInst_InitData, FullModData, ModData, ModsFolder, Res_GetInstMods, RP_Data, UpdateSearch, World_Data, WorldState } from "../interface";
-import { deselectItem, getImageURL, getWorldStateText, InitData, SAPI2_Item, SelectedItem, selectItem, wait } from "../render_util";
+import { deselectItem, getImageURL, getWorldStateText, InitData, parseDescription, SAPI2_Item, SelectedItem, selectItem, wait } from "../render_util";
 
 let initData = new InitData<EditInst_InitData>(init);
 
@@ -368,13 +368,13 @@ class CMP_ResourcePackSimple extends MP_Flexbox{
                 )
             );
             body.addParts(
-                
                 new MP_Img({
                     src:getImageURL(data.data.icon),
                     width:"50%"
                 }).autoJustify("start","center"),
                 new MP_P({
-                    text:data.data.meta?.pack.description ?? "No description."
+                    className:"formatted-text-cont",
+                    innerHTML:parseDescription(data.data.meta?.pack.description)
                 })
             );
         }
@@ -673,8 +673,10 @@ async function loadSection(index:number,menu:MP_TabbedMenu){
                     );
                     main.addParts(
                         new MP_P({
-                            className:"l-desc",
-                            text:data.remote?.modrinth?.description ?? data.remote?.curseforge?.summary ?? data.local.description
+                            // className:"l-desc",
+                            // innerHTML:data.remote?.modrinth?.description ?? data.remote?.curseforge?.summary ?? data.local.description
+                            className:"l-desc formatted-text-cont",
+                            innerHTML:parseDescription(data.remote?.modrinth?.description ?? data.remote?.curseforge?.summary ?? data.local.description)
                         }),
                     );
                     footer.addParts(

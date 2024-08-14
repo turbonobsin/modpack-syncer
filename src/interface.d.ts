@@ -571,6 +571,12 @@ interface PrismAccountsData{
     accounts:PrismAccount[];
 }
 
+interface Arg_UnpublishRP{
+    mpID:string;
+    rpID:string;
+    uid:string;
+}
+
 interface Arg_UploadRP{
     iid:string;
     uid:string;
