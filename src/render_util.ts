@@ -1,4 +1,4 @@
-import { MenuPart, MP_Button, MP_Div, MP_Header, MP_HR, MP_Input, MP_Label, MP_OutlinedBox, MP_P, MP_Text } from "./menu_parts";
+import { MenuPart, MP_Button, MP_Div, MP_Flexbox, MP_Header, MP_HR, MP_Input, MP_Label, MP_OutlinedBox, MP_P, MP_Text } from "./menu_parts";
 import { InitMenuData, PackMetaData, WorldState } from "./interface";
 
 export function loadDefaultAside(aside:MenuPart,ops:{
@@ -90,19 +90,29 @@ export async function loadModPackMetaPanel(meta:PackMetaData,panel?:HTMLElement|
         ),
 
         new MP_HR(),
-        new MP_Button({
-            label:"Add Modpack",
-            className:"b-add-mod-pack",
-            onClick:async e=>{
-                let res = await window.gAPI.addInstance({
-                    meta,
-                    autoCreate:document.querySelector<HTMLInputElement>("#cb-auto-create-inst")?.checked ?? false
-                });
-                window.close();
-            }
-        }).onPostLoad(p=>{
-            // p.e!.style.float = "right";
-        })
+        new MP_Flexbox({
+            alignItems:"center",
+            justifyContent:"space-between"
+        }).addParts(
+            new MP_Button({
+                label:"Add Modpack",
+                className:"b-add-mod-pack",
+                onClick:async e=>{
+                    let res = await window.gAPI.addInstance({
+                        meta,
+                        autoCreate:document.querySelector<HTMLInputElement>("#cb-auto-create-inst")?.checked ?? false
+                    });
+                    window.close();
+                }
+            }),
+            new MP_Button({
+                label:"",
+                icon:"more_vert",
+                onClick:async e=>{
+                    window.gAPI.openDropdown("modpackOptions",meta.id);
+                }
+            })
+        )
     )
 
     footer.addParts();

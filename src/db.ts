@@ -1,14 +1,14 @@
 import { app, BrowserWindow, dialog, systemPreferences } from "electron";
-import { ETL_Generic, evtTimeline, pathTo7zip, searchStringCompare, set7zipPath, util_lstat, util_mkdir, util_note, util_note2, util_readBinary, util_readdir, util_readdirWithTypes, util_readJSON, util_readText, util_readTOML, util_rename, util_testAccess, util_warn, util_writeBinary, util_writeJSON, util_writeText, wait } from "./util";
+import { ETL_Generic, evtTimeline, EvtTL_Event, pathTo7zip, searchStringCompare, set7zipPath, util_lstat, util_mkdir, util_note, util_note2, util_readBinary, util_readdir, util_readdirWithTypes, util_readJSON, util_readText, util_readTOML, util_rename, util_testAccess, util_warn, util_writeBinary, util_writeJSON, util_writeText, wait } from "./util";
 import path from "path";
 import { DBSys, DBUser, InstanceData as ModPackInstData, TmpFile } from "./db_types";
-import { Arg_AddInstance, Arg_AddModToFolder, Arg_ChangeFolderType, Arg_CreateFolder, Arg_EditFolder, Arg_LaunchInst, Arg_PublishModpack, Arg_ToggleWorldEnabled, Arg_UploadModpack, Arg_UploadModpackFile, Arg_UploadRP, Arg_UploadRPFile, FolderType, IMO_Combobox, IMO_Input, IMO_MultiSelect, InputMenu_InitData, LocalModData, ModIndex, ModrinthModData, ModsFolder, ModsFolderDef, PackMetaData, PrismAccount, PrismAccountsData, RemoteModData, Res_GetInstResourcePacks, Res_GetInstWorlds, Res_InputMenu, Res_UploadModpack, Res_UploadRP, RP_Data, RPCache, SearchFilter, SlugMapData, UpdateProgress_InitData, World_Data } from "./interface";
+import { Arg_AddInstance, Arg_AddModToFolder, Arg_ChangeFolderType, Arg_CreateFolder, Arg_EditFolder, Arg_LaunchInst, Arg_PublishModpack, Arg_ToggleWorldEnabled, Arg_UploadModpack, Arg_UploadModpackFile, Arg_UploadRP, Arg_UploadRPFile, Data_PrismInstancesMenu, FolderType, IMO_Combobox, IMO_Input, IMO_MultiSelect, InputMenu_InitData, LocalModData, MMCPack, ModIndex, ModrinthModData, ModsFolder, ModsFolderDef, PackMetaData, PrismAccount, PrismAccountsData, RemoteModData, Res_GetInstResourcePacks, Res_GetInstWorlds, Res_InputMenu, Res_UploadModpack, Res_UploadRP, RP_Data, RPCache, SearchFilter, SelectPrismInstData, SlugMapData, UpdateProgress_InitData, World_Data } from "./interface";
 import { errors, Result } from "./errors";
 import express from "express";
 import toml from "toml";
 import { alertBox, changeServerURL, checkForInstUpdates, ensurePrismLinked, refreshMainWindow, uploadWorld } from "./app";
 import { semit, updateSocketURL } from "./network";
-import { getWindowStack, openCCMenu } from "./menu_api";
+import { getWindowStack, openCCMenu, PrismInstancesMenu } from "./menu_api";
 import Seven from "node-7z";
 import axios from "axios";
 import { mainWindow } from "./main";
@@ -1176,6 +1176,8 @@ JavaPath=${javaPath}`:""}
         }
     }
 
+    if(arg.linkName) instanceData.linkName = arg.linkName;
+
     let inst = await new ModPackInst(path.join(fspath_modPacks,instanceData.iid,"meta.json")).load(instanceData);
     if(!inst || !inst.meta){
         util_warn("Failed to add instance:");
@@ -1186,7 +1188,7 @@ JavaPath=${javaPath}`:""}
 
     refreshMainWindow();
 
-    await checkForInstUpdates(inst.meta.iid,undefined,true);
+    if(arg.autoCreate) await checkForInstUpdates(inst.meta.iid,undefined,true);
 
     return new Result(inst);
 }
@@ -1475,6 +1477,10 @@ export async function toggleWorldEnabled(arg:Arg_ToggleWorldEnabled,_w?:BrowserW
     if(!inst?.meta) return;
     let wID = arg.wID;
 
+    let prismPath = inst.getPrismInstPath();
+    if(!prismPath) return;
+
+    let loc = path.join(prismPath,".minecraft","saves",arg.wID);
     let dataInd = inst.meta.worlds.findIndex(v=>v.wID == wID);
     let data = inst.meta.worlds[dataInd];
     let newName = (wID.endsWith(".disabled") ? wID.substring(0,wID.length-".disabled".length) : wID+".disabled");
@@ -1502,6 +1508,35 @@ export async function toggleWorldEnabled(arg:Arg_ToggleWorldEnabled,_w?:BrowserW
 }
 
 export async function openPublishModpackMenu(){
+    
+    // let arg:Arg_PublishModpack = {
+    //     meta:{
+    //         id:data.name,
+    //         name:data.name,
+    //         desc:data.desc,
+    //         loader:data.loader,
+    //         version:data.version,
+    //         img:"",
+
+    //         resourcepacks:[],
+    //         update:0,
+    //     }
+    // };
+
+    let evt2 = evtTimeline.subEvt(new ETL_Generic<SelectPrismInstData|undefined>("select_prism_inst"));
+
+    await openCCMenu<Data_PrismInstancesMenu>("prism_instances",{
+        reason:"select",
+        iid:"",
+        instName:""
+    });
+
+    let data2 = await evtTimeline.waitFor(evt2);
+    if(!data2) return;
+
+    util_note("LOC: ",data2.loc);
+    // 
+
     let evt = evtTimeline.subEvt(new ETL_Generic<Res_InputMenu|undefined>("input_editFolder"));
     let finished = false;
 
@@ -1524,19 +1559,20 @@ export async function openPublishModpackMenu(){
                         type:"input",
                         inputType:"text",
                         id:"name",
-                        label:"Name"
+                        label:"Name (Optional)"
                     } as IMO_Input,
                     {
                         type:"input",
                         inputType:"text",
                         id:"desc",
-                        label:"Description"
+                        label:"Description",
+                        placeholder:"No Description."
                     } as IMO_Input,
                     {
                         type:"input",
-                        inputType:"text",
-                        id:"loader",
-                        label:"Mod Loader"
+                        inputType:"number",
+                        id:"ram",
+                        label:"Maximum RAM (MB) (Optional)"
                     } as IMO_Input,
                     {
                         type:"input",
@@ -1584,28 +1620,59 @@ export async function openPublishModpackMenu(){
     let resData = await evtTimeline.waitFor(evt);
     if(!resData) return errors.failedToPublishModpack.unwrap();
     let data = resData.data;
+
+    // 
+
+    let mmcPackFile = await util_readBinary(path.join(data2.loc,"mmc-pack.json")) ?? undefined;
+    let mmcJson = await util_readJSON<MMCPack>(path.join(data2.loc,"mmc-pack.json"));
+    if(!mmcJson) return errors.failedToPublishModpack.unwrap();
+
+    let mc = mmcJson.components.find(v=>v.cachedName == "Minecraft");
+    let loader = mmcJson.components.find(v=>["Forge","Fabric Loader"].includes(v.cachedName));
+    if(!mc || !loader) return errors.failedToPublishModpack.unwrap();
     
     let arg:Arg_PublishModpack = {
         meta:{
-            id:data.name,
-            name:data.name,
-            desc:data.desc,
-            loader:data.loader,
-            version:data.version,
+            id:data2.name,
+            name:data.name || data2.name,
+            desc:data.desc || "No description.",
             img:"",
-
+            loader:loader.cachedName.split(" ")[0].toLowerCase(),
+            version:mc.version,
             resourcepacks:[],
             update:0,
-        }
+            javaCodeName:getJavaCodeNameFromVersion(mc.version)
+        },
+        icon:await util_readBinary(data2.icon) ?? undefined,
+        mmcPackFile
     };
+    
+    // 
 
     return await publishModpack(arg);
 }
+export function getJavaCodeNameFromVersion(version:string){
+    let v = version.split(".");
+    if(v[1] == "20" && v[2] == "6") return "delta";
+    if(parseInt(v[1]) >= 21) return "delta";
+    
+    if(parseInt(v[1]) >= 18) return "gamma";
+
+    return "beta";
+}
 export async function publishModpack(arg:Arg_PublishModpack){
     let res = (await semit<Arg_PublishModpack,boolean>("publishModpack",arg)).unwrap();
+    
+    await addInstance({
+        autoCreate:false,
+        meta:arg.meta,
+        linkName:arg.meta.id
+    });
+    
     await dialog.showMessageBox({
         message:"Publish Modpack: "+res?"Success":"Failed"
     });
+
     return res;
 }
 export async function uploadModpack(iid:string){
@@ -1645,9 +1712,24 @@ export async function uploadModpack(iid:string){
             sloc:mod.name
         });
     }
+    let indexes = await util_readdirWithTypes(path.join(modLoc,".index"));
+    for(const index of indexes){
+        if(!index.isFile()) continue;
+
+        let stat = await util_lstat(path.join(modLoc,".index",index.name));
+        if(!stat) continue;
+        
+        arg.files.push({
+            mTime:Math.max(stat.mtimeMs,stat.birthtimeMs),
+            sloc:".index/"+index.name
+        });
+    }
 
     let res = (await semit<Arg_UploadModpack,Res_UploadModpack>("uploadModpack",arg)).unwrap();
-    if(!res) return;
+    if(!res){
+        w.close();
+        return;
+    }
     // 
 
     let total = res.files.length;
@@ -1658,13 +1740,17 @@ export async function uploadModpack(iid:string){
     let proms:Promise<void>[] = [];
     for(const file of res.files){
         proms.push(new Promise<void>(async resolve=>{
-            if(w?.isDestroyed()) return;
+            if(w?.isDestroyed()){
+                resolve();
+                return;
+            }
             w.webContents.send("updateProgress","main",completed,total,"Upload: "+file);
             
             let buf = await util_readBinary(path.join(modLoc,file));
             if(!buf){
                 failed.push(file);
                 completed++;
+                resolve();
                 return;
             }
             let res = await semit<Arg_UploadModpackFile,boolean>("upload_modpack_file",{
@@ -1680,6 +1766,8 @@ export async function uploadModpack(iid:string){
                 success.push(file);
                 completed++;
             }
+
+            resolve();
         }));
     }
 
@@ -1698,4 +1786,24 @@ export async function uploadModpack(iid:string){
             }
         ]
     });
+}
+export async function unpublishModpack(mpID:string){
+    let res = await dialog.showMessageBox({
+        message:"Are you sure you want to unpublish: "+mpID+"?\n\nThis action cannot be reversed.\n\n*The modpack will be deleted off the server so no one can sync it or download it anymore, IT DOES NOT AFFECT YOUR OWN INSTANCE OR DELETE ANYONE ELSES INSTANCES, IT SIMPLY MEANS NO MORE SYNCING OR DOWNLOADING THE MODPACK.*",
+        buttons:["Cancel","Unpublish"]
+    });
+    if(res.response != 1) return;
+    
+    if(!mpID) return errors.invalid_args.unwrap();
+
+    let acc = await getMainAccount();
+    if(!acc) return;
+    
+    let res1 = (await semit<string,boolean>("unpublishModpack",mpID)).unwrap();
+    if(!res1) return errors.failedToUnpublishModpack.unwrap();
+
+    let w2 = getWindowStack().find(v=>v.title == "Search Packs");
+    if(w2) w2.reload();
+
+    return new Result(true);
 }

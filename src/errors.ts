@@ -84,6 +84,7 @@ export const errors = {
 
     // modpacks (new)
     failedToPublishModpack: Result.err("Failed to publish modpack"),
+    failedToUnpublishModpack: Result.err("Failed to unpublish modpack"),
 
     // prism
     instgroupsRead: Result.err("Failed to read instance group data"),

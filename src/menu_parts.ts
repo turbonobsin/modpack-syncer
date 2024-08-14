@@ -41,6 +41,13 @@ export interface MP_Ops{
     minWidth?:string;
     minHeight?:string;
 
+    position?:string;
+    display?:string;
+    top?:string;
+    left?:string;
+    bottom?:string;
+    right?:string;
+
     onClick?:(e:MouseEvent,elm:HTMLElement)=>any;
     onMouseUp?:(e:MouseEvent,elm:HTMLElement)=>any;
 
@@ -281,6 +288,13 @@ export abstract class MenuPart{
             if(o.maxHeight) e.style.maxHeight = o.maxHeight;
             if(o.minWidth) e.style.minWidth = o.minWidth;
             if(o.minHeight) e.style.minHeight = o.minHeight;
+
+            if(o.position) e.style.position = o.position;
+            if(o.display) e.style.display = o.display;
+            if(o.top) e.style.top = o.top;
+            if(o.left) e.style.left = o.left;
+            if(o.bottom) e.style.bottom = o.bottom;
+            if(o.right) e.style.right = o.right;
 
             if(o.onClick) e.addEventListener("click",e=>{
                 if(!this.e) return;

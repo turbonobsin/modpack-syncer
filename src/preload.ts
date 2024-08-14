@@ -71,6 +71,7 @@ contextBridge.exposeInMainWorld("gAPI",{
     getServerWorlds:regf("getServerWorlds"),
     getWorldImg:regf("getWorldImg"),
     takeWorldOwnership:regf("takeWorldOwnership"),
+    toggleWorldEnabled:regf("toggleWorldEnabled"),
 
     checkForInstUpdates:regf("checkForInstUpdates"),
     updateInst:regf("updateInst"),

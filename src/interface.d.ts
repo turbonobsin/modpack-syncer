@@ -65,6 +65,7 @@ type InitMenuData<T> = {
 interface Arg_AddInstance{
     meta:PackMetaData;
     autoCreate:boolean;
+    linkName?:string;
 }
 
 type Arg_SearchPacks = {
@@ -79,7 +80,13 @@ interface Res_SearchPacksMeta{
     similar:PackMetaData[];
 }
 
-type ListPrismInstReason = "view" | "link";
+interface SelectPrismInstData{
+    name:string;
+    loc:string;
+    icon:string;
+}
+
+type ListPrismInstReason = "view" | "link" | "select";
 interface Data_PrismInstancesMenu{
     reason:ListPrismInstReason;
     iid:string;
@@ -93,6 +100,7 @@ interface PrismInstance{
     loaderVersion:string;
     totalTimePlayed:number;
     path:string;
+    iconPath:string;
 }
 interface Arg_GetPrismInstances{
     query?:string;

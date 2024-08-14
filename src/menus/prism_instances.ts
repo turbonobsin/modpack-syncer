@@ -2,9 +2,9 @@ import "../render_lib";
 import "../render_util";
 import "../styles/prism_instances.css";
 import "../styles/search_packs_menu.css";
-import { MP_Article, MP_Button, MP_Div, MP_Flexbox, MP_Header, MP_HR, MP_OutlinedBox, MP_P, MP_Section, MP_Text, PartTextStyle } from "../menu_parts";
-import { InitData, loadDefaultAside, SelectedItem, selectItem } from "../render_util";
-import { Data_PrismInstancesMenu, InitMenuData, PrismInstance } from "src/interface";
+import { MP_Article, MP_Button, MP_Div, MP_Flexbox, MP_Header, MP_HR, MP_Img, MP_OutlinedBox, MP_P, MP_Section, MP_Text, PartTextStyle } from "../menu_parts";
+import { getImageURL, InitData, loadDefaultAside, SelectedItem, selectItem } from "../render_util";
+import { Data_PrismInstancesMenu, InitMenuData, PrismInstance, SelectPrismInstData } from "src/interface";
 import { MP_SearchStructure, qElm } from "../render_lib";
 
 let hasLoadedPage = false;
@@ -60,6 +60,39 @@ async function initPage(){
             if(initData.d.reason == "view"){
 
             }
+            else if(initData.d.reason == "select"){
+                a.body.addParts(
+                    new MP_HR(),
+                    new MP_OutlinedBox({
+                        direction:"column",
+                        paddingBottom:"15px"
+                    }).addParts(
+                        new MP_P({
+                            style:PartTextStyle.note,
+                            innerHTML:`Link <span class="textstyle-accent">${initData.d.instName}</span> with <span class="textstyle-accent">${data.name}</span>?`
+                        }),
+                        new MP_Button({
+                            label:"Select",
+                            onClick:async e=>{
+                                window.gAPI.triggerEvt("select_prism_inst",<SelectPrismInstData>{
+                                    name:data.name,
+                                    loc:data.path,
+                                    icon:data.iconPath,
+                                });
+                                window.close();
+                            }
+                        })
+                    )
+                    // new MP_Section().addParts(
+                    //     new MP_Button({
+                    //         label:"Link to this Instance",
+                    //         onclick:e=>{
+                                
+                    //         }
+                    //     })
+                    // )
+                );
+            }
             else if(initData.d.reason == "link"){
                 a.body.addParts(
                     new MP_HR(),
@@ -105,7 +138,8 @@ async function initPage(){
 
             for(const inst of res.list){
                 let part = new MP_Article({
-                    className:"instance-item"
+                    className:"instance-item",
+                    position:"relative"
                 }).addParts(
                     new MP_Header({
                         textContent:inst.name
@@ -130,6 +164,21 @@ async function initPage(){
                         )
                     )
                 );
+
+                let img = new MP_Img({
+                    src:getImageURL(inst.iconPath),
+                    width:"42.5px",
+                    height:"42.5px"
+                });
+                if(img.e){
+                    img.e.style.position = "absolute";
+                    img.e.style.top = "10px";
+                    img.e.style.right = "10px";
+                    img.e.style.imageRendering = "pixelated";
+                    // part.e?.insertBefore(img.e,part.e.children[0]);
+                    part.addPart(img);
+                }
+
                 if(groups[inst.group]) groups[inst.group].parts[1].addPart(part);
                 else{
                     let gg = new MP_Section().addParts(

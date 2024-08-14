@@ -3609,6 +3609,13 @@ async function getPrismInstances(w=mainWindow,arg:Arg_GetPrismInstances):Promise
                 continue;
             }
 
+            let minecraftLoc = ".minecraft";
+            if(!await util_lstat(path.join(instancePath,inst,minecraftLoc))) minecraftLoc = "minecraft";
+            let iconPath = path.join(instancePath,inst,minecraftLoc,"icon.png");
+            if(!await util_lstat(iconPath)){
+                iconPath = path.join(sysInst.meta.prismRoot,"icons",cfg.getValue("iconKey") ?? "mc.png");
+            }
+
             data.list.push({
                 name,
                 group,
@@ -3616,7 +3623,8 @@ async function getPrismInstances(w=mainWindow,arg:Arg_GetPrismInstances):Promise
                 loader:loaderComp.cachedName,
                 loaderVersion:loaderComp.version,
                 totalTimePlayed:parseInt(totalTimePlayed),
-                path:path.join(instancePath,inst)
+                path:path.join(instancePath,inst),
+                iconPath
             });
         }
     }
@@ -3666,6 +3674,13 @@ async function getPrismInstances(w=mainWindow,arg:Arg_GetPrismInstances):Promise
                 continue;
             }
 
+            let minecraftLoc = ".minecraft";
+            if(!await util_lstat(path.join(instancePath,inst,minecraftLoc))) minecraftLoc = "minecraft";
+            let iconPath = path.join(instancePath,inst,minecraftLoc,"icon.png");
+            if(!await util_lstat(iconPath)){
+                iconPath = path.join(sysInst.meta.prismRoot,"icons",cfg.getValue("iconKey")+".png");
+            }
+
             data.list.push({
                 name,
                 group:unnamedGroup,
@@ -3673,7 +3688,8 @@ async function getPrismInstances(w=mainWindow,arg:Arg_GetPrismInstances):Promise
                 loader:loaderComp.cachedName,
                 loaderVersion:loaderComp.version,
                 totalTimePlayed:parseInt(totalTimePlayed),
-                path:path.join(instancePath,inst)
+                path:path.join(instancePath,inst),
+                iconPath
             });
     }
 

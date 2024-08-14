@@ -386,7 +386,7 @@ class CMP_World extends MP_Flexbox{
         ops.gap = "5px";
         ops.alignItems = "center";
         ops.marginBottom = "3px";
-
+        
         super(ops);
     }
     declare ops:CMP_World_Ops;
@@ -420,7 +420,7 @@ class CMP_World extends MP_Flexbox{
         if(d.wID.endsWith(".disabled")) this.e?.classList.add("disabled");
     }
 
-    static async showData(data:World_Data,aside:MP_Div){
+    static async showData(data:World_Data,aside:MP_Div,search:MP_SearchStructure<World_Data>){
         let d = data;
         const {head,body,footer} = setupAside(aside);
 
@@ -535,11 +535,14 @@ class CMP_World extends MP_Flexbox{
                         label:"Enable",
                         marginTop:"20px",
                         onClick:async (e,elm)=>{
-                            let res = await window.gAPI.toggleWorldEnabled({
-                                iid:initData.d.iid,
-                                wID:w.wID,
-                                enable:true
-                            });
+                            let list = search.sel.items.filter(v=>v.isSelected());
+                            for(const v of list){
+                                let res = await window.gAPI.toggleWorldEnabled({
+                                    iid:initData.d.iid,
+                                    wID:v.data.wID,
+                                    enable:true
+                                });
+                            };
                         }
                     }).autoJustify("center","center"),
                 );
@@ -948,7 +951,7 @@ async function loadSection(index:number,menu:MP_TabbedMenu){
                 listId:"_",
                 submitOnOpen:true,
                 onSelect:(data,item)=>{
-                    CMP_World.showData(data,menu.aside);
+                    CMP_World.showData(data,menu.aside,search);
                 },
                 onNoSelected:()=>{
                     menu.aside.clearParts();
