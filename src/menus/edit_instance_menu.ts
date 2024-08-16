@@ -289,13 +289,30 @@ class CMP_ResourcePackSimple extends MP_Flexbox{
 
         let info = await window.gAPI.getRPInfo(initData.d.iid,data.name);
         head.clearParts();
-        
-        head.addParts(
-            new MP_Header({text:d.name}),
-            new MP_HR()
-        );
 
         let needsUpdate = (info?.data?.update ?? -1) > (info?.local?.update ?? -1);
+        if(needsUpdate){
+            head.addPart(
+                new MP_Div({
+                    className:"rp-needs-update"
+                }).addParts(
+                    new MP_Div({
+                        className:"icon update-icon",
+                        text:"notifications_active"
+                    }),
+                    new MP_Div({
+                        className:"l-needs-update",
+                        text:"Update Available"
+                    })
+                ),0
+            );
+        }
+
+        let header = new MP_Header({text:d.name});
+        head.addParts(
+            header,
+            new MP_HR()
+        );
 
         if(!data.data){ // it's currently "packed" as a zip
             body.addParts(
@@ -319,7 +336,7 @@ class CMP_ResourcePackSimple extends MP_Flexbox{
         }
         else{
             head.e!.style.height = "unset";
-            head.parts[0].addPart(
+            header.addPart(
                 new MP_P({
                     text:"Pack format: "+data.data.meta?.pack.pack_format ?? "(none found)",
                     className:"l-details"
@@ -346,6 +363,7 @@ class CMP_ResourcePackSimple extends MP_Flexbox{
                             // skipAdd:d.data?.sync != null,
                             label:"Upload",
                             icon:"upload",
+                            classList:!needsUpdate ? ["accent"] : [],
                             enabled:info?.canUpload && info.isPublished,
                             onClick:(e,elm)=>{
                                 window.gAPI.uploadRP({
@@ -421,9 +439,9 @@ class CMP_ResourcePackSimple extends MP_Flexbox{
                     }).addParts(
                         new MP_Div({color:"var(--text-dim)"}).addParts(
                             ...[
-                                "Version:",
+                                "Server Version:",
                                 "Date:",
-                                "by:",
+                                "By:",
                             ].map(v=>new MP_Div({text:v}))
                         ),
                         new MP_Div({}).addParts(
@@ -1125,6 +1143,13 @@ setTimeout(()=>{
                 if(data.data.wID != "*"){
                     console.log("ITEMS:",currentSearch?.sel.items);
                     let item = currentSearch?.sel.items.some((v:SAPI2_Item<World_Data>)=>v.data.wID == data.data.wID);
+                    if(!item) return;
+                }
+            }
+            else if(data.id == "rp"){
+                if(curSection != 1) return;
+                if(data.data.rpID != "*"){
+                    let item = currentSearch?.sel.items.some((v:SAPI2_Item<RP_Data>)=>v.data.name == data.data.rpID);
                     if(!item) return;
                 }
             }

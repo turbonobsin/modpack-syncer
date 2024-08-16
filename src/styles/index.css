@@ -1,5 +1,10 @@
 @import "material_symbols.css";
 
+:root{
+	--alert-bg:rgb(219, 29, 29);
+	--alert-col:whitesmoke;
+}
+
 :root.themestyle-dark{
 	/* colors */
 	--c1:#501010;

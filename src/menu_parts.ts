@@ -166,7 +166,7 @@ export abstract class MenuPart{
         }
         return this;
     }
-    addPart(part:MenuPart){
+    addPart(part:MenuPart,i?:number){
         if(this.ops.skipAdd) return part;
         if(part.ops.skipAdd) return part;
 
@@ -175,10 +175,14 @@ export abstract class MenuPart{
             return part;
         }
         
-        this.parts.push(part);
+        if(i == undefined) this.parts.push(part);
+        else this.parts.splice(i,0,part);
         part._load(); // I'm moving part loading to be immidiate so stuff can happen even before it's been appended
 
-        if(part.e) this.e.appendChild(part.e);
+        if(part.e){
+            if(i == undefined) this.e.appendChild(part.e);
+            else this.e.insertBefore(part.e,this.e.children[i]);
+        }
 
         if(part.ops.onAdded) part.ops.onAdded();
 
