@@ -1773,6 +1773,8 @@ export async function downloadRP(arg:Arg_DownloadRP){
         ]
     });
     // if(failed.length == 0) w.close(); // I think it's best to leave it open to see what it downloaded
+    
+    getWindowStack().find(v=>v.title == "Edit Instance")?.webContents.send("updateSearch");
 
     if(getWindowStack().some(v=>v.title == "Add Resource Pack")){ // may need to fix this later because it's no future proof if the title gets changed
         let rpW = getWindowStack().findIndex(v=>v.title == "Add Resource Pack");
