@@ -625,6 +625,10 @@ interface Arg_UploadRP{
     name:string; // this is now rpID which is just the name of the folder/file that is the pack
     force?:boolean;
 }
+interface Arg_FinishUploadRP{
+    mpID:string;
+    rpID:string;
+}
 interface Res_UploadRP{
     res:number;
     update:number;
@@ -893,6 +897,29 @@ interface UpdateSearch{
     data:any;
 }
 
+// get rp info
+interface Arg_GetRPInfo{
+    mpID:string;
+    rpID:string;
+}
+interface Res_GetRPInfo{
+    isPublished:boolean;
+    canUpload:boolean;
+    data?:{
+        update:number;
+        lastUploaded:number;
+        whoLastUploaded:string;
+    };
+}
+interface Res_GetRPInfoLocal extends Res_GetRPInfo{
+    local?:{
+        update:number;
+        lastUploaded:number;
+        lastDownloaded:number;
+        lastUpdated:number;
+    };
+}
+
 // 
 
 export interface IGlobalAPI{
@@ -960,6 +987,7 @@ export interface IGlobalAPI{
     getRPs:(arg:ArgC_GetRPs)=>Promise<Res_GetRPs>;
     getRPImg:(iid:string,rpID:string)=>Promise<string>;
     genAllThePBR:(iid:string)=>Promise<boolean>;
+    getRPInfo:(iid:string,rpID:string)=>Promise<Res_GetRPInfoLocal|undefined>;
 
     // sync
     sync:{

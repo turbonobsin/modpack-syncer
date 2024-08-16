@@ -20,8 +20,12 @@ export interface MP_Ops{
     innerHTML?:string;
     __tag?:string;
     skipAdd?:boolean;
+    keepAdd?:boolean;
     fontSize?:string;
     textAlign?:string;
+    color?:string;
+    fontStyle?:string;
+    fontWeight?:string;
 
     margin?:string;
     marginTop?:string;
@@ -67,6 +71,7 @@ export interface MP_Button_Ops extends MP_Ops{
     // onClick:(e:MouseEvent)=>any;
     label:string;
     disabled?:boolean;
+    enabled?:boolean;
     icon?:string;
 }
 export interface MP_Input_Ops extends MP_Ops{
@@ -95,6 +100,7 @@ export function makeDivPart(selector:string){
 
 export abstract class MenuPart{
     constructor(ops:MP_Ops){
+        if(ops.keepAdd != undefined) ops.skipAdd = !ops.keepAdd;
         this.ops = ops;
         this.parts = [];
         this.init();
@@ -184,6 +190,9 @@ export abstract class MenuPart{
         if(this.e){
             this.e.textContent = "";
         }
+        for(const p of this.parts){
+            p.parent = undefined;
+        }
         this.parts = [];
     }
     clearFromPoint(startI:number){
@@ -271,6 +280,9 @@ export abstract class MenuPart{
             if(o.id) e.id = o.id;
             if(o.fontSize) e.style.fontSize = o.fontSize;
             if(o.textAlign) e.style.textAlign = o.textAlign;
+            if(o.color) e.style.color = o.color;
+            if(o.fontSize) e.style.fontSize = o.fontSize;
+            if(o.fontWeight) e.style.fontWeight = o.fontWeight;
             if(o.margin) e.style.margin = o.margin;
             if(o.marginTop) e.style.marginTop = o.marginTop;
             if(o.marginLeft) e.style.marginLeft = o.marginLeft;
@@ -422,6 +434,14 @@ export class MP_HR extends MenuPart{
         this.e = document.createElement("hr");
     }
 }
+export class MP_BR extends MenuPart{
+    constructor(ops:MP_Ops={}){
+        super(ops);
+    }
+    create(): void {
+        this.e = document.createElement("br");
+    }
+}
 export class MP_Section extends MenuPart{
     constructor(ops:MP_Ops={}){
         super(ops);
@@ -450,6 +470,7 @@ export class MP_Article extends MenuPart{
 
 export class MP_Button extends MenuPart{
     constructor(ops:MP_Button_Ops){
+        if(ops.enabled != undefined) ops.disabled = !ops.enabled;
         if(ops.icon) addClassToOps(ops,"icon-btn");
         super(ops);
     }
@@ -1053,6 +1074,21 @@ export class MP_ImgCube extends MP_Div{
             this.e.appendChild(img);
         }
     }
+}
+
+/**
+ * Menu Part Util: Flip
+ */
+export function MPU_Flip(v?:boolean,...parts:MenuPart[]){
+    if(v) return parts[0];
+    else return parts[1];
+}
+/**
+ * Menu Part Util: Switch
+ */
+export function MPU_Switch(i?:number,...parts:MenuPart[]){
+    if(i == undefined) i == 0; // or should this return nothing instead of 0?
+    return parts[i!]; // why does this have to be definite here?
 }
 
 // ideas

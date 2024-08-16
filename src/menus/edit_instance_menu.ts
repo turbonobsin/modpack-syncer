@@ -1,6 +1,6 @@
 import "../render_lib";
 import "../styles/edit_instance_menu.css";
-import { addClassToOps, makeDivPart, MP_ActivityBarItem, MP_Button, MP_Combobox, MP_Div, MP_Flexbox, MP_Flexbox_Ops, MP_Generic, MP_Grid, MP_Header, MP_HR, MP_Img, MP_Section, MP_TabbedMenu, MP_TableList, MP_P, MP_Text, MP_TR, PartTextStyle } from "../menu_parts";
+import { addClassToOps, makeDivPart, MP_ActivityBarItem, MP_Button, MP_Combobox, MP_Div, MP_Flexbox, MP_Flexbox_Ops, MP_Generic, MP_Grid, MP_Header, MP_HR, MP_Img, MP_Section, MP_TabbedMenu, MP_TableList, MP_P, MP_Text, MP_TR, PartTextStyle, MP_OutlinedBox, MPU_Flip, MP_BR } from "../menu_parts";
 import { MP_SearchStructure, qElm } from "../render_lib";
 import { EditInst_InitData, FullModData, ModData, ModsFolder, Res_GetInstMods, RP_Data, UpdateSearch, World_Data, WorldState } from "../interface";
 import { deselectItem, getImageURL, getWorldStateText, InitData, parseDescription, SAPI2_Item, SelectedItem, selectItem, wait } from "../render_util";
@@ -277,14 +277,25 @@ class CMP_ResourcePackSimple extends MP_Flexbox{
         }).addTo(cont);
     }
 
-    static showData(data:RP_Data,aside:MP_Div){
+    static async showData(data:RP_Data,aside:MP_Div){
         let d = data;
         const {head,body,footer} = setupAside(aside);
+
+        head.addPart(
+            new MP_Header({
+                text:"Loading..."
+            })
+        );
+
+        let info = await window.gAPI.getRPInfo(initData.d.iid,data.name);
+        head.clearParts();
         
         head.addParts(
             new MP_Header({text:d.name}),
             new MP_HR()
         );
+
+        let needsUpdate = (info?.data?.update ?? -1) > (info?.local?.update ?? -1);
 
         if(!data.data){ // it's currently "packed" as a zip
             body.addParts(
@@ -318,7 +329,8 @@ class CMP_ResourcePackSimple extends MP_Flexbox{
                 new MP_Flexbox({
                     justifyContent:"space-between",
                     alignItems:"center",
-                    marginBottom:"20px"
+                    marginBottom:"20px",
+                    skipAdd:info == undefined
                 }).addParts(
                     new MP_Button({
                         // label:"Edit",
@@ -328,25 +340,45 @@ class CMP_ResourcePackSimple extends MP_Flexbox{
                             window.gAPI.openDropdown("rpOptions",initData.d.iid,d.name);
                         }
                     }),
+                    MPU_Flip(
+                        info?.isPublished,
+                        new MP_Button({
+                            // skipAdd:d.data?.sync != null,
+                            label:"Upload",
+                            icon:"upload",
+                            enabled:info?.canUpload && info.isPublished,
+                            onClick:(e,elm)=>{
+                                window.gAPI.uploadRP({
+                                    iid:initData.d.iid,
+                                    mpID:"bob",
+                                    name:d.name,
+                                    uid:"",
+                                    uname:""
+                                });
+                            }
+                        }),
+                        new MP_Button({
+                            // skipAdd:info?.canUpload && !info.isPublished,
+                            label:"Publish",
+                            icon:"publish",
+                            enabled:info?.canUpload && !info.isPublished,
+                            onClick:(e,elm)=>{
+                                window.gAPI.uploadRP({
+                                    iid:initData.d.iid,
+                                    mpID:"bob",
+                                    name:d.name,
+                                    uid:"",
+                                    uname:"",
+                                    // force:true // not sure if this is needed here
+                                });
+                            }
+                        }),
+                    ),
                     new MP_Button({
-                        // skipAdd:d.data?.sync != null,
-                        label:"Upload",
-                        icon:"upload",
-                        onClick:(e,elm)=>{
-                            window.gAPI.uploadRP({
-                                iid:initData.d.iid,
-                                mpID:"bob",
-                                name:d.name,
-                                uid:"",
-                                uname:""
-                            });
-                        }
-                    }),
-                    new MP_Button({
-                        // skipAdd:d.data?.sync != null,
+                        keepAdd:info?.isPublished,
                         label:"Download",
                         icon:"download",
-                        className:"accent",
+                        className:needsUpdate ? "accent" : "",
                         onClick:(e,elm)=>{
                             window.gAPI.downloadRP({
                                 iid:initData.d.iid,
@@ -355,7 +387,7 @@ class CMP_ResourcePackSimple extends MP_Flexbox{
                                 lastDownloaded:-1
                             });
                         }
-                    }),//
+                    }),
                     // new MP_Button({
                     //     // skipAdd:d.data?.sync == null,
                     //     skipAdd:true,
@@ -377,6 +409,72 @@ class CMP_ResourcePackSimple extends MP_Flexbox{
                     innerHTML:parseDescription(data.data.meta?.pack.description)
                 })
             );
+            console.log("INFO:",info);
+            if(info){
+                body.addParts(
+                    new MP_OutlinedBox({
+                        keepAdd:info.isPublished,
+                        gap:"5px",
+                        alignItems:"start",
+                        padding:"10px",
+                        classList:["rp-info-box"]
+                    }).addParts(
+                        new MP_Div({color:"var(--text-dim)"}).addParts(
+                            ...[
+                                "Version:",
+                                "Date:",
+                                "by:",
+                            ].map(v=>new MP_Div({text:v}))
+                        ),
+                        new MP_Div({}).addParts(
+                            ...[
+                                ((info.data?.update ?? 0)/10).toString(),
+                                ((info.data?.update ?? 0 > 50) ? new Date(info.data?.lastUploaded ?? -1).toLocaleString(undefined,{dateStyle:"short",timeStyle:"short"}) : "(None)"),
+                                info.data?.whoLastUploaded ?? "(Unknown User)",
+                            ].map(v=>new MP_Div({text:v}))
+                        ).onPostLoad(p=>{
+                            p.parts[2].e?.classList.add("accent-text");
+                            p.parts[0].e?.classList.add("monospace");
+                        })
+                    ),
+                    new MP_P({
+                        keepAdd:!info.isPublished,
+                        text:"This pack is not published.",
+                        color:"var(--text-dim)",
+                        fontStyle:"italic"
+                    })
+                );
+                if(info.local){
+                    body.addParts(
+                        new MP_OutlinedBox({
+                            keepAdd:info.isPublished,
+                            gap:"5px",
+                            alignItems:"start",
+                            padding:"10px",
+                            classList:["rp-info-box"]
+                        }).addParts(
+                            new MP_Div({color:"var(--text-dim)"}).addParts(
+                                ...[
+                                    "Your Version:",
+                                    "Last Synced:",
+                                    "Last Uploaded:",
+                                    "Last Downloaded:",
+                                ].map(v=>new MP_Div({text:v}))
+                            ),
+                            new MP_Div({}).addParts(
+                                ...[
+                                    ((info.local.update ?? 0)/10).toString(),
+                                    ((info.local.lastUpdated ?? 0 > 50) ? new Date(info.local.lastUpdated ?? -1).toLocaleString(undefined,{dateStyle:"short",timeStyle:"short"}) : "(None)"),
+                                    ((info.local.lastUploaded ?? 0 > 50) ? new Date(info.local.lastUploaded ?? -1).toLocaleString(undefined,{dateStyle:"short",timeStyle:"short"}) : "(None)"),
+                                    ((info.local.lastDownloaded ?? 0 > 50) ? new Date(info.local.lastDownloaded ?? -1).toLocaleString(undefined,{dateStyle:"short",timeStyle:"short"}) : "(None)"),
+                                ].map(v=>new MP_Div({text:v}))
+                            ).onPostLoad(p=>{
+                                p.parts[0].e?.classList.add("monospace");
+                            })
+                        )
+                    )
+                }
+            }
         }
     }
 }
@@ -808,7 +906,6 @@ async function loadSection(index:number,menu:MP_TabbedMenu){
                 },
                 onSubmit:async (t,e,q)=>{
                     let res = await window.gAPI.getInstRPs({iid:initData.d.iid,filter:{query:q}});
-                    console.log("RP:",res);
                     if(!res) return;
 
                     for(const pack of res.packs){
@@ -821,6 +918,15 @@ async function loadSection(index:number,menu:MP_TabbedMenu){
                             window.gAPI.openDropdown("rpItem",initData.d.iid,pack.name);
                         });
                     }
+                },
+                getItemUniqueID(item){
+                    return item.data.name
+                },
+                getItemByID(s,id){
+                    return s.sel.items.find(v=>v.data.name == id);
+                },
+                getScrollableElm(){
+                    return menu.main.e;
                 }
             });
             menu.main_body.addPart(search);
@@ -1009,7 +1115,6 @@ async function loadSection(index:number,menu:MP_TabbedMenu){
 
 let currentSearch:MP_SearchStructure<any>|undefined;
 setTimeout(()=>{
-    console.log("> SETUP UPDATE SEARCH LISTENER");
     window.gAPI.onUpdateSearch((data?:UpdateSearch)=>{
         console.log("...updating search:",data);
         
@@ -1242,12 +1347,18 @@ async function init(){
         // new MP_ActivityBarItem({ icon:"public" }),
         // new MP_ActivityBarItem({ icon:"outdoor_grill" }),
         new MP_ActivityBarItem({ icon:"inbox_customize" }),
+        
         new MP_ActivityBarItem({ icon:"texture" }),
-        new MP_ActivityBarItem({ icon:"landscape" }),
-        new MP_ActivityBarItem({ icon:"grass" }),
+        // new MP_ActivityBarItem({ icon:"deployed_code" }),
+        
+        new MP_ActivityBarItem({ icon:"photo_camera" }),
+        // new MP_ActivityBarItem({ icon:"landscape" }),
+
+        new MP_ActivityBarItem({ icon:"public" }),
             // new MP_ActivityBarItem({ icon:"park" }),
             // new MP_ActivityBarItem({ icon:"psychiatry" }),
             // new MP_ActivityBarItem({ icon:"potted_plant" }),
+
         new MP_ActivityBarItem({ icon:"coffee" }),
         new MP_ActivityBarItem({ icon:"settings" }),
     );

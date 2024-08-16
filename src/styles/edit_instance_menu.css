@@ -30,3 +30,16 @@
 .folder-tag:hover{
     opacity:1;
 }
+
+.rp-info-box{
+    display:grid;
+    grid-template-columns:0.5fr 0.5fr;
+    margin-bottom:5px;
+}
+.rp-info-box > div > div:not(:last-child){
+    margin-bottom:8px;
+}
+.monospace{
+    font-family:monospace;
+    line-height:1.3;
+}

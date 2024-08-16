@@ -108,6 +108,7 @@ contextBridge.exposeInMainWorld("gAPI",{
     getRPs:regf("getRPs"),
     getRPImg:regf("getRPImg"),
     genAllThePBR:regf("genAllThePBR"),
+    getRPInfo:regf("getRPInfo"),
 
     dropdown:{
         mod:regf("dropdown-mod")

@@ -2,7 +2,7 @@ import { app, BrowserWindow, dialog, systemPreferences } from "electron";
 import { ETL_Generic, evtTimeline, EvtTL_Event, pathTo7zip, searchStringCompare, set7zipPath, util_lstat, util_mkdir, util_note, util_note2, util_readBinary, util_readdir, util_readdirWithTypes, util_readJSON, util_readText, util_readTOML, util_rename, util_testAccess, util_warn, util_writeBinary, util_writeJSON, util_writeText, wait } from "./util";
 import path from "path";
 import { DBSys, DBUser, InstanceData as ModPackInstData, TmpFile } from "./db_types";
-import { Arg_AddInstance, Arg_AddModToFolder, Arg_ChangeFolderType, Arg_CreateFolder, Arg_EditFolder, Arg_LaunchInst, Arg_PublishModpack, Arg_ToggleWorldEnabled, Arg_UploadModpack, Arg_UploadModpackFile, Arg_UploadRP, Arg_UploadRPFile, Data_PrismInstancesMenu, FolderType, IMO_Combobox, IMO_Input, IMO_MultiSelect, InputMenu_InitData, LocalModData, MMCPack, ModIndex, ModrinthModData, ModsFolder, ModsFolderDef, PackMetaData, PrismAccount, PrismAccountsData, RemoteModData, Res_GetInstResourcePacks, Res_GetInstWorlds, Res_InputMenu, Res_UploadModpack, Res_UploadRP, RP_Data, RPCache, SearchFilter, SelectPrismInstData, SlugMapData, UpdateProgress_InitData, World_Data } from "./interface";
+import { Arg_AddInstance, Arg_AddModToFolder, Arg_ChangeFolderType, Arg_CreateFolder, Arg_EditFolder, Arg_FinishUploadRP, Arg_GetRPInfo, Arg_LaunchInst, Arg_PublishModpack, Arg_ToggleWorldEnabled, Arg_UploadModpack, Arg_UploadModpackFile, Arg_UploadRP, Arg_UploadRPFile, Data_PrismInstancesMenu, FolderType, IMO_Combobox, IMO_Input, IMO_MultiSelect, InputMenu_InitData, LocalModData, MMCPack, ModIndex, ModrinthModData, ModsFolder, ModsFolderDef, PackMetaData, PrismAccount, PrismAccountsData, RemoteModData, Res_GetInstResourcePacks, Res_GetInstWorlds, Res_GetRPInfo, Res_GetRPInfoLocal, Res_InputMenu, Res_UploadModpack, Res_UploadRP, RP_Data, RPCache, SearchFilter, SelectPrismInstData, SlugMapData, UpdateProgress_InitData, World_Data } from "./interface";
 import { errors, Result } from "./errors";
 import express from "express";
 import toml from "toml";
@@ -867,13 +867,16 @@ export class ModPackInst extends Inst<ModPackInstData>{
             }
             await Promise.all(proms);
 
-            meta.lastUploaded = new Date().getTime();
-            // meta.lastDownloaded = new Date().getTime();
-            meta.lastModified = meta.lastUploaded;
-            // console.log("LAST UPLOADED",lastUploaded);
-            await this.save();
-
             console.log(`>> time [2 - ${files.length}]: `,performance.now()-start);
+
+            // UPLOAD FINAL/FINISH
+            let res_final = (await semit<Arg_FinishUploadRP,{update:number}>("finishUploadRP",{mpID:arg.mpID,rpID:arg.name})).unwrap();
+            if(!res_final) return errors.failedUploadRP.unwrap();
+
+            meta.lastUploaded = Date.now();
+            meta.lastModified = meta.lastUploaded;
+            meta.update = res_final.update; // just to be safe
+            await this.save();
 
             // w.webContents.send("updateProgress","main",completed,files.length,"Finished.");
 
@@ -890,6 +893,8 @@ export class ModPackInst extends Inst<ModPackInstData>{
                     }
                 ]
             });
+
+            getWindowStack().find(v=>v.title == "Edit Instance")?.webContents.send("updateSearch");
             
             await wait(500);
 
@@ -1806,4 +1811,26 @@ export async function unpublishModpack(mpID:string){
     if(w2) w2.reload();
 
     return new Result(true);
+}
+
+
+// get RP info
+export async function getRPInfo(iid:string,rpID:string): Promise<Res_GetRPInfoLocal|undefined>{    
+    let inst = await getModpackInst(iid);
+    if(!inst || !inst.meta) return errors.couldNotFindPack.unwrap();
+
+    let res = (await semit<Arg_GetRPInfo,Res_GetRPInfo>("getRPInfo",{mpID:inst.meta.meta.id,rpID})).unwrap();
+    if(!res) return;
+
+    let rp = inst.meta.resourcepacks.find(v=>v.rpID == rpID);
+
+    let res2:Res_GetRPInfoLocal = res;
+    if(rp) res2.local = {
+        update:rp.update,
+        lastDownloaded:rp.lastDownloaded,
+        lastUploaded:rp.lastUploaded,
+        lastUpdated:rp.lastModified
+    };
+
+    return res2;
 }
