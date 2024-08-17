@@ -251,7 +251,7 @@ class CMP_ResourcePackSimple extends MP_Flexbox{
     declare ops:CMP_RP_Ops;
     content = new MP_Div({className:"mod-row-content"});
 
-    load(): void {
+    async load() {
         super.load();
 
         let d = this.ops.data;
@@ -270,11 +270,26 @@ class CMP_ResourcePackSimple extends MP_Flexbox{
         }).addTo(this);
 
         let cont = this.content.addTo(this);
+        if(cont.e){
+            cont.e.style.justifyContent = "normal";
+            cont.e.style.alignItems = "center";
+        }
 
         let name = new MP_Text({
             text:d.name,
-            marginRight:"auto"
+            // marginRight:"auto"
         }).addTo(cont);
+
+        let flags = new MP_Div({className:"rp-flags"}).addTo(cont);
+
+        let info = await window.gAPI.getRPInfo(initData.d.iid,this.ops.data.name);
+        let needsUpdate = (info?.data?.update ?? -1) > (info?.local?.update ?? -1);
+        if(needsUpdate){
+            new MP_Div({
+                className:"rp-flag icon",
+                text:"notifications_active"
+            }).addTo(flags);
+        }
     }
 
     static async showData(data:RP_Data,aside:MP_Div){

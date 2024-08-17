@@ -76,3 +76,18 @@
 .l-needs-update{
     
 }
+.rp-flags{
+    margin-left:15px;
+}
+.rp-flags .icon{
+    font-size:14px;
+    font-variation-settings:'wght' 500;
+    color:var(--alert-col);
+    background-color:var(--alert-bg);
+    border-radius:50%;
+    min-width:20px;
+    height:20px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+}
