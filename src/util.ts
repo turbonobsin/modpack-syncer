@@ -3,6 +3,12 @@ import fs from "fs";
 import path from "path";
 import toml from "toml";
 
+let tmp = path.join;
+path.join = (...paths:any[])=>{
+    if(paths.includes(undefined)) return tmp("");
+    return tmp(...paths);
+};
+
 export let pathTo7zip = path.join(app.getAppPath(),"node_modules","7zip-bin","win",process.arch,"7za.exe");
 if(process.platform == "darwin"){
     if(process.arch == "arm64") pathTo7zip = path.join(app.getAppPath(),"node_modules","7zip-bin","mac","arm64","7za");

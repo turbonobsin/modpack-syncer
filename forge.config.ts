@@ -7,6 +7,20 @@ import { VitePlugin } from '@electron-forge/plugin-vite';
 import { FusesPlugin } from '@electron-forge/plugin-fuses';
 import { FuseV1Options, FuseVersion } from '@electron/fuses';
 
+module.exports = {
+	makers: [
+		{
+			name: '@electron-forge/maker-deb',
+			config: {
+		  		options: {
+					maintainer: 'claebcode',
+					homepage: 'https://claebcode.github.io'
+				}
+			}
+		}
+	]
+};
+
 const config: ForgeConfig = {
 	packagerConfig: {
 		asar: true,
