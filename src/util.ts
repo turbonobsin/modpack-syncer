@@ -5,6 +5,7 @@ import toml from "toml";
 
 let tmp = path.join;
 path.join = (...paths:any[])=>{
+    paths = paths.map(v=>v == undefined ? "" : v);
     if(paths.includes(undefined)) return tmp("");
     return tmp(...paths);
 };
