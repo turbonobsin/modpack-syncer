@@ -99,6 +99,20 @@ async function openModDropdown(w:BrowserWindow,iid:string,files:string[]){
                 
                 shell.showItemInFolder(path.join(prismPath,".minecraft","mods",files[files.length-1] ?? ""));
             }
+        },
+        {
+            label:"Delete",
+            click:async ()=>{
+                let prismPath = inst.getPrismInstPath();
+                if(!prismPath) return errors.failedToGetPrismInstPath.unwrap();
+                
+                for(const f of files){
+                    util_warn("REMOVE: "+f);
+                    await util_rm(path.join(prismPath,".minecraft","mods",f));
+                }
+
+                w.webContents.send("updateSearch");
+            }
         }
     ])
     // Menu.setApplicationMenu(menu);

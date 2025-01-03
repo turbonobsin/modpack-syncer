@@ -502,6 +502,7 @@ export async function preInit(){
             }
             
             let fres = (await semit<Arg_UploadWorldFile,boolean>("upload_world_file",{ // file res
+                // buf:new Uint8Array(buf.buffer),
                 buf,
                 mpID:inst.meta.meta.id,
                 path:sloc,
@@ -1994,6 +1995,10 @@ async function syncMods(w:BrowserWindow,iid:string,noMsg=false): Promise<Result<
             path:string;
         }[] = [];
 
+        console.log("DEBUG: Syncing mods...");
+        console.log("ignores: ",ignoreMods);
+        console.log("MODS: ",res.mods);
+
         // 
         for(const mod of res.mods.add){
             items.push({
@@ -2077,6 +2082,10 @@ async function syncMods(w:BrowserWindow,iid:string,noMsg=false): Promise<Result<
                     // console.log("remove: ",item.path);
 
                     let response = await util_rename(item.path,path.join(path.dirname(item.path),".deleted",item.name));
+                    if(!response){
+                        await util_mkdir(path.join(path.dirname(item.path),".deleted"));
+                        response = await util_rename(item.path,path.join(path.dirname(item.path),".deleted",item.name));
+                    }
                     // let response = await util_rm(item.path);
                     if(!response){
                         util_warn("Failed to remove file: "+item.name);
@@ -2683,11 +2692,26 @@ async function getInstMods(arg:Arg_GetInstMods): Promise<Result<Res_GetInstMods>
                 return;
             }
 
-            if(arg.query) if(!searchStringCompare(file.name,arg.query)){
-                resolve();
-                return;
-            }
             let cleanName = cleanModName(file.name);
+            let cacheData = await new LocalModInst(modsPath,arg.iid,cleanName).load();
+            
+            // if(arg.query) if(!searchStringCompare(file.name,arg.query) && cacheData.meta ? (
+            //     !searchStringCompare(cacheData.meta.name,arg.query)
+            //     // !searchStringCompare(cacheData.meta.description,arg.query)
+            // ) : true){
+            //     resolve();
+            //     return;
+            // }
+
+            if(arg.query){
+                if(!(
+                    searchStringCompare(file.name,arg.query) ||
+                    cacheData.meta?.name ? (searchStringCompare(cacheData.meta?.name,arg.query)) : false
+                )){
+                    resolve();
+                    return;
+                }
+            }
 
             let fRef = inst.meta.folders.find(v=>v.mods.includes(cleanName));
             let f:ModsFolder | undefined;
@@ -2713,7 +2737,6 @@ async function getInstMods(arg:Arg_GetInstMods): Promise<Result<Res_GetInstMods>
                 }
             }
             
-            let cacheData = await new LocalModInst(modsPath,arg.iid,cleanName).load();
             if(cacheData.meta){
                 let remoteCache:RemoteModData | undefined;
                 if(cacheData.meta.slug){
