@@ -97,11 +97,11 @@ export function util_readdirWithTypes(path:fs.PathLike,recursive=false){
         });
     });
 }
-export function util_readBinary(path:fs.PathOrFileDescriptor){
-    return new Promise<Buffer|undefined>(resolve=>{
+export function util_readBinary(path:fs.PathOrFileDescriptor):Promise<Uint8Array | undefined>{
+    return new Promise<Uint8Array|undefined>(resolve=>{
         fs.readFile(path,(err,data)=>{
             if(err) resolve(undefined);
-            resolve(data);
+            resolve(data as unknown as Uint8Array);
         });
     });
 }
@@ -164,7 +164,7 @@ export function util_writeJSON(path:fs.PathOrFileDescriptor,data:any){
 }
 export function util_writeBinary(path:fs.PathOrFileDescriptor,data:Buffer){
     return new Promise<boolean>(resolve=>{
-        fs.writeFile(path,data,(err)=>{
+        fs.writeFile(path,data as unknown as Uint8Array,(err)=>{
             if(err) resolve(false);
             else resolve(true);
         });

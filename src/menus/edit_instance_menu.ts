@@ -22,6 +22,7 @@ const tab_menu = new MP_TabbedMenu(
                 "Resource Packs",
                 "Screenshots",
                 "Worlds",
+                "Servers",
                 "Java Configuration",
                 "Settings"
             ][index];
@@ -353,7 +354,7 @@ class CMP_ResourcePackSimple extends MP_Flexbox{
             head.e!.style.height = "unset";
             header.addPart(
                 new MP_P({
-                    text:"Pack format: "+data.data.meta?.pack.pack_format ?? "(none found)",
+                    text:"Pack format: "+data.data.meta?.pack.pack_format || "(none found)",
                     className:"l-details"
                 })
             );
@@ -1143,6 +1144,64 @@ async function loadSection(index:number,menu:MP_TabbedMenu){
                 })
             );
         } break;
+        case 4:{
+            let search = new MP_SearchStructure<World_Data>({
+                listId:"_",
+                submitOnOpen:true,
+                onSelect:(data,item)=>{
+                    CMP_World.showData(data,menu.aside,search);
+                },
+                onNoSelected:()=>{
+                    menu.aside.clearParts();
+                },
+                onSubmit:async (t,e,q)=>{
+                    let res = await window.gAPI.getInstWorlds({iid:initData.d.iid,filter:{query:q}});
+                    console.log("WORLDS:",res);
+                    if(!res) return;
+
+                    for(const world of res.worlds){
+                        let p = new CMP_World({data:world}).addTo(search.list);
+                        let sel = search.registerSelItem(world,p.content.e);
+                        if(p.e) p.e.addEventListener("mouseup",e=>{
+                            if(!sel) return;
+                            if(e.button != 2) return;
+                            if(!sel.isSelected()) sel.toggle(e);
+                            window.gAPI.openDropdown("worldItem",initData.d.iid,world.wID);
+                        });
+                    }
+                },
+                getItemByID(s,id){
+                    return s.sel.items.find(v=>v.data.wID == id);
+                },
+                getItemUniqueID(item){
+                    return item.data.wID;
+                },
+                getScrollableElm(){
+                    return menu.main.e;
+                }
+            });
+            menu.main_body.addPart(search);
+            currentSearch = search;
+
+            if(0) search.mainOptions.addParts(
+                new MP_Button({
+                    label:"",
+                    className:"accent",
+                    icon:"add",
+                    onClick:(e,elm)=>{
+                        window.gAPI.openMenu("add_world_menu",{iid:initData.d.iid});
+                    }
+                }),
+                new MP_Button({
+                    label:"",
+                    icon:"more_vert",
+                    onClick:(e,elm)=>{
+                        // window.gAPI.genAllThePBR(initData.d.iid);
+                        window.gAPI.openDropdown("worldsAdditional",initData.d.iid);
+                    }
+                })
+            );
+        } break;
     }
 }
 
@@ -1398,6 +1457,9 @@ async function init(){
             // new MP_ActivityBarItem({ icon:"park" }),
             // new MP_ActivityBarItem({ icon:"psychiatry" }),
             // new MP_ActivityBarItem({ icon:"potted_plant" }),
+
+        // new MP_ActivityBarItem({ icon:"dns" }),
+        new MP_ActivityBarItem({ icon:"wifi" }),
 
         new MP_ActivityBarItem({ icon:"coffee" }),
         new MP_ActivityBarItem({ icon:"settings" }),

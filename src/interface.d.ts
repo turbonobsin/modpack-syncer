@@ -300,7 +300,7 @@ interface Res_GetInstMods{
 
 interface RP_MCMeta{
     pack:{
-        pack_format:number;
+        pack_format:number|undefined|null;
         description:string;
     }
 }
@@ -777,7 +777,7 @@ interface Arg_UploadWorldFile{
     wID:string;
     uid:string;
     uname:string;
-    buf:Uint8Array;
+    buf:Uint8Array|Buffer;
 }
 interface Arg_DownloadWorldFile{
     path:string;

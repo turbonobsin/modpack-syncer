@@ -2049,6 +2049,7 @@ async function syncMods(w:BrowserWindow,iid:string,noMsg=false): Promise<Result<
         }[] = [];
 
         console.log(">> STARTING UPDATE");
+        let time = performance.now();
         let proms:Promise<void>[] = [];
         for(let i = 0; i < items.length; i++){
             proms.push(new Promise<void>(async resolve=>{
@@ -2104,7 +2105,7 @@ async function syncMods(w:BrowserWindow,iid:string,noMsg=false): Promise<Result<
         }
         await Promise.all(proms);
 
-        console.log(">> FINISHED UPDATE");
+        console.log(">> FINISHED UPDATE",performance.now()-time);
 
         let sections:any[] = [];
         // sections.push({
