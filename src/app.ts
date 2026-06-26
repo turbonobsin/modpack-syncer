@@ -1961,7 +1961,7 @@ async function getModUpdatesData(iid:string):Promise<Result<{
 }
 async function syncMods(w:BrowserWindow,iid:string,noMsg=false): Promise<Result<Res_SyncMods|undefined>>{
     if(!sysInst.meta) return errors.noSys;
-    
+
     let _res = await getModUpdatesData(iid);
     if(!_res) return new Result(undefined);
     let _d = _res.unwrap();
@@ -1974,6 +1974,53 @@ async function syncMods(w:BrowserWindow,iid:string,noMsg=false): Promise<Result<
         });
         return new Result({upToDate:true});
     }
+    
+    // QUICK SYNC NEW (FROM MP SYNC 2)
+
+    // await new Promise<void>(resolve=>{
+    //     socket.emit("v2_getMods",{id:inst.meta?.meta.id ?? ''},async (data:{
+    //         data:{
+    //             mods:{
+    //                 filename:string;
+    //                 name:string;
+    //                 custom?:boolean;
+    //                 url:string;
+    //                 side:string;
+    //             }[]
+    //         }
+    //     })=>{
+    //         console.log("DATA:",data);
+    //         let mods = data.data.mods;
+
+    //         // await mkdir(p,{
+    //         //     baseDir:BaseDirectory.Download
+    //         // });
+    //         let start = performance.now();
+    //         let proms:Promise<void>[] = [];
+    //         for(const mod of mods){
+    //             proms.push(new Promise<void>(async resolve=>{
+    //                 let fileRes = await fetch(mod.url);
+    //                 if(!fileRes){
+    //                     resolve();
+    //                     util_warn("err: couldn't get file:",mod.filename,mod.url);
+    //                 }
+    //                 // let buf = await fileRes.bytes();
+    //                 let buf = await fileRes.arrayBuffer();
+    //                 await util_writeBinary(path.join(modsPath,mod.filename),new Uint8Array(buf));
+    //                 // invoke("test",{url:"http://bigjoeroy.no-ip.org:25565/mod?id=Jory%20Pack%205&name=modmenu-11.0.2.jar",name:"test_modmenu.jar"});
+    //                 // invoke("test",{url:mod.url,name:mod.filename});
+    //                 resolve();
+    //             }));
+    //         }
+    //         await Promise.all(proms);
+    //         console.log("DONE (quick sync)",performance.now()-start);
+
+    //         resolve();
+    //     });
+
+    // });
+
+    // //////
 
     // I'VE DISABLED THIS FOR NOW BC I'M NOT SURE WHY IT'S HERE AT THE MOMENT, HOPEFULLY DOESN'T BREAK ANYTHING
     // let deletedPath = path.join(modsPath,".deleted");
@@ -2068,16 +2115,24 @@ async function syncMods(w:BrowserWindow,iid:string,noMsg=false): Promise<Result<
                     url.searchParams.set("name",item.name);
                     let href = url.href;
                     
-                    let response = await fetch(href);
-                    if(!response.ok){
-                        util_warn("Failed to get file: "+item.name+" ~ "+response.statusText+" ~ "+response.status);
-                        console.log(href);
-                        fails.push(item);
+                    async function tryDownload(url:string){
+                        try{
+                            let response = await fetch(url);
+                            if(!response.ok){
+                                util_warn("Failed to get file: "+item.name+" ~ "+response.statusText+" ~ "+response.status);
+                                console.log(href);
+                                fails.push(item);
+                            }
+                            else{
+                                let buf = await response.arrayBuffer();
+                                await util_writeBinary(item.path,Buffer.from(buf));
+                            }
+                        }
+                        catch(e){
+                            util_warn("failed to fetch...",url);
+                        }
                     }
-                    else{
-                        let buf = await response.arrayBuffer();
-                        await util_writeBinary(item.path,Buffer.from(buf));
-                    }
+                    await tryDownload(href);
                 }
                 else{ // remove
                     // console.log("remove: ",item.path);
@@ -3811,7 +3866,7 @@ export async function alertBox(w:BrowserWindow,message:string,title="Error"){
 
 import { ETL_Generic, evtTimeline, parseCFGFile, pathTo7zip, searchStringCompare, util_cp, util_lstat, util_mkdir, util_note, util_note2, util_readBinary, util_readdir, util_readdirWithTypes, util_readJSON, util_readText, util_readTOML, util_rename, util_rm, util_utimes, util_warn, util_writeBinary, util_writeJSON, util_writeText, wait } from "./util";
 import { AddRP_InitData, Arg_AddInstance, Arg_AddModToFolder, Arg_ChangeFolderType, Arg_CheckModUpdates, Arg_CreateFolder, Arg_DownloadRP, Arg_DownloadRPFile, Arg_DownloadWorld, Arg_DownloadWorldFile, Arg_FinishUploadWorld, Arg_GetAllowedDirs, Arg_GetInstances, Arg_GetInstMods, Arg_GetInstResourcePacks, Arg_GetInstScreenshots, Arg_GetInstWorlds, Arg_GetPrismInstances, Arg_GetRPs, Arg_GetRPVersions, Arg_GetServerWorlds, Arg_GetWorldFiles, Arg_GetWorldInfo, Arg_IID, Arg_LaunchInst, Arg_PublishWorld, Arg_RemoveRP, Arg_SearchPacks, Arg_SyncMods, Arg_TakeWorldOwnership, Arg_ToggleWorldEnabled, Arg_UnpackRP, Arg_UnpublishWorld, Arg_UploadRP, Arg_UploadWorld, Arg_UploadWorldFile, ArgC_GetRPs, CurseForgeUpdate, Data_PrismInstancesMenu, FSTestData, FullModData, InputMenu_InitData, InstGroups, LocalModData, MMCPack, ModData, ModifiedFile, ModifiedFileData, ModIndex, ModInfo, ModrinthModData, ModrinthUpdate, ModsFolder, ModsFolderDef, PackMetaData, RemoteModData, Res_DownloadRP, Res_FinishUploadWorld, Res_GetInstMods, Res_GetInstResourcePacks, Res_GetInstScreenshots, Res_GetModIndexFiles, Res_GetModUpdates, Res_GetPrismInstances, Res_GetRPs, Res_GetRPVersions, Res_GetServerWorlds, Res_GetWorldFiles, Res_GetWorldInfo, Res_InputMenu, Res_SyncMods, RPCache, SArg_GetServerWorlds, SArg_PublishWorld, SArg_TakeWorldOwnership, ServerWorld, UpdateProgress_InitData } from "./interface";
-import { getConnectionStatus, getModUpdates, getPackMeta, getSocketId, searchPacks, searchPacksMeta, semit, updateSocketURL } from "./network";
+import { getConnectionStatus, getModUpdates, getPackMeta, getSocketId, searchPacks, searchPacksMeta, semit, socket, updateSocketURL } from "./network";
 import { getWindowStack, ListPrismInstReason, openCCMenu, openCCMenuCB, SearchPacksMenu, ViewInstanceMenu } from "./menu_api";
 import { addInstance, appPath, cleanModName, cleanModNameDisabled, dataPath, getMainAccount, getModFolderPath, getModpackInst, getModpackPath, getRPInfo, getWorlds, instCache, LocalModInst, ModPackInst, RemoteModInst, slugMap, sysInst, toggleWorldEnabled } from "./db";
 import { InstanceData } from "./db_types";
