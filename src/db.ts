@@ -13,6 +13,8 @@ import Seven from "node-7z";
 import axios from "axios";
 import { mainWindow } from "./main";
 import { i } from "vite/dist/node/types.d-aGj9QkWt";
+import fps from "fs/promises";
+import { syncOptionsDotTxt } from "./extras";
 
 // export let appPath = app.isPackaged ? path.join(process.resourcesPath,"..","data") : app.getAppPath();
 // export let appPath = app.isPackaged ? path.join(process.resourcesPath) : app.getAppPath();
@@ -1193,7 +1195,13 @@ JavaPath=${javaPath}`:""}
 
     refreshMainWindow();
 
-    if(arg.autoCreate) await checkForInstUpdates(inst.meta.iid,undefined,true);
+    if(arg.autoCreate){
+        // vvv - download options.txt when it's first downloaded
+        await syncOptionsDotTxt(inst.meta.iid,true);
+        
+        // vvv - check for updates right at the end to make sure
+        await checkForInstUpdates(inst.meta.iid,undefined,true);
+    }
 
     return new Result(inst);
 }
@@ -1623,18 +1631,35 @@ export async function openPublishModpackMenu(){
     });
 
     let resData = await evtTimeline.waitFor(evt);
-    if(!resData) return errors.failedToPublishModpack.unwrap();
+    if(!resData){
+        util_warn("-> there was no res data");
+        return errors.failedToPublishModpack.unwrap();
+    }
     let data = resData.data;
 
     // 
 
     let mmcPackFile = await util_readBinary(path.join(data2.loc,"mmc-pack.json")) ?? undefined;
     let mmcJson = await util_readJSON<MMCPack>(path.join(data2.loc,"mmc-pack.json"));
-    if(!mmcJson) return errors.failedToPublishModpack.unwrap();
+    if(!mmcJson){
+        util_warn("-> failed to read mmc-pack.json file");
+        return errors.failedToPublishModpack.unwrap();
+    }
 
     let mc = mmcJson.components.find(v=>v.cachedName == "Minecraft");
-    let loader = mmcJson.components.find(v=>["Forge","Fabric Loader"].includes(v.cachedName));
-    if(!mc || !loader) return errors.failedToPublishModpack.unwrap();
+    let loader = mmcJson.components.find(v=>["Forge","Fabric Loader","NeoForge","Quilt"].includes(v.cachedName)); // <-- not sure what the name for quilt is but these others should work
+    if(!mc || !loader){
+        util_warn("-> failed to get a component from mmcJson file");
+        console.log(mc,loader);
+        return errors.failedToPublishModpack.unwrap();
+    }
+
+    // vvv - make sure it's ".minecraft" and not "minecraft" or else it won't find folders/files inside
+    if(!await util_lstat(path.join(data2.loc,".minecraft")) && await util_lstat(path.join(data2.loc,"minecraft"))){
+        if(!await util_rename(path.join(data2.loc,"minecraft"),path.join(data2.loc,".minecraft"))){
+            util_warn("failed to move 'minecraft' to '.minecraft'");
+        }
+    }
     
     let arg:Arg_PublishModpack = {
         meta:{
@@ -1654,7 +1679,22 @@ export async function openPublishModpackMenu(){
     
     // 
 
-    return await publishModpack(arg);
+    const result = await publishModpack(arg);
+
+    if(result.ok && w && result.inst?.meta){
+        if((await dialog.showMessageBox(w,{
+            message:"Would you like to go ahead and upload your mod files to the published instance?",
+            buttons:[
+                "Cancel",
+                "Yes"
+            ]
+        })).response == 1){
+            // vvv - try to upload mods right after
+            await uploadModpack(result.inst.meta.iid);
+        }
+    }
+    
+    return result;
 }
 export function getJavaCodeNameFromVersion(version:string){
     let v = version.split(".");
@@ -1668,7 +1708,7 @@ export function getJavaCodeNameFromVersion(version:string){
 export async function publishModpack(arg:Arg_PublishModpack){
     let res = (await semit<Arg_PublishModpack,boolean>("publishModpack",arg)).unwrap();
     
-    await addInstance({
+    const inst = await addInstance({
         autoCreate:false,
         meta:arg.meta,
         linkName:arg.meta.id
@@ -1678,7 +1718,7 @@ export async function publishModpack(arg:Arg_PublishModpack){
         message:"Publish Modpack: "+res?"Success":"Failed"
     });
 
-    return res;
+    return {ok:res,inst:inst.unwrap()};
 }
 export async function uploadModpack(iid:string){
     if(!iid) return;
@@ -1771,6 +1811,8 @@ export async function uploadModpack(iid:string){
                 success.push(file);
                 completed++;
             }
+
+            w.webContents.send("updateProgress","main",completed,total,"Upload: "+file);
 
             resolve();
         }));

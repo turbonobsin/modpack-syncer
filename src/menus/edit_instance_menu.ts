@@ -1063,14 +1063,14 @@ async function loadSection(index:number,menu:MP_TabbedMenu){
                 img.setAttribute("path-name",ss.name);
                 
                 if(false) setTimeout(()=>{
-                    window.gAPI.getImage(ss.path).then(buf=>{
-                        let blob = new Blob([buf]);
-                        let url = URL.createObjectURL(blob);
-                        img.src = url;
-                        img.onload = ()=>{
-                            URL.revokeObjectURL(url);
-                        };
-                    });
+                    // window.gAPI.getImage(ss.path).then(buf=>{
+                    //     let blob = new Blob([buf]);
+                    //     let url = URL.createObjectURL(blob);
+                    //     img.src = url;
+                    //     img.onload = ()=>{
+                    //         URL.revokeObjectURL(url);
+                    //     };
+                    // });
                 },300+500*(Math.ceil(Math.random()*5)));
 
                 img.onload = ()=>{
@@ -1411,15 +1411,15 @@ async function _loadImage(e:HTMLImageElement,i:number){
     let j = i;
 
     if(false) window.gAPI.getImage(path).then(function(buf){
-        let blob = new Blob([buf]);
-        let url = URL.createObjectURL(blob);
-        e.src = url;
+        // let blob = new Blob([buf]);
+        // let url = URL.createObjectURL(blob);
+        // e.src = url;
         
-        e.onload = function(){
-            // URL.revokeObjectURL(url);
-            // if(j == 1) console.log("TIME:",performance.now()-startTime);
-            // console.log("TIME:",performance.now()-startTime);
-        };
+        // e.onload = function(){
+        //     // URL.revokeObjectURL(url);
+        //     // if(j == 1) console.log("TIME:",performance.now()-startTime);
+        //     // console.log("TIME:",performance.now()-startTime);
+        // };
     });
     else{
         // setTimeout(()=>{

@@ -17,10 +17,25 @@ export function getSocketId(){
 }
 
 export function updateSocketURL(){
-    let url = sysInst.meta?.serverURL;
-    if(!url) return;
+    let url0 = sysInst.meta?.serverURL;
+    if(!url0) return;
 
-    socket = io(url);
+    // 1. Get the current path (e.g., "/umm/" or "/mp/" or "/")
+    // let serverUrlOrigin = server_url.value.match(/^.+\:\/\/.+\//)[0];
+    let url = new URL(url0);
+    let currentPath = url.pathname;
+
+    // 2. Ensure it ends with a trailing slash if it isn't just root
+    if (!currentPath.endsWith('/')) {
+        currentPath += '/';
+    }
+
+    // 3. Append the required socket.io suffix
+    const dynamicSocketPath = currentPath + "socket.io/";
+    
+    socket = io(url.origin,{
+        path:dynamicSocketPath,
+    });
     // 
 
     socket.on("connect",()=>{
@@ -133,8 +148,10 @@ export async function searchPacksMeta(arg:Arg_SearchPacks){
     if(!res) return;
 
     for(const item of res.similar){
-        let url = new URL(sysInst.meta.serverURL);
-        url.pathname = "modpack_image";
+        let url = getServerURLWithNewPath(sysInst.meta.serverURL,{
+            pathname:"modpack_image"
+        });
+        // url.pathname += "modpack_image";
         url.searchParams.set("mpID",item.id);
         item.img = url.href;
 
@@ -147,6 +164,17 @@ export async function searchPacksMeta(arg:Arg_SearchPacks){
     }
 
     return res;
+}
+
+export function getServerURLWithNewPath(serverURL:string,ops:{
+    pathname?:string;
+}={}){
+    const url = new URL(serverURL.replaceAll("\\","/").replaceAll("//","/"));
+    if(!url.pathname.endsWith("/")) url.pathname += "/";
+    if(ops.pathname){
+        url.pathname += ops.pathname;
+    }
+    return url;
 }
 
 // sync

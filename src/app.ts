@@ -157,6 +157,17 @@ export async function preInit(){
         let inst = await getModpackInst(iid);
         if(!inst || !inst.meta) return;
 
+        // vvv - make sure it's ".minecraft" and not "minecraft" or else it won't find folders/files inside
+        // -- should hopefully fix itself when clicking edit
+        if(sysInst.meta?.prismRoot && inst.meta.linkName){
+            const prismInstRootPath = path.join(sysInst.meta.prismRoot,"instances",inst.meta.linkName);
+            if(!await util_lstat(path.join(prismInstRootPath,".minecraft")) && await util_lstat(path.join(prismInstRootPath,"minecraft"))){
+                if(!await util_rename(path.join(prismInstRootPath,"minecraft"),path.join(prismInstRootPath,".minecraft"))){
+                    util_warn("failed to move 'minecraft' to '.minecraft'");
+                }
+            }
+        }
+
         await openCCMenu("edit_instance_menu",{iid,mpID:inst.meta.meta.id});
     });
 
@@ -348,8 +359,9 @@ export async function preInit(){
 
         if(!inst.meta.meta.id) return errors.failedToGetPackLink.unwrap();
 
-        let url = new URL(sysInst.meta.serverURL.replaceAll("\\","/"));
-        url.pathname = "rp_image";
+        let url = getServerURLWithNewPath(sysInst.meta.serverURL,{
+            pathname:"rp_image"
+        });
         url.searchParams.set("mpID",inst.meta.meta.id);
         url.searchParams.set("rpID",rpID);
 
@@ -590,8 +602,9 @@ export async function preInit(){
 
         if(!inst.meta.meta.id) return errors.failedToGetPackLink.unwrap();
 
-        let url = new URL(sysInst.meta.serverURL.replaceAll("\\","/"));
-        url.pathname = "world_image";
+        let url = getServerURLWithNewPath(sysInst.meta.serverURL,{
+            pathname:"world_image"
+        });
         url.searchParams.set("mpID",inst.meta.meta.id);
         url.searchParams.set("wID",wID);
 
@@ -1837,6 +1850,9 @@ export async function changeServerURL(url?:string){
     
     if(url == undefined) return false;
 
+    url = url.replaceAll("\\","/").replace(/\/+/g,"/");
+    if(url.endsWith("/")) url = url.substring(0,url.length-1);
+
     sysInst.meta.serverURL = url;
     await sysInst.save();
     updateSocketURL();
@@ -2110,7 +2126,9 @@ async function syncMods(w:BrowserWindow,iid:string,noMsg=false): Promise<Result<
                 if(item.action == ItemAction.add){ // add
                     // console.log("add: ",item.path);
 
-                    let url = new URL((sysInst.meta.serverURL+"/"+item.ep).replaceAll("\\","/").replaceAll("//","/"));
+                    let url = getServerURLWithNewPath(sysInst.meta.serverURL,{
+                        pathname:item.ep
+                    });
                     url.searchParams.set("id",inst!.meta!.meta.id);
                     url.searchParams.set("name",item.name);
                     let href = url.href;
@@ -3866,7 +3884,7 @@ export async function alertBox(w:BrowserWindow,message:string,title="Error"){
 
 import { ETL_Generic, evtTimeline, parseCFGFile, pathTo7zip, searchStringCompare, util_cp, util_lstat, util_mkdir, util_note, util_note2, util_readBinary, util_readdir, util_readdirWithTypes, util_readJSON, util_readText, util_readTOML, util_rename, util_rm, util_utimes, util_warn, util_writeBinary, util_writeJSON, util_writeText, wait } from "./util";
 import { AddRP_InitData, Arg_AddInstance, Arg_AddModToFolder, Arg_ChangeFolderType, Arg_CheckModUpdates, Arg_CreateFolder, Arg_DownloadRP, Arg_DownloadRPFile, Arg_DownloadWorld, Arg_DownloadWorldFile, Arg_FinishUploadWorld, Arg_GetAllowedDirs, Arg_GetInstances, Arg_GetInstMods, Arg_GetInstResourcePacks, Arg_GetInstScreenshots, Arg_GetInstWorlds, Arg_GetPrismInstances, Arg_GetRPs, Arg_GetRPVersions, Arg_GetServerWorlds, Arg_GetWorldFiles, Arg_GetWorldInfo, Arg_IID, Arg_LaunchInst, Arg_PublishWorld, Arg_RemoveRP, Arg_SearchPacks, Arg_SyncMods, Arg_TakeWorldOwnership, Arg_ToggleWorldEnabled, Arg_UnpackRP, Arg_UnpublishWorld, Arg_UploadRP, Arg_UploadWorld, Arg_UploadWorldFile, ArgC_GetRPs, CurseForgeUpdate, Data_PrismInstancesMenu, FSTestData, FullModData, InputMenu_InitData, InstGroups, LocalModData, MMCPack, ModData, ModifiedFile, ModifiedFileData, ModIndex, ModInfo, ModrinthModData, ModrinthUpdate, ModsFolder, ModsFolderDef, PackMetaData, RemoteModData, Res_DownloadRP, Res_FinishUploadWorld, Res_GetInstMods, Res_GetInstResourcePacks, Res_GetInstScreenshots, Res_GetModIndexFiles, Res_GetModUpdates, Res_GetPrismInstances, Res_GetRPs, Res_GetRPVersions, Res_GetServerWorlds, Res_GetWorldFiles, Res_GetWorldInfo, Res_InputMenu, Res_SyncMods, RPCache, SArg_GetServerWorlds, SArg_PublishWorld, SArg_TakeWorldOwnership, ServerWorld, UpdateProgress_InitData } from "./interface";
-import { getConnectionStatus, getModUpdates, getPackMeta, getSocketId, searchPacks, searchPacksMeta, semit, socket, updateSocketURL } from "./network";
+import { getConnectionStatus, getModUpdates, getPackMeta, getServerURLWithNewPath, getSocketId, searchPacks, searchPacksMeta, semit, socket, updateSocketURL } from "./network";
 import { getWindowStack, ListPrismInstReason, openCCMenu, openCCMenuCB, SearchPacksMenu, ViewInstanceMenu } from "./menu_api";
 import { addInstance, appPath, cleanModName, cleanModNameDisabled, dataPath, getMainAccount, getModFolderPath, getModpackInst, getModpackPath, getRPInfo, getWorlds, instCache, LocalModInst, ModPackInst, RemoteModInst, slugMap, sysInst, toggleWorldEnabled } from "./db";
 import { InstanceData } from "./db_types";

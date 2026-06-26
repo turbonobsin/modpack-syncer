@@ -8,6 +8,7 @@ import { checkForModUpdates, downloadRP, downloadWorld, genAllThePBR, getInstMod
 import { openCCMenu } from "./menu_api";
 import { Arg_FinishUploadWorld, Arg_UnpublishRP, IMO_Combobox, IMO_Input, IMO_MultiSelect, InputMenu_InitData, ModsFolderDef, Res_InputMenu, UpdateProgress_InitData } from "./interface";
 import { semit } from "./network";
+import { syncKeybinds, syncOptionsDotTxt, syncShaders } from "./extras";
 
 // const folderIcon = nativeImage.createFromPath(path.join(appPath,"icons","folder.svg"));
 const folderIcon = path.join(appPath,"icons","folder.png");
@@ -258,7 +259,7 @@ async function openEditModsAdditional(_w:BrowserWindow,iid:string){
             }
         },
         {
-            label:"Get Full Mod Info",
+            label:"Fetch Mod Icons",
             click:async ()=>{
                 if(!inst.meta) return;
                 let w = await openCCMenu<UpdateProgress_InitData>("update_progress_menu",{iid:inst.meta.iid});
@@ -342,6 +343,33 @@ async function openEditModsAdditional(_w:BrowserWindow,iid:string){
 export const allDropdowns = {
     modItem:openModDropdown,
     editModsAdditional:openEditModsAdditional,
+    instApplyOptions:async (_w:BrowserWindow,iid:string)=>{
+        let inst = await getModpackInst(iid);
+        if(!inst || !inst.meta) return;
+
+        let menu = Menu.buildFromTemplate([
+            {
+                label:"Sync Keybinds",
+                click:async ()=>{
+                    syncKeybinds(iid);
+                }
+            },
+            {
+                label:"Sync Shaders",
+                click:async ()=>{
+                    syncShaders(iid);
+                }
+            },
+            {
+                label:"Sync Settings",
+                click:async ()=>{
+                    syncOptionsDotTxt(iid);
+                }
+            }
+        ]);
+
+        menu.popup({window:_w});
+    },
     modFolder:async (_w:BrowserWindow,iid:string,folderName:string)=>{
         let inst = await getModpackInst(iid);
         if(!inst || !inst.meta) return;
