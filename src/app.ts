@@ -7,6 +7,7 @@ import Seven, { extract } from "node-7z";
 import sevenBin from "7zip-bin";
 import toml from "toml";
 import { Curseforge } from "node-curseforge";
+import fsp from "fs/promises";
 
 const _cf = new Curseforge("$2a$10$/vPH6A3TRcGR9ahXyWmjo.p1lcpWAYQERThrNAT6Jrl/pT4G4qh.C");
 const cf_mc = _cf.get_game("minecraft");
@@ -648,6 +649,124 @@ export async function checkForInstUpdates(iid:string,ev?:Electron.IpcMainInvokeE
     if(!res) return;
 
     console.log("VERSIONS:",res.versions);
+
+    // correct RAM if it was too high ... ?
+
+
+    // get server pack info
+    const prismInstPath = inst.getPrismInstPath();
+    const meta = (await getPackMeta(inst.meta.meta.id)).data;
+    if(meta && prismInstPath){
+        const dotMinecraftPath = path.join(prismInstPath,".minecraft");
+        // console.log("got meta info",meta); // DEBUG
+
+        // sync mod loader version
+
+        try{
+            await fsp.writeFile(
+                path.join(prismInstPath,"mmc-pack.json"),
+                meta.mmcPackFile
+            );
+        }
+        catch(e){
+            util_warn("failed to write mmc-pack.json file");
+        }
+
+        const extras = await getExtrasJSON(inst);
+
+        if(extras){
+
+            // sync config
+            
+            if(extras.config){
+                for(const item of extras.config){
+                    if(item.ignore) continue;
+                    if(!item.path) continue;
+                    if(item.path.startsWith("/")) continue;
+                    if(item.path.includes("..")) continue;
+                    
+                    if(!item.alwaysReplace){
+                        const exists = await util_lstat(path.join(dotMinecraftPath,item.path));
+                        if(exists) continue; // if it already exists then skip...
+                    }
+
+                    try{
+                        const url = getExtrasURL(inst,path.join("config",item.path));
+                    
+                        if(url){
+                            const res = await fetch(url);
+                            const text = await res.text();
+                            if(res.ok && text != undefined){
+                                await fsp.mkdir(path.dirname(path.join(dotMinecraftPath,item.path)),{recursive:true});
+                                await fsp.writeFile(path.join(dotMinecraftPath,item.path),text,"utf8");
+                            }
+                            else{
+                                throw "failed to to read text: "+res.status+" - "+text;
+                            }
+                        }
+                        else{
+                            util_warn("failed to get extras url for config item sync",JSON.stringify(item,undefined,4));
+                        }
+                    }
+                    catch(e){
+                        util_warn("failed to sync config item: ",`${e}`);
+                    }
+                    
+                }
+            }
+            
+
+            // sync specific DH config
+
+            if(extras.dh){
+
+                // max chunk dist: "lodChunkRenderDistanceRadius"
+
+                try{
+                    const dhConfigPath = path.join(dotMinecraftPath,"config","DistantHorizons.toml");
+                
+                    let dhConfig = await fsp.readFile(dhConfigPath,{encoding:"utf8"});
+
+                    if(dhConfig){
+
+                        let changed = false;
+
+                        if(extras.dh.chunks != undefined){
+                            const existing = dhConfig.match(/lodChunkRenderDistanceRadius = (?<dist>\d+)/);
+                        
+                            if(!existing || !existing[0] || !existing.groups?.dist) throw "wasn't a proper existing config for lod chunk render distance radius";
+
+                            // console.log("DH EXISTING",existing);
+
+                            const newLine = existing[0].replace(existing.groups.dist,extras.dh.chunks.toString());
+
+                            console.log("DH chunk dist replace -> ",[existing[0],newLine]);
+
+                            dhConfig = dhConfig.replace(existing[0],newLine); // <-- replace the old line with the new one that contains the new chunk distance
+
+                            changed = true;
+                        }
+
+                        if(changed){
+                            await fsp.writeFile(dhConfigPath,dhConfig,{encoding:"utf8"});
+                        }
+                        
+                    }
+                }
+                catch(e){
+                    util_warn("failed to sync DH config",`${e}`);
+                }
+                
+            }
+
+            // sync shaders
+
+            await syncShaders(inst.meta.iid,true);
+
+        }
+
+    }
+    else util_warn("failed to get pack meta or prism inst path");
 
     // sync mods
     let res1 = (await syncMods(window,iid,true)).unwrap();
@@ -2133,24 +2252,35 @@ async function syncMods(w:BrowserWindow,iid:string,noMsg=false): Promise<Result<
                     url.searchParams.set("name",item.name);
                     let href = url.href;
                     
-                    async function tryDownload(url:string){
+                    const maxTries = 3;
+                    
+                    async function tryDownload(url:string,isLast=false){
                         try{
                             let response = await fetch(url);
                             if(!response.ok){
                                 util_warn("Failed to get file: "+item.name+" ~ "+response.statusText+" ~ "+response.status);
                                 console.log(href);
-                                fails.push(item);
+                                if(isLast) fails.push(item);
+                                return false;
                             }
                             else{
                                 let buf = await response.arrayBuffer();
                                 await util_writeBinary(item.path,Buffer.from(buf));
+                                return true;
                             }
                         }
                         catch(e){
                             util_warn("failed to fetch...",url);
+                            if(isLast) fails.push(item);
+                            return false;
                         }
                     }
-                    await tryDownload(href);
+                    
+                    for(let i2 = 0; i2 < maxTries; i2++){
+                        if(await tryDownload(href,i2 == maxTries-1) == true) break;
+
+                        await wait(5000); // <-- wait 5 seconds to try again
+                    }
                 }
                 else{ // remove
                     // console.log("remove: ",item.path);
@@ -3897,6 +4027,7 @@ import { Dirent } from "fs";
 import axios from "axios";
 import { toggleModEnabled, allDropdowns } from "./dropdowns";
 import { text } from "stream/consumers";
+import { getExtrasJSON, getExtrasURL, syncShaders } from "./extras";
 
 async function fsTest(customPath?:string): Promise<FSTestData|undefined>{
     let instancePath:string;

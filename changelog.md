@@ -32,3 +32,14 @@
 - fixed uploading mods to published modpack's progress bar didn't update during the process
 - when publishing a modpack and it succeeds, added an optional message dialog box that comes up and asks if you'd like to go ahead and upload the mods too then (so you don't have to go straight to Edit->Mods->MoreOptions->Upload)
 - probably some other little things too
+
+# 7/25/26 -- 0.32.4
+todo:
+- auto add custom servers -- doesn't seem to be possible for some reason, copying over the servers.dat file doesn't work, and opening the .dat seems too hard for right now
+- set RAM amount -- added but prism seems to override it every time somehow
+
+done:
+- want to add some specific sync configs -- *done*
+- want to add specific distant horizons distance one to force a specific distance (64 chunks) -- *done*
+- be able to update mod loader version -- *done*
+- fix downloading mods silently fail (hopefully fixed now, added delay with 3 times auto retry)

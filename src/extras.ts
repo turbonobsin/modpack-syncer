@@ -1,12 +1,13 @@
 import { getModpackInst, ModPackInst, sysInst } from "./db";
 import { errors } from "./errors";
-import { UpdateProgress_InitData } from "./interface";
+import { InputMenu_InitData, Res_InputMenu, UpdateProgress_InitData } from "./interface";
 import { openCCMenu } from "./menu_api";
-import { getServerURLWithNewPath } from "./network";
+import { getPackMeta, getServerURLWithNewPath } from "./network";
 import path from "path";
-import { util_mkdir, util_note, util_readText, util_warn, util_writeBinary, util_writeText, wait } from "./util";
+import { ETL_Generic, evtTimeline, parseCFGFile, util_mkdir, util_note, util_note2, util_readText, util_warn, util_writeBinary, util_writeJSON, util_writeText, wait } from "./util";
 import { dialog } from "electron";
 import { mainWindow } from "./main";
+import os from "os";
 
 export type ExtrasJson = {
     shaderpacks?:{
@@ -15,6 +16,19 @@ export type ExtrasJson = {
          */
         file:string;
     }[];
+
+    /**
+     * Paths to config files to sync
+     */
+    config?:{
+        path:string;
+        alwaysReplace?:boolean;
+        ignore?:boolean;
+    }[];
+
+    dh?:{
+        chunks?:number;
+    };
 };
 
 export async function syncKeybinds(iid:string){
@@ -85,7 +99,7 @@ function getKeysFromOptionsFile(file:string){
     return keys;
 }
 
-export async function syncShaders(iid:string){
+export async function syncShaders(iid:string,silent=false){
     const data = await setupExtras(iid);
     if(!data) return;
     
@@ -109,10 +123,12 @@ export async function syncShaders(iid:string){
 
         await util_mkdir(path.join(data.minecraftLoc,"shaderpacks"),true);
 
-        w = await openCCMenu<UpdateProgress_InitData>("update_progress_menu",{iid});
-        if(!w) return errors.failedNewWindow.unwrap();
+        if(!silent){
+            w = await openCCMenu<UpdateProgress_InitData>("update_progress_menu",{iid});
+            if(!w) return errors.failedNewWindow.unwrap();
+        }
 
-        w.webContents.send("updateProgress","main",0,1,"Initializing mod upload...");
+        w?.webContents.send("updateProgress","main",0,1,"Initializing mod upload...");
 
         let total = extras.shaderpacks.length;
         let completed = 0;
@@ -202,7 +218,7 @@ export async function syncShaders(iid:string){
         await Promise.all(proms);
         // 
 
-        w.webContents.send("updateProgress","main",total,total,"Finished.",{
+        w?.webContents.send("updateProgress","main",total,total,"Finished.",{
             sections:[
                 {
                     header:`Failed: (${failed.length})`,
@@ -217,19 +233,29 @@ export async function syncShaders(iid:string){
 
         if(failed.length == 0){
             await wait(1000);
-            w.close();
+            w?.close();
         }
     }
     catch(e:any){
         w?.close();
-        dialog.showErrorBox("Failed to Sync Shaderpacks",`${e}`);
+        if(!silent) dialog.showErrorBox("Failed to Sync Shaderpacks",`${e}`);
         return;
     }
 }
 
-function getExtrasURL(inst:ModPackInst,path:string){
+export function correctRAM(RAM:number){
+    const osRAM = os.totalmem() / 1024;
+
+    if(osRAM < 8200) RAM = 4096;
+
+    return RAM;
+}
+
+export function getExtrasURL(inst:ModPackInst,path:string){
     if(!sysInst.meta) return;
     if(!inst.meta) return;
+
+    path = path.replaceAll("\\","/");
     
     let url = getServerURLWithNewPath(sysInst.meta.serverURL,{
         pathname:"modindex"
@@ -240,6 +266,23 @@ function getExtrasURL(inst:ModPackInst,path:string){
     return url;
 }
 
+export async function getExtrasJSON(inst:ModPackInst){
+    const url = getExtrasURL(inst,"extras.json");
+    if(!url) return;
+
+    const res = await fetch(url,{
+        method:"GET"
+    });
+
+    return await res.json() as ExtrasJson;
+}
+
+export async function getExtrasFile(inst:ModPackInst,path:string){
+    const url = getExtrasURL(inst,path);
+    if(!url) return;
+    return await (await fetch(url,{method:"GET"})).text();
+}
+
 async function setupExtras(iid:string){
     if(!iid) return;
     if(!sysInst || !sysInst.meta) return;
@@ -248,7 +291,7 @@ async function setupExtras(iid:string){
     if(!inst || !inst.meta) return;
     
     let prismPath = inst.getPrismInstPath();
-    if(!prismPath) return
+    if(!prismPath) return;
 
     // let w = await openCCMenu<UpdateProgress_InitData>("update_progress_menu",{iid});
     // if(!w) return errors.failedNewWindow.unwrap();
@@ -263,6 +306,96 @@ async function setupExtras(iid:string){
         prismPath,
         minecraftLoc
     };
+}
+
+export async function setRAM(iid:string){
+    const data = await setupExtras(iid);
+    if(!data) return;
+    if(!data.inst.meta?.meta) return;
+
+    // const cfg = await getExtrasFile(data.inst,"");
+    // const meta = (await getPackMeta(data.inst.meta.meta.id))?.data;
+    // if(!meta) return;
+
+    const instPath = data.inst.getPrismInstPath();
+    if(!instPath) return;
+
+    let text = await util_readText(path.join(instPath,"instance.cfg"));
+    if(!text) return;
+
+    let cfg = parseCFGFile(text);
+    if(!cfg) return;
+
+    // `OverrideMemory=true
+    // MaxMemAlloc=${correctRAM(meta.RAM)}
+    
+    const existingOverrideMemory = cfg.getValue("OverrideMemory");
+    const maxMemAlloc = cfg.getValue("MaxMemAlloc");
+
+    // const newVal = prompt(`
+    //     ${existingOverrideMemory != "true" ? `You currently don't have a custom RAM amount set.` : `You currently have the max RAM usage set to ${maxMemAlloc}.`}
+
+    //     This instance recommends using: ${data.inst.meta.meta.RAM}
+
+    //     How much RAM would you like to give this instance?
+    // `,maxMemAlloc ?? data.inst.meta.meta.RAM?.toString());
+
+    // 
+
+    let evt = evtTimeline.subEvt(new ETL_Generic<Res_InputMenu|undefined>("input_setRAM"));
+    let finished = false;
+
+    let w = await openCCMenu<InputMenu_InitData>("input_menu",{
+        cmd:"triggerEvt",args:[evt.getId()],
+        title:"Set Max RAM Usage",
+        height:500,
+        sections:[
+            {
+                options:[
+                    {
+                        type:"title",
+                        title:"Set Max RAM Usage",
+                        desc:`${existingOverrideMemory != "true" ? `You currently don't have a custom RAM amount set.` : `You currently have the max RAM usage set to ${maxMemAlloc}.`}
+${data.inst.meta.meta.RAM ? `\nThis instance recommends using: ${data.inst.meta.meta.RAM}\n` : ``}
+How much RAM would you like to give this instance?
+4096 is usually a good amount for most packs.`
+                    }
+                ]
+            },
+            {
+                options:[
+                    {
+                        type:"input",
+                        id:"ram",
+                        label:"RAM (KB)",
+                        inputType:"number",
+                        placeholder:"4096",
+                        value:maxMemAlloc ?? data.inst.meta.meta.RAM?.toString()
+                    },
+                ]
+            }
+        ]
+    });
+    if(w) w.addListener("close",e=>{
+        if(finished) return;
+        if(!evt._end) return;
+        evt._end(undefined);
+    });
+
+    let resData = await evtTimeline.waitFor(evt);
+    if(!resData) return;
+
+    // 
+
+    const newVal = resData.data.ram;
+    if(!newVal) return;
+
+    cfg.setValue("OverrideMemory","true");
+    cfg.setValue("MaxMemAlloc",newVal);
+
+    await util_writeText(path.join(instPath,"instance.cfg"),cfg.toText());
+
+    util_note2("saved new ram usage amount",newVal);
 }
 
 export async function syncOptionsDotTxt(iid:string,silent=false){

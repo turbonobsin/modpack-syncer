@@ -8,7 +8,7 @@ import { checkForModUpdates, downloadRP, downloadWorld, genAllThePBR, getInstMod
 import { openCCMenu } from "./menu_api";
 import { Arg_FinishUploadWorld, Arg_UnpublishRP, IMO_Combobox, IMO_Input, IMO_MultiSelect, InputMenu_InitData, ModsFolderDef, Res_InputMenu, UpdateProgress_InitData } from "./interface";
 import { semit } from "./network";
-import { syncKeybinds, syncOptionsDotTxt, syncShaders } from "./extras";
+import { setRAM, syncKeybinds, syncOptionsDotTxt, syncShaders } from "./extras";
 
 // const folderIcon = nativeImage.createFromPath(path.join(appPath,"icons","folder.svg"));
 const folderIcon = path.join(appPath,"icons","folder.png");
@@ -365,7 +365,13 @@ export const allDropdowns = {
                 click:async ()=>{
                     syncOptionsDotTxt(iid);
                 }
-            }
+            },
+            // { // vvv - prism seems to always override it
+            //     label:"Set Max RAM Usage",
+            //     click:async ()=>{
+            //         setRAM(iid);
+            //     }
+            // }
         ]);
 
         menu.popup({window:_w});

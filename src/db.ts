@@ -14,7 +14,7 @@ import axios from "axios";
 import { mainWindow } from "./main";
 import { i } from "vite/dist/node/types.d-aGj9QkWt";
 import fps from "fs/promises";
-import { syncOptionsDotTxt } from "./extras";
+import { correctRAM, syncOptionsDotTxt } from "./extras";
 
 // export let appPath = app.isPackaged ? path.join(process.resourcesPath,"..","data") : app.getAppPath();
 // export let appPath = app.isPackaged ? path.join(process.resourcesPath) : app.getAppPath();
@@ -1164,7 +1164,7 @@ iconKey=${iid}
 name=${meta.name}
 ${meta.RAM ?
 `OverrideMemory=true
-MaxMemAlloc=${meta.RAM}
+MaxMemAlloc=${correctRAM(meta.RAM)}
 MinMemAlloc=512`:""}${meta.javaCodeName ?
 `OverrideJavaLocation=true
 JavaPath=${javaPath}`:""}
