@@ -653,6 +653,10 @@ export async function checkForInstUpdates(iid:string,ev?:Electron.IpcMainInvokeE
     // correct RAM if it was too high ... ?
 
 
+    // 
+
+    let runAfter = [] as Promise<any>[];
+
     // get server pack info
     const prismInstPath = inst.getPrismInstPath();
     const meta = (await getPackMeta(inst.meta.meta.id)).data;
@@ -660,6 +664,26 @@ export async function checkForInstUpdates(iid:string,ev?:Electron.IpcMainInvokeE
         const dotMinecraftPath = path.join(prismInstPath,".minecraft");
         // console.log("got meta info",meta); // DEBUG
 
+        // update meta data from remote meta data that might be updated -- actually let's just keep it how it is for now
+
+        // inst.meta.meta = meta;
+        // await inst.save(); // <-- save meta
+
+        if(inst.meta.meta.desc != meta.desc){
+            inst.meta.meta.desc = meta.desc;
+            await inst.save();
+        }
+
+        // update icon maybe
+        // if(meta.img){
+        //     let img = await (await (await fetch(meta.img)).blob()).arrayBuffer();
+        //     if(img){
+        //         await util_writeBinary(path.join(instPath,".minecraft","icon.png"),Buffer.from(img));
+        //         await util_writeBinary(path.join(sysInst.meta.prismRoot,"icons",iid+".png"),Buffer.from(img));
+        //     }
+        // }
+
+        
         // sync mod loader version
 
         try{
@@ -761,7 +785,7 @@ export async function checkForInstUpdates(iid:string,ev?:Electron.IpcMainInvokeE
 
             // sync shaders
 
-            await syncShaders(inst.meta.iid,true);
+            runAfter.push(syncShaders(inst.meta.iid,true));
 
         }
 
@@ -807,6 +831,15 @@ export async function checkForInstUpdates(iid:string,ev?:Electron.IpcMainInvokeE
                 if(!res) return;
             }
         }
+    }
+
+    try{
+        for(const item of runAfter){
+            await item;
+        }
+    }
+    catch(e){
+        util_warn("something went wrong in runAfter",`${e}`);
     }
 
     // finish

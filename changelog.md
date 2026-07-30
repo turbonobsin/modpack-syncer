@@ -43,3 +43,9 @@ done:
 - want to add specific distant horizons distance one to force a specific distance (64 chunks) -- *done*
 - be able to update mod loader version -- *done*
 - fix downloading mods silently fail (hopefully fixed now, added delay with 3 times auto retry)
+
+# 7/29/26 -- 0.32.5
+- fixed shader packs being able to download on initial pack download
+- added modpack download screen to sort based on name, and if a date property is on the pack meta.json then sort by that with the newest first, otherwise alphabetical order
+- added ability to update meta data of pack from remote meta data (like pack name) -- (disabled for now)
+    - added desc to update at least

@@ -22,6 +22,11 @@ interface PackMetaData{
     version:string;
     img:string;
 
+    /**
+     * Date of when the pack was published, for sorting
+     */
+    date?:string;
+
     publisherUID?:string;
     publisherName?:string;
 

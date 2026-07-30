@@ -190,6 +190,16 @@ async function initPage(){
                 uname:"",
             });
             if(!res) return;
+
+            res.similar.sort((a,b)=>{
+                let w1 = (a.date ? new Date(a.date).getTime() : 0);
+                let w2 = (b.date ? new Date(b.date).getTime() : 0);
+
+                if(w1 != w2) return w2 - w1; // greater first
+
+                return a.name.localeCompare(b.name); // lesser first
+            });
+            
             console.log("RES:",res);
             for(const m of res.similar){
                 let p = search.list.addPart(
